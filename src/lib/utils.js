@@ -128,26 +128,31 @@ export async function sendTeamsNotification(webhookUrl, title, message) {
 }
 
 export function parseSIMCsv(text, Papa) {
-  // CSV tem 2 linhas de cabeçalho — pula a primeira (grupos)
-  const lines = text.split('\n')
-  const dataWithoutFirstRow = lines.slice(1).join('\n')
+  // Remove BOM se existir
+  const clean = text.replace(/^\uFEFF/, '')
   
-  const result = Papa.parse(dataWithoutFirstRow, { 
+  // CSV tem 2 linhas de cabeçalho — pula a primeira (grupos)
+  const lines = clean.split(/\r?\n/)
+  const dataText = lines.slice(1).join('\n')
+  
+  const result = Papa.parse(dataText, { 
     header: true, 
     skipEmptyLines: true, 
-    delimiter: ';',
-    encoding: 'utf-8'
+    delimiter: ';'
   })
+
+  console.log('CSV rows parsed:', result.data.length)
+  console.log('First row keys:', Object.keys(result.data[0] || {}))
 
   const map = {}
   result.data.forEach(r => {
     const name = (r['Planta/Obra'] || '').trim()
     if (!name) return
 
-    const nInterno = (r['Nº interno'] || r['N° Interno'] || r['Nº Interno'] || '').trim()
+    const nInterno = (r['Nº interno'] || r['N° Interno'] || r['Nº Interno'] || r['N interno'] || '').trim()
     const state    = (r['Estado (Planta/Obra)'] || '').trim()
     const city     = (r['Município (Planta/Obra)'] || '').trim()
-    const familia  = (r['Família'] || '').trim()
+    const familia  = (r['Família'] || r['Familia'] || '').trim()
 
     if (!map[name]) map[name] = { name, state, city, segment:'', families:new Set(), machines:0, nInternos:new Set() }
     map[name].machines++
@@ -157,7 +162,10 @@ export function parseSIMCsv(text, Papa) {
     if (!map[name].city  && city)  map[name].city  = city
   })
 
-  return Object.values(map)
+  const clients = Object.values(map)
     .map(c => ({ ...c, families:[...c.families].slice(0,5), nInternos:[...c.nInternos].slice(0,10) }))
     .sort((a,b) => b.machines - a.machines)
+
+  console.log('Clients parsed:', clients.length)
+  return clients
 }
