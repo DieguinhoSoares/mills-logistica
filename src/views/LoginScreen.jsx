@@ -3,15 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { T, FONT, FILIAIS, IS, LS } from '../lib/constants'
 
 function MillsLogoFull() {
-  return (
-    <svg height="52" viewBox="0 0 180 52" fill="none">
-      {/* texto mills em laranja sem fundo */}
-      <text x="0" y="44" fontFamily="Nunito, Arial Rounded MT Bold, sans-serif"
-        fontWeight="900" fontSize="48" fill="#F37021" letterSpacing="-2">mills</text>
-      {/* ponto quadrado acima do i */}
-      <rect x="108" y="4" width="10" height="10" rx="2" fill="#F37021"/>
-    </svg>
-  )
+  return <img src="/mills-logistica/mills-logo.png" alt="mills" height={52} style={{ display:'block' }}/>
 }
 
 export function LoginScreen() {
