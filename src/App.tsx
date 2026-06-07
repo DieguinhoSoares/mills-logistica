@@ -1,16 +1,17 @@
-import { AuthProvider } from './contexts/AuthContext'
-import { LoginScreen } from './views/LoginScreen'
-import { FrotasView } from './views/FrotasView'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { LoginScreen }     from './views/LoginScreen'
+import { FrotasView }      from './views/FrotasView'
+import { MasterView }      from './views/MasterView'
 import { SolicitanteView } from './views/SolicitanteView'
-import { useSimClients } from './hooks/useFirestore'
-import { useAuth } from './contexts/AuthContext'
+import { useSimClients }   from './hooks/useFirestore'
 
 function AppInner() {
   const { user, profile } = useAuth()
-  const { simClients } = useSimClients()
+  const { simClients }    = useSimClients()
 
   if (!user || !profile) return <LoginScreen />
-  if (profile.role === 'frotas') return <FrotasView />
+  if (profile.role === 'master')      return <MasterView simClients={simClients} />
+  if (profile.role === 'frotas')      return <FrotasView simClients={simClients} />
   if (profile.role === 'solicitante') return <SolicitanteView simClients={simClients} />
   return <LoginScreen />
 }
