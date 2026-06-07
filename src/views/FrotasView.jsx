@@ -668,7 +668,7 @@ export function FrotasView() {
       <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}} ::-webkit-scrollbar{width:5px;height:5px} ::-webkit-scrollbar-track{background:${T.bg}} ::-webkit-scrollbar-thumb{background:${T.borderMid};border-radius:10px}`}</style>
 
       {/* HEADER */}
-      <div style={{ background:T.surface, borderBottom:`1px solid ${T.border}`, padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:56, flexShrink:0, boxShadow:`0 1px 0 ${T.border},0 2px 8px rgba(26,22,18,.04)` }}>
+      <div style={{ background:T.surface, borderBottom:`1px solid ${T.border}`, padding:'0 8px', display:'flex', alignItems:'center', justifyContent:'space-between', height:56, flexShrink:0, boxShadow:`0 1px 0 ${T.border},0 2px 8px rgba(26,22,18,.04)` }}>
         <div style={{ display:'flex', alignItems:'center', gap:14 }}>
           <MillsLogo height={30}/>
           <div style={{ width:1, height:26, background:T.border }}/>
@@ -709,7 +709,7 @@ export function FrotasView() {
 
       {/* AGENDA TAB */}
       {activeTab==='agenda'&&<>
-        <div style={{ flex:'0 0 35%', overflow:'hidden', padding:'12px 20px 6px', display:'flex', flexDirection:'column', minHeight:0 }}>
+        <div style={{ flex:'0 0 35%', overflow:'hidden', padding:'12px 8px 6px', display:'flex', flexDirection:'column', minHeight:0 }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10, flexShrink:0 }}>
             <div style={{ display:'flex', alignItems:'center', gap:8 }}>
               <button onClick={()=>view==='semana'?navWeek(-1):view==='mes'?navMonth(-1):setYr(y=>y-1)} style={NB}>‹</button>
@@ -742,7 +742,7 @@ export function FrotasView() {
         </div>
 
         {/* Bottom: Mapa maior + KPIs + solicitações rápidas */}
-        <div style={{ flex:'1 1 62%', display:'grid', gridTemplateColumns:'1fr 340px', gap:12, padding:'0 20px 14px', minHeight:0, overflow:'hidden' }}>
+        <div style={{ flex:'1 1 62%', display:'grid', gridTemplateColumns:'1fr 340px', gap:12, padding:'0 8px 8px', minHeight:0, overflow:'hidden' }}>
           {/* MAPA — agora ocupa mais espaço */}
           <BrazilMap cards={cards}/>
           <div style={{ display:'flex', flexDirection:'column', gap:8, overflow:'hidden' }}>
@@ -791,7 +791,7 @@ export function FrotasView() {
 
       {/* REQUESTS TAB */}
       {activeTab==='requests'&&(
-        <div style={{ flex:1, overflow:'hidden', padding:'14px 20px', display:'flex', flexDirection:'column' }}>
+        <div style={{ flex:1, overflow:'hidden', padding:'14px 8px', display:'flex', flexDirection:'column' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14, flexShrink:0 }}>
             <div>
               <h2 style={{ fontFamily:FONT, fontWeight:700, fontSize:22, color:T.text, margin:0 }}>Solicitações de Serviço</h2>
