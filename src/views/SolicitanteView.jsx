@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
 import { useRequests, useNotifications } from '../hooks/useFirestore'
 import { MillsLogo, NotificationBell, ClientInput, FrotaInput, MunicipioInput, ToastContainer, useToasts } from '../components/UI'
@@ -39,12 +39,10 @@ function RequestForm({ simClients, onSubmit, onClose, profile }) {
     desiredDate:todayStr(), urgency:'medio', description:'',
     clientName:'', channel:'teams',
   })
-  const [frotaAlert, setFrotaAlert] = useState('')
   const [saving, setSaving] = useState(false)
   const set = (k,v) => setForm(p=>({...p,[k]:v}))
 
   const handleSubmit = async () => {
-    if (frotaAlert) return
     setSaving(true)
     await onSubmit({
       ...form,
@@ -68,12 +66,13 @@ function RequestForm({ simClients, onSubmit, onClose, profile }) {
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}>
           <div>
             <h2 style={{ color:T.text, fontFamily:FONT, fontWeight:900, fontSize:20, margin:0 }}>➕ Solicitar Serviço</h2>
-            <p style={{ color:T.textMuted, fontFamily:FONT, fontSize:12, margin:'3px 0 0' }}>Solicitando como: <strong style={{ color:T.verde }}>{profile?.name}</strong> · {profile?.unit}</p>
+            <p style={{ color:T.textMuted, fontFamily:FONT, fontSize:12, margin:'3px 0 0' }}>
+              Solicitando como: <strong style={{ color:T.verde }}>{profile?.name}</strong> · {profile?.unit}
+            </p>
           </div>
           <button onClick={onClose} style={{ background:'none', border:'none', color:T.textMuted, fontSize:24, cursor:'pointer' }}>×</button>
         </div>
 
-        {/* Tipo */}
         <div style={{ marginBottom:14 }}>
           <label style={LS}>Tipo de Serviço</label>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
@@ -90,19 +89,24 @@ function RequestForm({ simClients, onSubmit, onClose, profile }) {
 
         <SubtypeSelect type={form.type} value={form.subtype} onChange={v=>set('subtype',v)}/>
 
-        {/* Planta/Obra */}
         <div style={{ marginBottom:14, padding:'11px 13px', background:T.laranjaXLight, borderRadius:T.r, border:`1px solid ${T.laranja}20` }}>
           <label style={LS}>🔍 Planta / Obra (base SIM)</label>
-          <ClientInput value={form.clientName?{name:form.clientName}:null}
-            onChange={c=>{ set('clientName',c?.name||''); if(c&&c.state){ set('destCity',{m:c.city||'',s:c.state}) } }}
-            simClients={simClients}/>
+          <ClientInput
+            value={form.clientName ? {name:form.clientName} : null}
+            onChange={c => {
+              set('clientName', c?.name||'')
+              if (c?.state) set('destCity', {m:c.city||'', s:c.state})
+              if (c?.nInternos?.length) set('nInterno', c.nInternos[0])
+            }}
+            simClients={simClients||[]}
+          />
+          {form.clientName && <div style={{ marginTop:4, color:T.verde, fontSize:11, fontFamily:FONT, fontWeight:700 }}>✓ {form.clientName}</div>}
         </div>
 
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
           <div>
             <label style={LS}>N° Interno (Frota)</label>
-            <FrotaInput value={form.nInterno} onChange={v=>set('nInterno',v)} simClients={simClients}/>
-            {frotaAlert && <div style={{ marginTop:5, color:T.perigo, fontSize:11, fontFamily:FONT, fontWeight:700 }}>{frotaAlert}</div>}
+            <FrotaInput value={form.nInterno} onChange={v=>set('nInterno',v)} simClients={simClients||[]}/>
           </div>
           <div>
             <label style={LS}>Urgência</label>
@@ -137,14 +141,15 @@ function RequestForm({ simClients, onSubmit, onClose, profile }) {
           <div style={{ gridColumn:'1/-1' }}>
             <label style={LS}>Descrição / Detalhes</label>
             <textarea value={form.description} onChange={e=>set('description',e.target.value)}
-              style={{ ...IS, height:70, resize:'vertical' }} placeholder="Descreva a operação, prazos, contato no local..."/>
+              style={{ ...IS, height:70, resize:'vertical' }}
+              placeholder="Descreva a operação, prazos, contato no local..."/>
           </div>
         </div>
 
         <div style={{ display:'flex', justifyContent:'flex-end', gap:10, marginTop:18 }}>
           <button onClick={onClose} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>Cancelar</button>
-          <button onClick={handleSubmit} disabled={saving||!!frotaAlert}
-            style={{ ...BS, background:saving||frotaAlert?T.borderMid:T.laranja, color:'white', fontWeight:900, fontSize:13 }}>
+          <button onClick={handleSubmit} disabled={saving}
+            style={{ ...BS, background:saving?T.borderMid:T.laranja, color:'white', fontWeight:900, fontSize:13 }}>
             {saving ? '⏳ Enviando...' : '📤 Enviar Solicitação'}
           </button>
         </div>
@@ -170,13 +175,13 @@ export function SolicitanteView({ simClients }) {
       <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet"/>
       <ToastContainer toasts={toasts} onDismiss={dismiss}/>
 
-      <div style={{ background:T.surface, borderBottom:`1px solid ${T.border}`, padding:'0 22px', display:'flex', alignItems:'center', justifyContent:'space-between', height:56, boxShadow:`0 1px 0 ${T.border}` }}>
+      <div style={{ background:T.surface, borderBottom:`1px solid ${T.border}`, padding:'0 12px', display:'flex', alignItems:'center', justifyContent:'space-between', height:56 }}>
         <div style={{ display:'flex', alignItems:'center', gap:12 }}>
           <MillsLogo height={28}/>
           <div style={{ width:1, height:22, background:T.border }}/>
           <div>
             <div style={{ color:T.text, fontFamily:FONT, fontWeight:900, fontSize:12, letterSpacing:'0.06em', textTransform:'uppercase' }}>Portal do Solicitante</div>
-            <div style={{ color:T.textMuted, fontSize:9, letterSpacing:'0.1em', textTransform:'uppercase' }}>{profile?.unit || 'mills infraestrutura'}</div>
+            <div style={{ color:T.textMuted, fontSize:9, letterSpacing:'0.1em', textTransform:'uppercase' }}>{profile?.unit||'mills'}</div>
           </div>
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
@@ -185,42 +190,39 @@ export function SolicitanteView({ simClients }) {
         </div>
       </div>
 
-      <div style={{ maxWidth:860, margin:'0 auto', padding:'28px 22px' }}>
-        {/* Hero */}
-        <motion.div initial={{ opacity:0, y:14 }} animate={{ opacity:1, y:0 }} transition={{ delay:.1 }}
-          style={{ background:`linear-gradient(135deg, ${T.verde} 0%, #006466 100%)`, borderRadius:T.rLg, padding:'28px 32px', marginBottom:26, display:'flex', justifyContent:'space-between', alignItems:'center', boxShadow:T.shadowMd, overflow:'hidden', position:'relative' }}>
-          <div style={{ position:'absolute', right:-30, top:-30, width:140, height:140, borderRadius:'50%', background:'rgba(255,255,255,.05)' }}/>
+      <div style={{ maxWidth:860, margin:'0 auto', padding:'24px 12px' }}>
+        <motion.div initial={{ opacity:0, y:14 }} animate={{ opacity:1, y:0 }}
+          style={{ background:`linear-gradient(135deg, ${T.verde}, #006466)`, borderRadius:T.rLg, padding:'24px 28px', marginBottom:22, display:'flex', justifyContent:'space-between', alignItems:'center', boxShadow:T.shadowMd, overflow:'hidden', position:'relative' }}>
+          <div style={{ position:'absolute', right:-20, top:-20, width:120, height:120, borderRadius:'50%', background:'rgba(255,255,255,.05)' }}/>
           <div style={{ position:'relative' }}>
-            <div style={{ color:'rgba(255,255,255,.65)', fontSize:10, fontFamily:FONT, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:6 }}>mills · Gestão de Frotas</div>
-            <h2 style={{ color:'white', fontFamily:FONT, fontWeight:900, fontSize:24, margin:'0 0 6px', letterSpacing:'0.02em' }}>Precisa de frete ou guindauto?</h2>
+            <div style={{ color:'rgba(255,255,255,.65)', fontSize:10, fontFamily:FONT, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:5 }}>mills · Gestão de Frotas</div>
+            <h2 style={{ color:'white', fontFamily:FONT, fontWeight:900, fontSize:22, margin:'0 0 5px' }}>Precisa de frete ou guindauto?</h2>
             <p style={{ color:'rgba(255,255,255,.7)', fontFamily:FONT, fontSize:12, margin:0 }}>Solicite agora. O time de Frotas recebe em tempo real.</p>
           </div>
           <button onClick={()=>setShowForm(true)}
-            style={{ ...BS, background:T.laranja, color:'white', fontWeight:900, fontSize:14, padding:'13px 24px', borderRadius:T.rLg, boxShadow:'0 4px 16px rgba(243,112,33,.4)', whiteSpace:'nowrap', position:'relative', zIndex:1 }}>
+            style={{ ...BS, background:T.laranja, color:'white', fontWeight:900, fontSize:14, padding:'13px 22px', borderRadius:T.rLg, boxShadow:'0 4px 16px rgba(243,112,33,.4)', whiteSpace:'nowrap', position:'relative', zIndex:1 }}>
             + Nova Solicitação
           </button>
         </motion.div>
 
-        {/* Stats */}
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:24 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:22 }}>
           {[
-            { label:'Total',     value:requests.length,                                    color:T.laranja, bg:T.laranjaLight },
-            { label:'Pendentes', value:requests.filter(r=>r.status==='pendente').length,   color:T.amarelo, bg:T.amareloLight },
-            { label:'Aceitas',   value:requests.filter(r=>r.status==='aceito').length,     color:T.verde,   bg:T.verdeLight   },
+            { label:'Total',     value:requests.length,                                  color:T.laranja, bg:T.laranjaLight },
+            { label:'Pendentes', value:requests.filter(r=>r.status==='pendente').length, color:T.amarelo, bg:T.amareloLight },
+            { label:'Aceitas',   value:requests.filter(r=>r.status==='aceito').length,   color:T.verde,   bg:T.verdeLight   },
           ].map(s => (
-            <div key={s.label} style={{ background:s.bg, border:`1px solid ${s.color}30`, borderRadius:T.rLg, padding:'14px 18px', boxShadow:T.shadow }}>
-              <div style={{ color:s.color, fontFamily:FONT, fontWeight:900, fontSize:28, lineHeight:1 }}>{s.value}</div>
+            <div key={s.label} style={{ background:s.bg, border:`1px solid ${s.color}30`, borderRadius:T.rLg, padding:'14px 16px' }}>
+              <div style={{ color:s.color, fontFamily:FONT, fontWeight:900, fontSize:26, lineHeight:1 }}>{s.value}</div>
               <div style={{ color:T.textSec, fontSize:9, fontFamily:FONT, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.07em', marginTop:3 }}>{s.label}</div>
             </div>
           ))}
         </div>
 
-        {/* Lista */}
-        <h3 style={{ color:T.text, fontFamily:FONT, fontWeight:900, fontSize:16, margin:'0 0 14px' }}>Minhas Solicitações</h3>
+        <h3 style={{ color:T.text, fontFamily:FONT, fontWeight:900, fontSize:16, margin:'0 0 12px' }}>Minhas Solicitações</h3>
         {requests.length===0 && (
           <div style={{ textAlign:'center', padding:'40px 0', color:T.textMuted, fontFamily:FONT }}>
             <div style={{ fontSize:44, marginBottom:10 }}>📭</div>
-            <p style={{ fontSize:14 }}>Nenhuma solicitação ainda.</p>
+            <p>Nenhuma solicitação ainda.</p>
           </div>
         )}
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
@@ -243,7 +245,7 @@ export function SolicitanteView({ simClients }) {
                     ['Equipamento', r.machine||'—'],
                     ['Rota', `${r.originCityName||r.origin||'—'} → ${r.destCityName||r.destination||'—'}`],
                     ['Data desejada', fmt(r.desiredDate)],
-                  ].map(([l,v])=>(
+                  ].map(([l,v]) => (
                     <div key={l}>
                       <div style={{ color:T.textMuted, fontSize:9, textTransform:'uppercase', letterSpacing:'0.07em', fontFamily:FONT, marginBottom:2 }}>{l}</div>
                       <div style={{ color:T.text, fontWeight:700, fontSize:12, fontFamily:FONT }}>{v}</div>
@@ -261,7 +263,7 @@ export function SolicitanteView({ simClients }) {
         </div>
       </div>
 
-      {showForm && <RequestForm simClients={simClients} profile={profile} onSubmit={handleSubmit} onClose={()=>setShowForm(false)}/>}
+      {showForm && <RequestForm simClients={simClients||[]} profile={profile} onSubmit={handleSubmit} onClose={()=>setShowForm(false)}/>}
     </div>
   )
 }
