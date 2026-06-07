@@ -2,7 +2,8 @@ import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth }        from '../contexts/AuthContext'
 import { useCards, useRequests, useNotifications, useSimClients, useConfig } from '../hooks/useFirestore'
-import { MillsLogo, ToastContainer, useToasts, ServiceCard, BrazilMap, MoveModal, NotificationBell, ClientInput, FrotaInput, MunicipioInput } from '../components/UI'
+import { MillsLogo, ToastContainer, useToasts, ServiceCard, MoveModal, NotificationBell, ClientInput } from '../components/UI'
+import { BrazilMap } from '../components/BrazilMapReal'
 import { T, FONT, CARD_TYPES, CARD_SUBTYPES, URGENCY, BR_STATES, FILIAIS, MONTH_NAMES, WD_SHORT, BS, IS, LS, NB } from '../lib/constants'
 import { fmt, todayStr, getWeekDays, getMonthWeeks, cardsForDay, detectConflicts, buildReport, downloadTxt, sendTeamsNotification, parseSIMCsv, getSubtypeLabel } from '../lib/utils'
 import Papa from 'papaparse'
@@ -49,7 +50,6 @@ function CardModal({ card, defaultDate, simClients, onSave, onClose, onDelete })
   const [saving, setSaving] = useState(false)
   const set = (k,v) => setForm(p=>({...p,[k]:v}))
 
-  // Ao trocar tipo, limpa subtype para forçar nova seleção
   const handleTypeChange = v => setForm(p => ({ ...p, type: v, subtype: '' }))
 
   const handleClientSelect = c => {
@@ -85,7 +85,6 @@ function CardModal({ card, defaultDate, simClients, onSave, onClose, onDelete })
           <button onClick={onClose} style={{ background:'none', border:'none', color:T.textMuted, fontSize:24, cursor:'pointer' }}>×</button>
         </div>
 
-        {/* Tipo de Serviço — destacado no topo */}
         <div style={{ marginBottom:16 }}>
           <label style={LS}>Tipo de Serviço</label>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
@@ -101,14 +100,12 @@ function CardModal({ card, defaultDate, simClients, onSave, onClose, onDelete })
           </div>
         </div>
 
-        {/* Subtipo */}
         {subtypes.length > 0 && (
           <div style={{ marginBottom:16, padding:'12px 14px', background:T.surfaceAlt, borderRadius:T.r, border:`1px solid ${T.border}` }}>
             <SubtypeSelect type={form.type} value={form.subtype} onChange={v => set('subtype', v)}/>
           </div>
         )}
 
-        {/* Busca de cliente SIM */}
         <div style={{ marginBottom:14, padding:'12px 14px', background:T.laranjaLight, borderRadius:T.r, border:`1px solid ${T.laranja}30` }}>
           <label style={LS}>🔍 Buscar Planta/Obra (base SIM)</label>
           <ClientInput value={form.client?{name:form.client}:null} onChange={handleClientSelect} simClients={simClients}/>
@@ -126,7 +123,7 @@ function CardModal({ card, defaultDate, simClients, onSave, onClose, onDelete })
           </div>
           <div>
             <label style={LS}>N° Interno (Frota)</label>
-            <input value={form.nInterno||''} onChange={e=>set('nInterno',e.target.value)} placeholder="Ex: 1234" style={IS}/>
+            <input value={form.nInterno||''} onChange={e=>set('nInterno',e.target.value)} placeholder="Ex: XXX01234" style={IS}/>
           </div>
           <div>
             <label style={LS}>OM</label>
@@ -172,13 +169,6 @@ function CardModal({ card, defaultDate, simClients, onSave, onClose, onDelete })
           <div>
             <label style={LS}>Data Conclusão</label>
             <input type="date" value={form.endDate} onChange={e=>set('endDate',e.target.value)} style={IS}/>
-          </div>
-          <div>
-            <label style={LS}>Status</label>
-            <select value={form.status} onChange={e=>set('status',e.target.value)} style={IS}>
-              <option value="em_dia">✅ Em dia</option>
-              <option value="atrasado">🔴 Atrasado</option>
-            </select>
           </div>
           <div style={{ gridColumn:'1/-1' }}>
             <label style={LS}>Observações</label>
@@ -266,8 +256,8 @@ function RequestReviewModal({ req, teamsWebhookUrl, onRespond, onClose }) {
             <div style={{ color:T.laranja, fontSize:11, fontWeight:700, fontFamily:FONT }}>
               {chIcon[req.channel]||'📬'} Resposta via {chLabel[req.channel]||req.channel}
             </div>
-            {req.channel === 'teams' && teamsWebhookUrl && <div style={{ color:T.textSec, fontSize:10, fontFamily:FONT, marginTop:3 }}>Webhook configurado ✓ — mensagem será postada no canal</div>}
-            {req.channel === 'teams' && !teamsWebhookUrl && <div style={{ color:T.perigo, fontSize:10, fontFamily:FONT, marginTop:3 }}>⚠ Webhook não configurado. Configure em Configurações.</div>}
+            {req.channel === 'teams' && teamsWebhookUrl && <div style={{ color:T.textSec, fontSize:10, fontFamily:FONT, marginTop:3 }}>Webhook configurado ✓</div>}
+            {req.channel === 'teams' && !teamsWebhookUrl && <div style={{ color:T.perigo, fontSize:10, fontFamily:FONT, marginTop:3 }}>⚠ Webhook não configurado.</div>}
           </div>
         </div>
 
@@ -327,12 +317,6 @@ function ExportModal({ cards, weekDays, conflicts, onClose }) {
             )
           })}
         </div>
-        {drivers.length > 2 && (
-          <button onClick={()=>drivers.filter(d=>d!=='Todos os motoristas').forEach(d=>handleExport(d))}
-            style={{ ...BS, background:T.laranja, color:'white', fontWeight:700, fontSize:12, width:'100%', marginBottom:12 }}>
-            ⬇ Baixar relatório individual de cada motorista
-          </button>
-        )}
         <div style={{ display:'flex', justifyContent:'flex-end' }}>
           <button onClick={onClose} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>Fechar</button>
         </div>
@@ -535,7 +519,7 @@ function RequestsKanban({ requests, teamsWebhookUrl, onRespond }) {
   )
 }
 
-/* ══ CSV UPLOAD (CORRIGIDO) ══════════════════════════════════════════════════ */
+/* ══ CSV UPLOAD ══════════════════════════════════════════════════════════════ */
 function CsvUploadModal({ onLoaded, onClose }) {
   const [status, setStatus] = useState('idle')
   const [count,  setCount]  = useState(0)
@@ -548,7 +532,6 @@ function CsvUploadModal({ onLoaded, onClose }) {
     const reader = new FileReader()
     reader.onload = ev => {
       try {
-        // CORRIGIDO: usa import ESM do Papa (não require/window._Papa)
         const clients = parseSIMCsv(ev.target.result, Papa)
         setCount(clients.length)
         setPreview(clients.slice(0,4))
@@ -570,52 +553,21 @@ function CsvUploadModal({ onLoaded, onClose }) {
           <h2 style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:20, margin:0 }}>📂 Atualizar Base SIM</h2>
           <button onClick={onClose} style={{ background:'none', border:'none', color:T.textMuted, fontSize:24, cursor:'pointer' }}>×</button>
         </div>
-
-        {/* Colunas esperadas */}
-        <div style={{ padding:'10px 13px', background:T.infoLight, borderRadius:T.rSm, border:`1px solid ${T.info}20`, marginBottom:16 }}>
-          <div style={{ color:T.info, fontSize:11, fontWeight:700, fontFamily:FONT, marginBottom:4 }}>📋 Colunas lidas do CSV:</div>
-          <div style={{ color:T.textSec, fontSize:10, fontFamily:FONT, lineHeight:1.6 }}>
-            <strong>Cliente:</strong> "Planta/Obra"<br/>
-            <strong>Frota:</strong> "N° Interno"<br/>
-            <strong>Estado:</strong> "Estado (Planta/Obra)"<br/>
-            <strong>Cidade:</strong> "Município (Planta/Obra)"<br/>
-            Separador: ponto-e-vírgula (;) · Encoding: UTF-8
-          </div>
-        </div>
-
         <div style={{ padding:20, background:T.surfaceAlt, borderRadius:T.r, border:`2px dashed ${T.borderMid}`, textAlign:'center', marginBottom:16 }}>
           <div style={{ fontSize:36, marginBottom:10 }}>📊</div>
-          <p style={{ color:T.textSec, fontFamily:FONT, fontSize:13, margin:'0 0 12px' }}>CSV exportado do SIM</p>
+          <p style={{ color:T.textSec, fontFamily:FONT, fontSize:13, margin:'0 0 12px' }}>CSV exportado do SIM · separador ; · UTF-8</p>
           <button onClick={()=>inputRef.current?.click()} style={{ ...BS, background:T.laranja, color:'white', fontWeight:700 }}>Escolher arquivo</button>
           <input ref={inputRef} type="file" accept=".csv" onChange={handleFile} style={{ display:'none' }}/>
         </div>
-
         {status==='loading' && <div style={{ textAlign:'center', color:T.textSec, fontFamily:FONT, fontSize:13 }}>⏳ Processando...</div>}
-
-        {status==='done' && <>
-          <div style={{ padding:'10px 14px', background:T.verdeLight, borderRadius:T.r, border:`1px solid ${T.verde}30`, marginBottom:12 }}>
+        {status==='done' && (
+          <div style={{ padding:'10px 14px', background:T.verdeLight, borderRadius:T.r, marginBottom:12 }}>
             <div style={{ color:T.verde, fontWeight:700, fontSize:13, fontFamily:FONT }}>✅ {count} registros carregados!</div>
-            <div style={{ color:T.textSec, fontSize:11, fontFamily:FONT, marginTop:3 }}>Base sincronizada para todos os usuários.</div>
           </div>
-          {preview.length > 0 && (
-            <div style={{ marginBottom:12 }}>
-              <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:6 }}>Prévia (primeiros registros):</div>
-              {preview.map(c => (
-                <div key={c.name} style={{ padding:'6px 10px', background:T.surfaceAlt, borderRadius:T.rSm, marginBottom:4, fontFamily:FONT, fontSize:11 }}>
-                  <span style={{ fontWeight:700, color:T.text }}>{c.name}</span>
-                  <span style={{ color:T.textMuted }}> · {c.city||'—'}/{c.state||'—'}</span>
-                  {c.nInternos?.length > 0 && <span style={{ color:T.info }}> · N°: {c.nInternos.slice(0,3).join(', ')}</span>}
-                </div>
-              ))}
-            </div>
-          )}
-        </>}
-
+        )}
         {status==='error' && <div style={{ padding:'10px 14px', background:T.perigoLight, borderRadius:T.r, marginBottom:12 }}>
-          <div style={{ color:T.perigo, fontWeight:700, fontSize:13, fontFamily:FONT }}>❌ Erro ao processar. Verifique o formato do arquivo.</div>
-          <div style={{ color:T.textSec, fontSize:11, fontFamily:FONT, marginTop:4 }}>Certifique-se que o arquivo usa ; como separador e encoding UTF-8.</div>
+          <div style={{ color:T.perigo, fontWeight:700, fontSize:13, fontFamily:FONT }}>❌ Erro ao processar.</div>
         </div>}
-
         <div style={{ display:'flex', justifyContent:'flex-end' }}>
           <button onClick={onClose} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>Fechar</button>
         </div>
@@ -656,41 +608,42 @@ export function FrotasView() {
   const handleSaveCard   = async f => { await saveCard(f); setModal(null); setEditCard(null); addToast(`Serviço de ${f.client||'novo'} salvo.`, 'success') }
   const handleDeleteCard = async id => { await deleteCard(id); setModal(null); setEditCard(null); addToast('Serviço removido.', 'info') }
   const handleMoveCard   = async (id, ns, ne, reason) => { await moveCard(id, ns, ne, reason); addToast('Serviço reagendado com justificativa.', 'success') }
+
   const handleRespond = async (id, status, note, webhook) => {
-  await respondRequest(id, status, note, webhook)
-  if (status === 'aceito') {
-    const req = requests.find(r => r.id === id)
-    if (req) {
-      await saveCard({
-        type:        req.type,
-        subtype:     req.subtype || '',
-        client:      req.clientName || req.requesterName || '',
-        plantaObra:  req.clientName || '',
-        nInterno:    req.nInterno || '',
-        machine:     req.machine || '',
-        urgency:     req.urgency || 'medio',
-        origin:      req.origin || '',
-        destination: req.destination || '',
-        originCity:  req.originCityName || '',
-        destCity:    req.destCityName || '',
-        startDate:   req.desiredDate || todayStr(),
-        endDate:     req.desiredDate || todayStr(),
-        driver:      '',
-        unit:        req.unit || profile?.unit || '',
-        notes:       req.description || '',
-        requestId:   id,
-        status:      'confirmado',
-      })
-      addToast('✅ Solicitação aceita — serviço criado no calendário!', 'accepted')
+    await respondRequest(id, status, note, webhook)
+    if (status === 'aceito') {
+      const req = requests.find(r => r.id === id)
+      if (req) {
+        await saveCard({
+          type:        req.type,
+          subtype:     req.subtype || '',
+          client:      req.clientName || req.requesterName || '',
+          plantaObra:  req.clientName || '',
+          nInterno:    req.nInterno || '',
+          machine:     req.machine || '',
+          urgency:     req.urgency || 'medio',
+          origin:      req.origin || '',
+          destination: req.destination || '',
+          originCity:  req.originCityName || '',
+          destCity:    req.destCityName || '',
+          startDate:   req.desiredDate || todayStr(),
+          endDate:     req.desiredDate || todayStr(),
+          driver:      '',
+          unit:        req.unit || profile?.unit || '',
+          notes:       req.description || '',
+          requestId:   id,
+          status:      'confirmado',
+        })
+        addToast('✅ Solicitação aceita — serviço criado no calendário!', 'accepted')
+      }
+    } else {
+      addToast('❌ Solicitação recusada — solicitante notificado.', 'info')
     }
-  } else {
-    addToast('❌ Solicitação recusada — solicitante notificado.', 'info')
   }
-}
 
   return (
     <div style={{ background:T.bg, height:'100vh', display:'flex', flexDirection:'column', overflow:'hidden', fontFamily:FONT }}>
-      <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet"/>
+      <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
       <ToastContainer toasts={toasts} onDismiss={dismiss}/>
       <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}} ::-webkit-scrollbar{width:5px;height:5px} ::-webkit-scrollbar-track{background:${T.bg}} ::-webkit-scrollbar-thumb{background:${T.borderMid};border-radius:10px}`}</style>
 
@@ -768,9 +721,7 @@ export function FrotasView() {
           </AnimatePresence>
         </div>
 
-        {/* Bottom: Mapa maior + KPIs + solicitações rápidas */}
         <div style={{ flex:'1 1 62%', display:'grid', gridTemplateColumns:'1fr 340px', gap:12, padding:'0 6px 8px', minHeight:0, overflow:'hidden' }}>
-          {/* MAPA — agora ocupa mais espaço */}
           <BrazilMap cards={cards}/>
           <div style={{ display:'flex', flexDirection:'column', gap:8, overflow:'hidden' }}>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:6, flexShrink:0 }}>
@@ -816,7 +767,6 @@ export function FrotasView() {
         </div>
       </>}
 
-      {/* REQUESTS TAB */}
       {activeTab==='requests'&&(
         <div style={{ flex:1, overflow:'hidden', padding:'8px 6px', display:'flex', flexDirection:'column' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14, flexShrink:0 }}>
@@ -831,11 +781,10 @@ export function FrotasView() {
         </div>
       )}
 
-      {/* MODALS */}
       <AnimatePresence>
         {modal==='card'&&<CardModal card={editCard} defaultDate={defaultDate} simClients={simClients} onSave={handleSaveCard} onClose={()=>{setModal(null);setEditCard(null);}} onDelete={handleDeleteCard}/>}
         {exportModal&&<ExportModal cards={cards} weekDays={weekDays} conflicts={conflicts} onClose={()=>setExportModal(false)}/>}
-        {csvModal&&<CsvUploadModal onLoaded={async clients=>{await uploadClients(clients);setCsvModal(false);addToast(`${clients.length} registros sincronizados para todos os usuários.`,'success');}} onClose={()=>setCsvModal(false)}/>}
+        {csvModal&&<CsvUploadModal onLoaded={async clients=>{await uploadClients(clients);setCsvModal(false);addToast(`${clients.length} registros sincronizados.`,'success');}} onClose={()=>setCsvModal(false)}/>}
         {settingsModal&&<SettingsModal config={config} onSave={saveConfig} onClose={()=>setSettingsModal(false)}/>}
       </AnimatePresence>
     </div>
