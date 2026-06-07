@@ -35,7 +35,7 @@ export function ToastContainer({ toasts, onDismiss }) {
             <div style={{ position:'absolute', left:0, top:0, bottom:0, width:4, background:TOAST_COLORS[t.type]||T.info, borderRadius:'4px 0 0 4px' }}/>
             <div style={{ paddingLeft:10 }}>
               <div style={{ display:'flex', justifyContent:'space-between' }}>
-                <span style={{ fontFamily:FONT, fontWeight:800, fontSize:11, color:T.text, textTransform:'uppercase' }}>{TOAST_LABELS[t.type]||'Info'}</span>
+                <span style={{ fontFamily:FONT, fontWeight:700, fontSize:11, color:T.text, textTransform:'uppercase' }}>{TOAST_LABELS[t.type]||'Info'}</span>
                 <button onClick={()=>onDismiss(t.id)} style={{ background:'none', border:'none', cursor:'pointer', color:T.textMuted, fontSize:18 }}>×</button>
               </div>
               <p style={{ fontFamily:FONT, fontSize:12, color:T.textSec, margin:'3px 0 0', lineHeight:1.4 }}>{t.msg}</p>
@@ -72,7 +72,7 @@ export function NotificationBell({ notifications, unreadCount, onMarkAllRead }) 
           borderRadius:T.r, color:unreadCount>0?T.laranja:T.textSec, padding:'6px 12px', cursor:'pointer', position:'relative', fontFamily:FONT, transition:'all .2s' }}>
         🔔
         {unreadCount > 0 && (
-          <span style={{ position:'absolute', top:-4, right:-4, background:T.perigo, color:'white', borderRadius:20, fontSize:9, fontWeight:800, padding:'1px 5px', fontFamily:FONT }}>
+          <span style={{ position:'absolute', top:-4, right:-4, background:T.perigo, color:'white', borderRadius:20, fontSize:9, fontWeight:700, padding:'1px 5px', fontFamily:FONT }}>
             {unreadCount}
           </span>
         )}
@@ -82,7 +82,7 @@ export function NotificationBell({ notifications, unreadCount, onMarkAllRead }) 
           <motion.div initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:8 }}
             style={{ position:'absolute', right:0, top:'calc(100% + 8px)', width:320, background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.rLg, boxShadow:T.shadowLg, zIndex:999 }}>
             <div style={{ padding:'11px 14px', borderBottom:`1px solid ${T.border}`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <span style={{ fontFamily:FONT, fontWeight:800, fontSize:12, color:T.text }}>Notificações</span>
+              <span style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:T.text }}>Notificações</span>
               <button onClick={()=>{ onMarkAllRead(); setOpen(false) }} style={{ background:'none', border:'none', cursor:'pointer', color:T.laranja, fontSize:11, fontFamily:FONT, fontWeight:700 }}>✓ Marcar todas lidas</button>
             </div>
             <div style={{ maxHeight:280, overflowY:'auto' }}>
@@ -235,19 +235,19 @@ export function ServiceCard({ card, conflicts, onEdit, onDragStart, compact=fals
         padding:compact?'5px 7px':'9px 11px', cursor:'grab', marginBottom:4,
         position:'relative', userSelect:'none',
         boxShadow:hasConf?`0 0 0 2px ${T.amarelo},${T.shadow}`:isLate?`0 0 0 2px ${T.perigo},${T.shadow}`:T.shadow }}>
-      {hasConf && <div style={{ position:'absolute', top:-8, right:6, background:T.amarelo, color:'#000', fontSize:8, fontWeight:800, padding:'1px 5px', borderRadius:4, fontFamily:FONT }}>OTIMIZAR</div>}
-      {isLate   && <div style={{ position:'absolute', top:-8, left:6, background:T.perigo, color:'#fff', fontSize:8, fontWeight:800, padding:'1px 5px', borderRadius:4, fontFamily:FONT }}>ATRASADO</div>}
+      {hasConf && <div style={{ position:'absolute', top:-8, right:6, background:T.amarelo, color:'#000', fontSize:8, fontWeight:700, padding:'1px 5px', borderRadius:4, fontFamily:FONT }}>OTIMIZAR</div>}
+      {isLate   && <div style={{ position:'absolute', top:-8, left:6, background:T.perigo, color:'#fff', fontSize:8, fontWeight:700, padding:'1px 5px', borderRadius:4, fontFamily:FONT }}>ATRASADO</div>}
       <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:compact?1:4 }}>
         <span style={{ fontSize:compact?10:12 }}>{ct?.icon}</span>
-        <span style={{ color:ct?.color, fontSize:8, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.08em', fontFamily:FONT }}>{ct?.short}</span>
+        <span style={{ color:ct?.color, fontSize:8, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', fontFamily:FONT }}>{ct?.short}</span>
         <span style={{ marginLeft:'auto', fontSize:compact?9:11 }}>{ug?.icon}</span>
       </div>
-      <div style={{ color:T.text, fontWeight:800, fontSize:compact?10:12, fontFamily:FONT, marginBottom:compact?0:2, lineHeight:1.2 }}>{card.client}</div>
+      <div style={{ color:T.text, fontWeight:700, fontSize:compact?10:12, fontFamily:FONT, marginBottom:compact?0:2, lineHeight:1.2 }}>{card.client}</div>
       {!compact && <>
-        {card.subtype && <div style={{ color:ct?.color, fontSize:9, fontFamily:FONT, marginBottom:2, fontWeight:700 }}>{card.subtype.replace(/_/g,' ')}</div>}
+        {card.subtype && <div style={{ color:ct?.color, fontSize:9, fontFamily:FONT, marginBottom:2, fontWeight:600 }}>{card.subtype.replace(/_/g,' ')}</div>}
         <div style={{ color:T.textSec, fontSize:9, fontFamily:FONT }}>{card.originCity||card.origin||'—'} → {card.destCity||card.destination||'—'}</div>
-        {card.nInterno && <div style={{ color:T.info, fontSize:9, fontFamily:FONT, fontWeight:700 }}>🔢 {card.nInterno}</div>}
-        {card.driver   && <div style={{ color:T.verde, fontSize:9, fontFamily:FONT, fontWeight:700 }}>👤 {card.driver}</div>}
+        {card.nInterno && <div style={{ color:T.info, fontSize:9, fontFamily:FONT, fontWeight:600 }}>🔢 {card.nInterno}</div>}
+        {card.driver   && <div style={{ color:T.verde, fontSize:9, fontFamily:FONT, fontWeight:600 }}>👤 {card.driver}</div>}
       </>}
     </motion.div>
   )
@@ -256,28 +256,43 @@ export function ServiceCard({ card, conflicts, onEdit, onDragStart, compact=fals
 export function BrazilMap({ cards }) {
   const [hov, setHov] = useState(null)
   const cnt = {}; const types = {}
+
+  const STATE_MAP = {
+    'São Paulo':'SP','Minas Gerais':'MG','Rio de Janeiro':'RJ','Paraná':'PR',
+    'Santa Catarina':'SC','Rio Grande do Sul':'RS','Bahia':'BA','Goiás':'GO',
+    'Pará':'PA','Amazonas':'AM','Ceará':'CE','Pernambuco':'PE','Mato Grosso':'MT',
+    'Mato Grosso do Sul':'MS','Espírito Santo':'ES','Maranhão':'MA','Piauí':'PI',
+    'Rio Grande do Norte':'RN','Paraíba':'PB','Alagoas':'AL','Sergipe':'SE',
+    'Tocantins':'TO','Rondônia':'RO','Roraima':'RR','Amapá':'AP','Acre':'AC',
+    'Distrito Federal':'DF',
+  }
+  const toSigla = v => STATE_MAP[v] || v
+
   cards.forEach(c => {
-    [c.originState||c.origin, c.destState||c.destination].filter(Boolean).forEach(s => {
+    ;[toSigla(c.originState||c.origin), toSigla(c.destState||c.destination)].filter(Boolean).forEach(s => {
+      if (s.length > 2) return
       cnt[s]=(cnt[s]||0)+1
       if(!types[s]) types[s]=new Set()
       types[s].add(c.type)
     })
   })
+
   const routes = {}
   cards.filter(c=>(c.originState||c.origin)&&(c.destState||c.destination)).forEach(c=>{
-    const o=c.originState||c.origin, d=c.destState||c.destination
-    if(o===d) return
+    const o=toSigla(c.originState||c.origin), d=toSigla(c.destState||c.destination)
+    if(o===d || o.length>2 || d.length>2) return
     const k=[o,d].sort().join('-')
     if(!routes[k]) routes[k]=[]
     routes[k].push(c)
   })
+
   const getS = id => BR_STATES.find(s=>s.id===id)
   const getColor = id => {
     const n=cnt[id]||0
-    if(!n)    return { fill:'rgba(243,112,33,0.06)', stroke:'rgba(243,112,33,0.18)' }
-    if(n===1) return { fill:'rgba(243,112,33,0.28)', stroke:'rgba(243,112,33,0.8)'  }
-    if(n<=3)  return { fill:'rgba(243,112,33,0.65)', stroke:'rgba(194,64,3,0.9)'    }
-    return           { fill:'rgba(194,64,3,0.88)',   stroke:'rgba(140,30,0,1)'       }
+    if(!n)    return { fill:'#F0EDE8', stroke:'#CEC8C0' }
+    if(n===1) return { fill:'rgba(243,112,33,0.35)', stroke:'#F37021' }
+    if(n<=3)  return { fill:'rgba(243,112,33,0.65)', stroke:'#C24003' }
+    return           { fill:'rgba(194,64,3,0.88)',   stroke:'#8B2500' }
   }
 
   return (
@@ -285,11 +300,11 @@ export function BrazilMap({ cards }) {
       <MillsPattern opacity={0.05} color={T.laranja}/>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6, position:'relative', zIndex:1, flexShrink:0 }}>
         <div style={{ display:'flex', alignItems:'center', gap:7 }}>
-          <span style={{ fontFamily:FONT, fontWeight:800, fontSize:10, textTransform:'uppercase', letterSpacing:'0.1em', color:T.text }}>🗺 Operações Ativas</span>
-          {Object.keys(cnt).length>0 && <span style={{ background:T.laranjaLight, border:`1px solid ${T.laranja}50`, borderRadius:20, padding:'1px 7px', color:T.laranja, fontSize:9, fontWeight:800, fontFamily:FONT }}>{Object.keys(cnt).length} estados</span>}
+          <span style={{ fontFamily:FONT, fontWeight:700, fontSize:10, textTransform:'uppercase', letterSpacing:'0.1em', color:T.text }}>🗺 Operações Ativas</span>
+          {Object.keys(cnt).length>0 && <span style={{ background:T.laranjaLight, border:`1px solid ${T.laranja}50`, borderRadius:20, padding:'1px 7px', color:T.laranja, fontSize:9, fontWeight:700, fontFamily:FONT }}>{Object.keys(cnt).length} estados</span>}
         </div>
         <div style={{ display:'flex', gap:5 }}>
-          {[{f:'rgba(243,112,33,0.28)',s:T.laranja,l:'1'},{f:'rgba(243,112,33,0.65)',s:'#C24003',l:'2–3'},{f:'rgba(194,64,3,0.88)',s:'#8B2500',l:'4+'}].map(l=>(
+          {[{f:'#F0EDE8',s:'#CEC8C0',l:'0'},{f:'rgba(243,112,33,0.35)',s:'#F37021',l:'1'},{f:'rgba(243,112,33,0.65)',s:'#C24003',l:'2–3'},{f:'rgba(194,64,3,0.88)',s:'#8B2500',l:'4+'}].map(l=>(
             <div key={l.l} style={{ display:'flex', alignItems:'center', gap:2 }}>
               <div style={{ width:8, height:8, background:l.f, border:`1px solid ${l.s}`, borderRadius:2 }}/>
               <span style={{ fontSize:8, color:T.textMuted, fontFamily:FONT }}>{l.l}</span>
@@ -314,29 +329,29 @@ export function BrazilMap({ cards }) {
           return (
             <g key={s.id} onMouseEnter={()=>setHov(s.id)} onMouseLeave={()=>setHov(null)} style={{ cursor:isActive?'pointer':'default' }}>
               {isActive && <circle cx={s.x} cy={s.y} r={isHov?24:19} fill={fill} opacity={0.2}/>}
-              <circle cx={s.x} cy={s.y} r={isActive?(isHov?14:12):5} fill={fill} stroke={stroke}
-                strokeWidth={isActive?(isHov?2.5:2):1}
+              <circle cx={s.x} cy={s.y} r={isActive?(isHov?14:12):8} fill={fill} stroke={stroke}
+                strokeWidth={isActive?(isHov?2.5:2):1.5}
                 filter={isActive&&isHov?'url(#glow)':isActive?'url(#shadow2)':undefined}
                 style={{ transition:'all .18s' }}/>
-              <text x={s.x} y={s.y+(isActive?-15:-7)} textAnchor="middle"
-                fill={isActive?T.text:T.textMuted}
-                fontSize={isActive?(isHov?10:9):6.5} fontWeight={isActive?'800':'400'}
-                fontFamily="Nunito,sans-serif" style={{ pointerEvents:'none' }}>{s.id}</text>
+              <text x={s.x} y={s.y+(isActive?-15:-9)} textAnchor="middle"
+                fill={isActive?T.text:T.textSec}
+                fontSize={isActive?(isHov?10:9):7} fontWeight={isActive?'700':'400'}
+                fontFamily="IBM Plex Sans, sans-serif" style={{ pointerEvents:'none' }}>{s.id}</text>
               {isActive && <text x={s.x} y={s.y+4} textAnchor="middle" fill="white"
-                fontSize={isHov?10:9} fontWeight="800" fontFamily="Nunito,sans-serif"
+                fontSize={isHov?10:9} fontWeight="700" fontFamily="IBM Plex Sans, sans-serif"
                 style={{ pointerEvents:'none' }}>{cnt[s.id]}</text>}
             </g>
           )
         })}
         {Object.entries(routes).map(([key,rts])=>{
           const oId=rts[0].originState||rts[0].origin, dId=rts[0].destState||rts[0].destination
-          const o=getS(oId), d=getS(dId); if(!o||!d) return null
+          const o=getS(toSigla(oId)), d=getS(toSigla(dId)); if(!o||!d) return null
           const ct=CARD_TYPES[rts[0].type], mx=(o.x+d.x)/2, my=(o.y+d.y)/2-28
           return (
             <g key={key}>
               <path d={`M${o.x},${o.y} Q${mx},${my} ${d.x},${d.y}`} stroke={ct?.color} strokeWidth={rts.length>1?2.5:1.5} fill="none" strokeDasharray={rts.length>1?'none':'5,4'} opacity={0.7}/>
               <circle cx={mx} cy={my} r={rts.length>1?9:5} fill={rts.length>1?T.amarelo:ct?.bg} stroke={ct?.color} strokeWidth={1.5}/>
-              <text x={mx} y={my+4} textAnchor="middle" fill={rts.length>1?'#000':ct?.color} fontSize={rts.length>1?9:7} fontWeight="800" fontFamily="Nunito,sans-serif">{rts.length>1?rts.length:ct?.icon?.slice(0,1)}</text>
+              <text x={mx} y={my+4} textAnchor="middle" fill={rts.length>1?'#000':ct?.color} fontSize={rts.length>1?9:7} fontWeight="700" fontFamily="IBM Plex Sans, sans-serif">{rts.length>1?rts.length:ct?.icon?.slice(0,1)}</text>
             </g>
           )
         })}
@@ -359,16 +374,16 @@ export function MoveModal({ card, targetDate, onConfirm, onCancel }) {
     <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.55)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(3px)' }}>
       <motion.div initial={{ scale:.9, opacity:0 }} animate={{ scale:1, opacity:1 }}
         style={{ background:T.surface, borderRadius:T.rLg, padding:26, width:420, boxShadow:T.shadowLg, border:`2px solid ${T.laranja}` }}>
-        <h3 style={{ color:T.text, fontFamily:FONT, fontWeight:800, fontSize:17, marginTop:0 }}>⚠️ Justificar Remanejamento</h3>
+        <h3 style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:17, marginTop:0 }}>⚠️ Justificar Remanejamento</h3>
         <p style={{ color:T.textSec, fontSize:13, fontFamily:FONT, margin:'0 0 13px' }}>
           Mover <strong style={{ color:T.laranja }}>{card?.client}</strong> para <strong>{fmt(targetDate)}</strong>.
         </p>
         <textarea value={reason} onChange={e=>setReason(e.target.value)} placeholder="Motivo do reagendamento..."
           style={{ width:'100%', background:T.surfaceAlt, border:`1px solid ${T.border}`, borderRadius:8, padding:'9px 12px', color:T.text, fontSize:13, fontFamily:FONT, boxSizing:'border-box', outline:'none', height:76, resize:'vertical' }}/>
         <div style={{ display:'flex', gap:10, marginTop:14, justifyContent:'flex-end' }}>
-          <button onClick={onCancel} style={{ background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}`, borderRadius:T.r, padding:'8px 16px', cursor:'pointer', fontFamily:FONT, fontWeight:700, fontSize:12 }}>Cancelar</button>
+          <button onClick={onCancel} style={{ background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}`, borderRadius:T.r, padding:'8px 16px', cursor:'pointer', fontFamily:FONT, fontWeight:600, fontSize:12 }}>Cancelar</button>
           <button onClick={()=>reason.trim()&&onConfirm(reason)} disabled={!reason.trim()}
-            style={{ background:reason.trim()?T.laranja:'#CCC', color:'white', border:'none', borderRadius:T.r, padding:'8px 16px', cursor:'pointer', fontFamily:FONT, fontWeight:800, fontSize:12 }}>Confirmar</button>
+            style={{ background:reason.trim()?T.laranja:'#CCC', color:'white', border:'none', borderRadius:T.r, padding:'8px 16px', cursor:'pointer', fontFamily:FONT, fontWeight:700, fontSize:12 }}>Confirmar</button>
         </div>
       </motion.div>
     </div>
