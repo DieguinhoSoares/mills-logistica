@@ -126,7 +126,9 @@ export function LoginScreen() {
         </div>
         <div style={{ textAlign:'center', marginTop:16, color:'rgba(255,255,255,0.45)', fontSize:10, fontFamily:FONT, letterSpacing:'0.08em' }}>
           Mills Pesados Locação, Serviços e Logística S.A. 
-          Segurança para sonhar mais alto
+          <div style={{ textAlign:'center', marginTop:6, color:'rgba(255,255,255,0.45)', fontSize:10, fontFamily:FONT, letterSpacing:'0.08em' }}>
+  Segurança para sonhar mais alto
+</div>
         </div>
       </div>
     </div>
