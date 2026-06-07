@@ -1,5 +1,5 @@
 // ─── MILLS BRAND — Manual da Marca Abril 2021 ────────────────────────────────
-// Fonte: Nunito (Google Fonts) — arredondada, próxima ao lettering mills
+// Fonte: IBM Plex Sans (Google Fonts)
 // Laranja: Pantone 021 C | #F37021 | Verde escuro: Pantone 2217 C | #004042
 
 export const T = {
@@ -34,7 +34,7 @@ export const T = {
   r:   10, rSm: 6, rLg: 16, rXl: 24,
 }
 
-export const FONT = "'Nunito', 'IBM Plex Sans', sans-serif"
+export const FONT = "'IBM Plex Sans', sans-serif"
 
 export const CARD_TYPES = {
   guindauto:         { label:'Guindauto / Campo',     color:'#004042', bg:'#E0EEEE', icon:'🏗️', short:'GUINDAUTO'  },
@@ -126,23 +126,23 @@ export const MONTH_NAMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho
 export const WD_SHORT    = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom']
 
 export const LS = {
-  display:'block', color:'#9E9590', fontSize:10, fontWeight:800,
+  display:'block', color:'#9E9590', fontSize:10, fontWeight:700,
   letterSpacing:'0.1em', textTransform:'uppercase',
-  marginBottom:5, fontFamily:"'Nunito', sans-serif",
+  marginBottom:5, fontFamily:"'IBM Plex Sans', sans-serif",
 }
 export const IS = {
   width:'100%', background:'#FAF8F5', border:'1px solid #E2DDD6',
   borderRadius:8, padding:'9px 12px', color:'#1A1612',
-  fontSize:13, fontFamily:"'Nunito', sans-serif",
+  fontSize:13, fontFamily:"'IBM Plex Sans', sans-serif",
   boxSizing:'border-box', outline:'none',
 }
 export const BS = {
   padding:'9px 18px', borderRadius:10, border:'none',
   cursor:'pointer', fontSize:12,
-  fontFamily:"'Nunito', sans-serif", fontWeight:800,
+  fontFamily:"'IBM Plex Sans', sans-serif", fontWeight:700,
 }
 export const NB = {
   background:'#FFFFFF', border:'1px solid #E2DDD6', borderRadius:8,
   color:'#6B6258', padding:'5px 12px', cursor:'pointer',
-  fontSize:15, fontFamily:"'Nunito', sans-serif", fontWeight:700,
+  fontSize:15, fontFamily:"'IBM Plex Sans', sans-serif", fontWeight:700,
 }
