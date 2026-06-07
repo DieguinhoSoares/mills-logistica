@@ -35,7 +35,7 @@ function SubtypeSelect({ type, value, onChange }) {
 function RequestForm({ simClients, onSubmit, onClose, profile }) {
   const [form, setForm] = useState({
     type:'freteCliente', subtype:'', machine:'', nInterno:'',
-    originCity:null, destCity:null,
+    originCity:null, destCity:null, selectedClient:null,
     desiredDate:todayStr(), urgency:'medio', description:'',
     clientName:'', channel:'teams',
   })
@@ -93,29 +93,23 @@ function RequestForm({ simClients, onSubmit, onClose, profile }) {
           <label style={LS}>🔍 Planta / Obra (base SIM)</label>
           <ClientInput
             value={form.clientName ? {name:form.clientName} : null}
-            onChange={c=>{ set('clientName',c?.name||''); if(c?.state){ set('destCity',{m:c.city||'',s:c.state}) } set('nInterno',''); set('selectedClient',c||null) }}
+            onChange={c => {
+              set('clientName', c?.name||'')
+              set('selectedClient', c||null)
+              set('nInterno', '')
+              if (c?.state) set('destCity', {m:c.city||'', s:c.state})
+            }}
             simClients={simClients||[]}
           />
           {form.clientName && <div style={{ marginTop:4, color:T.verde, fontSize:11, fontFamily:FONT, fontWeight:700 }}>✓ {form.clientName}</div>}
         </div>
 
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-        <div>
+          <div>
             <label style={LS}>N° Interno (Frota)</label>
-            {form.clientName && form.nInternoOptions?.length > 0 ? (
-              <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginTop:4 }}>
-                {form.nInternoOptions.map(n => (
-                  <div key={n} onClick={()=>set('nInterno',n)}
-                    style={{ border:`2px solid ${form.nInterno===n?T.laranja:T.border}`, borderRadius:T.rSm, padding:'5px 10px', cursor:'pointer',
-                      background:form.nInterno===n?T.laranjaLight:T.surface, fontFamily:FONT, fontSize:12, fontWeight:form.nInterno===n?800:500, color:T.text }}>
-                    {n}
-                  </div>
-                ))}
-              <div>
-            <label style={LS}>N° Interno (Frota)</label>
-            <FrotaInput 
-              value={form.nInterno} 
-              onChange={v=>set('nInterno',v)} 
+            <FrotaInput
+              value={form.nInterno}
+              onChange={v=>set('nInterno',v)}
               simClients={form.selectedClient ? [form.selectedClient] : (simClients||[])}
             />
             {form.selectedClient?.nInternos?.length > 0 && !form.nInterno && (
