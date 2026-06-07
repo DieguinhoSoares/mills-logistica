@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React from 'react'
 import { motion } from 'framer-motion'
 import { useCards, useRequests, useNotifications, useSimClients, useConfig, runDailyBackup } from '../hooks/useFirestore'
 import { MillsLogo, ToastContainer, useToasts, BrazilMap, NotificationBell, ServiceCard, MoveModal, ClientInput, FrotaInput, MunicipioInput } from '../components/UI'
@@ -10,19 +10,53 @@ import { useCards, useRequests, useNotifications, useSimClients, useConfig, runD
 import { MillsLogo, ToastContainer, useToasts, BrazilMap, NotificationBell } from '../components/UI'
 import { KPIView } from './KPIView'
 import { T, FONT, CARD_TYPES, CARD_SUBTYPES, URGENCY, BR_STATES, FILIAIS, MONTH_NAMES, WD_SHORT, BS, IS, LS, NB } from '../lib/constants'
-import { detectConflicts } from '../lib/utils'
+import { fmt, todayStr, getWeekDays, getMonthWeeks, cardsForDay, detectConflicts, buildReport, downloadTxt, parseSIMCsv, getSubtypeLabel } from '../lib/utils'
+import Papa from 'papaparse'
 
 // Master tem acesso a tudo: KPIs, todas as solicitações, todos os cards, backup
+function CsvUploadModal({ onLoaded }) {
+  const [status, setStatus] = React.useState('idle')
+  const [count, setCount]   = React.useState(0)
+  const inputRef = React.useRef()
+  const handleFile = e => {
+    const file = e.target.files[0]; if (!file) return
+    setStatus('loading')
+    const reader = new FileReader()
+    reader.onload = ev => {
+      try {
+        const clients = parseSIMCsv(ev.target.result, Papa)
+        setCount(clients.length); setStatus('done'); onLoaded(clients)
+      } catch(err) { setStatus('error') }
+    }
+    reader.readAsText(file, 'utf-8')
+  }
+  return (
+    <div style={{ background:T.surface, borderRadius:T.rLg, border:`1px solid ${T.border}`, padding:24, maxWidth:500 }}>
+      <div style={{ padding:20, background:T.surfaceAlt, borderRadius:T.r, border:`2px dashed ${T.borderMid}`, textAlign:'center', marginBottom:12 }}>
+        <div style={{ fontSize:36, marginBottom:8 }}>📊</div>
+        <p style={{ color:T.textSec, fontFamily:FONT, fontSize:13, margin:'0 0 12px' }}>CSV exportado do SIM · separador ; · UTF-8</p>
+        <button onClick={()=>inputRef.current?.click()} style={{ ...BS, background:T.laranja, color:'white' }}>Escolher arquivo</button>
+        <input ref={inputRef} type="file" accept=".csv" onChange={handleFile} style={{ display:'none' }}/>
+      </div>
+      {status==='loading' && <div style={{ color:T.textSec, fontFamily:FONT, fontSize:13, textAlign:'center' }}>⏳ Processando...</div>}
+      {status==='done'    && <div style={{ padding:'10px 14px', background:T.verdeLight, borderRadius:T.r, color:T.verde, fontFamily:FONT, fontWeight:700 }}>✅ {count} registros carregados!</div>}
+      {status==='error'   && <div style={{ padding:'10px 14px', background:T.perigoLight, borderRadius:T.r, color:T.perigo, fontFamily:FONT, fontWeight:700 }}>❌ Erro. Verifique o arquivo.</div>}
+    </div>
+  )
+}
 export function MasterView({ simClients }) {
-  const { profile, logout }                = useAuth()
-  const { cards }                          = useCards()
-  const { requests, respondRequest }       = useRequests('frotas')
-  const { notifications, unreadCount, markAllRead } = useNotifications()
-  const { config }                         = useConfig()
-  const { toasts, add:addToast, dismiss }  = useToasts()
-  const [tab, setTab]                      = useState('kpis')
+  const { profile, logout }                           = useAuth()
+  const { cards, saveCard, deleteCard, moveCard }     = useCards()
+  const { requests, respondRequest }                  = useRequests('frotas')
+  const { simClients: simClientsHook, uploadClients } = useSimClients()
+  const { notifications, unreadCount, markAllRead }   = useNotifications()
+  const { config, saveConfig }                        = useConfig()
+  const { toasts, add:addToast, dismiss }             = useToasts()
+  const [tab, setTab]                                 = useState('kpis')
+  const simClientsList = simClientsHook.length > 0 ? simClientsHook : (simClients || [])
+  const conflicts = detectConflicts(cards)
+  const pending   = requests.filter(r=>r.status==='pendente').length
 
-  // Backup automático ao carregar
   useState(() => {
     if (cards.length > 0 || requests.length > 0) {
       runDailyBackup(cards, requests).catch(console.warn)
@@ -33,9 +67,11 @@ export function MasterView({ simClients }) {
   const pending   = requests.filter(r=>r.status==='pendente').length
 
   const TABS = [
-    { id:'kpis',    label:'📊 Indicadores', badge:null },
-    { id:'map',     label:'🗺 Mapa',         badge:null },
-    { id:'requests',label:'📥 Solicitações', badge:pending||null },
+    { id:'kpis',     label:'📊 Indicadores',  badge:null },
+    { id:'agenda',   label:'📅 Agenda',        badge:null },
+    { id:'map',      label:'🗺 Mapa',           badge:null },
+    { id:'requests', label:'📥 Solicitações',  badge:pending||null },
+    { id:'sim',      label:'⬆ Base SIM',       badge:null },
   ]
 
   return (
@@ -83,6 +119,21 @@ export function MasterView({ simClients }) {
             <div style={{ height:'calc(100% - 44px)' }}>
               <BrazilMap cards={cards}/>
             </div>
+          </div>
+        )}
+
+        {tab==='agenda' && (
+          <div style={{ flex:1, overflow:'hidden', padding:'8px 6px 4px', display:'flex', flexDirection:'column', minHeight:0 }}>
+            <div style={{ fontFamily:FONT, fontWeight:900, fontSize:16, color:T.text, marginBottom:8 }}>Agenda Semanal</div>
+            <p style={{ color:T.textMuted, fontFamily:FONT, fontSize:12, marginBottom:8 }}>Visualização completa disponível na versão Frotas. Em breve no Master.</p>
+          </div>
+        )}
+
+        {tab==='sim' && (
+          <div style={{ flex:1, padding:'16px 20px', overflowY:'auto' }}>
+            <h3 style={{ fontFamily:FONT, fontWeight:900, fontSize:16, color:T.text, margin:'0 0 6px' }}>⬆ Base SIM — Clientes e Frotas</h3>
+            <p style={{ color:T.textMuted, fontFamily:FONT, fontSize:12, marginBottom:16 }}>Faça upload do CSV exportado do SIM para popular a base de clientes e frotas.</p>
+            <CsvUploadModal inline simClients={simClientsList} onLoaded={async clients => { await uploadClients(clients); addToast(`${clients.length} registros carregados!`, 'success') }}/>
           </div>
         )}
 
