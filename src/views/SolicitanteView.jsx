@@ -93,16 +93,16 @@ function RequestForm({ simClients, onSubmit, onClose, profile }) {
           <label style={LS}>🔍 Planta / Obra (base SIM)</label>
           <ClientInput
             value={form.clientName ? {name:form.clientName} : null}
-            onChange={c=>{ set('clientName',c?.name||''); if(c?.state){ set('destCity',{m:c.city||'',s:c.state}) } if(c?.nInternos?.length){ set('nInterno',c.nInternos[0]); set('nInternoOptions',c.nInternos) } else { set('nInternoOptions',[]) } }}
+            onChange={c=>{ set('clientName',c?.name||''); if(c?.state){ set('destCity',{m:c.city||'',s:c.state}) } set('nInterno',''); set('selectedClient',c||null) }}
             simClients={simClients||[]}
           />
           {form.clientName && <div style={{ marginTop:4, color:T.verde, fontSize:11, fontFamily:FONT, fontWeight:700 }}>✓ {form.clientName}</div>}
         </div>
 
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-       <div>
+        <div>
             <label style={LS}>N° Interno (Frota)</label>
-            {form.nInternoOptions?.length > 0 ? (
+            {form.clientName && form.nInternoOptions?.length > 0 ? (
               <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginTop:4 }}>
                 {form.nInternoOptions.map(n => (
                   <div key={n} onClick={()=>set('nInterno',n)}
