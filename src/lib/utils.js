@@ -128,32 +128,35 @@ export async function sendTeamsNotification(webhookUrl, title, message) {
 }
 
 export function parseSIMCsv(text, Papa) {
-  const result = Papa.parse(text, { header:true, skipEmptyLines:true, delimiter:';' })
-  const stateMap = {
-    'São Paulo':'SP','Minas Gerais':'MG','Rio de Janeiro':'RJ','Paraná':'PR',
-    'Santa Catarina':'SC','Rio Grande do Sul':'RS','Bahia':'BA','Goiás':'GO',
-    'Mato Grosso':'MT','Mato Grosso do Sul':'MS','Pará':'PA','Amazonas':'AM',
-    'Ceará':'CE','Pernambuco':'PE','Tocantins':'TO','Maranhão':'MA','Piauí':'PI',
-    'Rio Grande do Norte':'RN','Paraíba':'PB','Alagoas':'AL','Sergipe':'SE',
-    'Espírito Santo':'ES','Distrito Federal':'DF','Rondônia':'RO',
-    'Roraima':'RR','Amapá':'AP','Acre':'AC',
-  }
+  // CSV tem 2 linhas de cabeçalho — pula a primeira (grupos)
+  const lines = text.split('\n')
+  const dataWithoutFirstRow = lines.slice(1).join('\n')
+  
+  const result = Papa.parse(dataWithoutFirstRow, { 
+    header: true, 
+    skipEmptyLines: true, 
+    delimiter: ';',
+    encoding: 'utf-8'
+  })
+
   const map = {}
   result.data.forEach(r => {
-    const name = (r['Planta/Obra']||r['Planta / Obra']||r['Cliente (CT)']||r['Cliente (reserva)']||'').trim()
+    const name = (r['Planta/Obra'] || '').trim()
     if (!name) return
-    const nInterno = (r['N° Interno']||r['N Interno']||r['Nº Interno']||r['n_interno']||'').trim()
-    const state = stateMap[r['Estado (Planta/Obra)']?.trim()] || r['Estado (Planta/Obra)']?.trim() || ''
-    const city  = r['Município (Planta/Obra)']?.trim() || ''
-    const seg   = r['Segmento de mercado']?.trim() || ''
-    const fam   = r['Família']?.trim() || ''
-    if (!map[name]) map[name] = { name, state, city, segment:seg, families:new Set(), machines:0, nInternos:new Set() }
+
+    const nInterno = (r['Nº interno'] || r['N° Interno'] || r['Nº Interno'] || '').trim()
+    const state    = (r['Estado (Planta/Obra)'] || '').trim()
+    const city     = (r['Município (Planta/Obra)'] || '').trim()
+    const familia  = (r['Família'] || '').trim()
+
+    if (!map[name]) map[name] = { name, state, city, segment:'', families:new Set(), machines:0, nInternos:new Set() }
     map[name].machines++
-    if (fam) map[name].families.add(fam)
+    if (familia)  map[name].families.add(familia)
     if (nInterno) map[name].nInternos.add(nInterno)
     if (!map[name].state && state) map[name].state = state
     if (!map[name].city  && city)  map[name].city  = city
   })
+
   return Object.values(map)
     .map(c => ({ ...c, families:[...c.families].slice(0,5), nInternos:[...c.nInternos].slice(0,10) }))
     .sort((a,b) => b.machines - a.machines)
