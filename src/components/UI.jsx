@@ -59,23 +59,14 @@ export function useToasts() {
 
 export function NotificationBell({ notifications, unreadCount, onMarkAllRead }) {
   const [open, setOpen] = useState(false)
-
-  const handleOpen = () => {
-    setOpen(o => !o)
-    if (unreadCount > 0) onMarkAllRead()
-  }
-
+  const handleOpen = () => { setOpen(o=>!o); if(unreadCount>0) onMarkAllRead() }
   return (
     <div style={{ position:'relative' }}>
       <button onClick={handleOpen}
         style={{ background:unreadCount>0?T.laranjaLight:T.surfaceAlt, border:`1px solid ${unreadCount>0?T.laranja+'60':T.border}`,
           borderRadius:T.r, color:unreadCount>0?T.laranja:T.textSec, padding:'6px 12px', cursor:'pointer', position:'relative', fontFamily:FONT, transition:'all .2s' }}>
         🔔
-        {unreadCount > 0 && (
-          <span style={{ position:'absolute', top:-4, right:-4, background:T.perigo, color:'white', borderRadius:20, fontSize:9, fontWeight:700, padding:'1px 5px', fontFamily:FONT }}>
-            {unreadCount}
-          </span>
-        )}
+        {unreadCount>0 && <span style={{ position:'absolute', top:-4, right:-4, background:T.perigo, color:'white', borderRadius:20, fontSize:9, fontWeight:700, padding:'1px 5px', fontFamily:FONT }}>{unreadCount}</span>}
       </button>
       <AnimatePresence>
         {open && (
@@ -137,15 +128,13 @@ export function FrotaInput({ value, onChange, simClients }) {
   const [notFound, setNotFound] = useState(false)
   const allFrotas = simClients.flatMap(c=>(c.nInternos||[]).map(n=>({ nInterno:n, client:c.name, state:c.state })))
   const filtered  = search.length>=2 ? allFrotas.filter(f=>f.nInterno.toLowerCase().includes(search.toLowerCase())).slice(0,8) : []
-
   const handleBlur = () => {
     setTimeout(()=>{
       setOpen(false)
-      if (search.length>=2 && allFrotas.length>0 && filtered.length===0) setNotFound(true)
+      if(search.length>=2 && allFrotas.length>0 && filtered.length===0) setNotFound(true)
       else setNotFound(false)
     }, 180)
   }
-
   return (
     <div style={{ position:'relative' }}>
       <input value={search}
@@ -153,11 +142,7 @@ export function FrotaInput({ value, onChange, simClients }) {
         onFocus={()=>setOpen(true)} onBlur={handleBlur}
         placeholder="Ex: XXX01234"
         style={{ width:'100%', background:T.surfaceAlt, border:`1px solid ${notFound?T.perigo:T.border}`, borderRadius:8, padding:'9px 12px', color:T.text, fontSize:13, fontFamily:FONT, boxSizing:'border-box', outline:'none' }} autoComplete="off"/>
-      {notFound && (
-        <div style={{ marginTop:5, padding:'7px 10px', background:T.perigoLight, borderRadius:T.rSm, color:T.perigo, fontSize:11, fontFamily:FONT, fontWeight:700 }}>
-          ⚠️ Frota não encontrada. Entre em contato com a Gestão de Frotas.
-        </div>
-      )}
+      {notFound && <div style={{ marginTop:5, padding:'7px 10px', background:T.perigoLight, borderRadius:T.rSm, color:T.perigo, fontSize:11, fontFamily:FONT, fontWeight:700 }}>⚠️ Frota não encontrada. Entre em contato com a Gestão de Frotas.</div>}
       {open && filtered.length>0 && (
         <div style={{ position:'absolute', top:'100%', left:0, right:0, background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.r, boxShadow:T.shadowLg, zIndex:500, maxHeight:200, overflowY:'auto' }}>
           {filtered.map((f,i) => (
@@ -180,24 +165,16 @@ export function MunicipioInput({ value, onChange, placeholder='Cidade...' }) {
   const [search, setSearch]   = useState(value ? `${value.m} (${value.s})` : '')
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
-
   const buscar = async (texto) => {
-    if (texto.length < 2) { setResults([]); return }
+    if(texto.length<2){ setResults([]); return }
     setLoading(true)
     try {
-      const res = await fetch('https://servicodados.ibge.gov.br/api/v1/localidades/municipios?orderBy=nome')
+      const res  = await fetch('https://servicodados.ibge.gov.br/api/v1/localidades/municipios?orderBy=nome')
       const data = await res.json()
-      const filtered = data
-        .filter(m => m.nome.toLowerCase().includes(texto.toLowerCase()))
-        .slice(0, 10)
-        .map(m => ({ m: m.nome, s: m.microrregiao.mesorregiao.UF.sigla }))
-      setResults(filtered)
-    } catch {
-      setResults([])
-    }
+      setResults(data.filter(m=>m.nome.toLowerCase().includes(texto.toLowerCase())).slice(0,10).map(m=>({ m:m.nome, s:m.microrregiao.mesorregiao.UF.sigla })))
+    } catch { setResults([]) }
     setLoading(false)
   }
-
   return (
     <div style={{ position:'relative' }}>
       <input value={search}
@@ -255,7 +232,6 @@ export function ServiceCard({ card, conflicts, onEdit, onDragStart, compact=fals
 
 export function BrazilMap({ cards }) {
   const [hov, setHov] = useState(null)
-  const cnt = {}; const types = {}
 
   const STATE_MAP = {
     'São Paulo':'SP','Minas Gerais':'MG','Rio de Janeiro':'RJ','Paraná':'PR',
@@ -268,19 +244,21 @@ export function BrazilMap({ cards }) {
   }
   const toSigla = v => STATE_MAP[v] || v
 
+  const cnt = {}; const types = {}; const stateCards = {}
   cards.forEach(c => {
-    ;[toSigla(c.originState||c.origin), toSigla(c.destState||c.destination)].filter(Boolean).forEach(s => {
-      if (s.length > 2) return
+    ;[toSigla(c.originState||c.origin), toSigla(c.destState||c.destination)].filter(s=>s&&s.length===2).forEach(s => {
       cnt[s]=(cnt[s]||0)+1
       if(!types[s]) types[s]=new Set()
       types[s].add(c.type)
+      if(!stateCards[s]) stateCards[s]=[]
+      if(!stateCards[s].find(x=>x.id===c.id)) stateCards[s].push(c)
     })
   })
 
   const routes = {}
   cards.filter(c=>(c.originState||c.origin)&&(c.destState||c.destination)).forEach(c=>{
     const o=toSigla(c.originState||c.origin), d=toSigla(c.destState||c.destination)
-    if(o===d || o.length>2 || d.length>2) return
+    if(o===d||o.length>2||d.length>2) return
     const k=[o,d].sort().join('-')
     if(!routes[k]) routes[k]=[]
     routes[k].push(c)
@@ -289,22 +267,25 @@ export function BrazilMap({ cards }) {
   const getS = id => BR_STATES.find(s=>s.id===id)
   const getColor = id => {
     const n=cnt[id]||0
-    if(!n)    return { fill:'#F0EDE8', stroke:'#CEC8C0' }
-    if(n===1) return { fill:'rgba(243,112,33,0.35)', stroke:'#F37021' }
-    if(n<=3)  return { fill:'rgba(243,112,33,0.65)', stroke:'#C24003' }
-    return           { fill:'rgba(194,64,3,0.88)',   stroke:'#8B2500' }
+    if(!n)    return { fill:'#E8F0EE', stroke:'#004042' }
+    if(n===1) return { fill:'rgba(243,112,33,0.3)',  stroke:'#F37021' }
+    if(n<=3)  return { fill:'rgba(243,112,33,0.6)',  stroke:'#C24003' }
+    return           { fill:'rgba(194,64,3,0.85)',   stroke:'#8B2500' }
   }
+
+  const hovCards = hov ? (stateCards[hov]||[]) : []
 
   return (
     <div style={{ background:T.surface, borderRadius:T.rLg, border:`1px solid ${T.border}`, padding:'12px 14px', height:'100%', display:'flex', flexDirection:'column', position:'relative', overflow:'hidden', boxShadow:T.shadow }}>
-      <MillsPattern opacity={0.05} color={T.laranja}/>
+      <MillsPattern opacity={0.04} color={T.laranja}/>
+
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6, position:'relative', zIndex:1, flexShrink:0 }}>
         <div style={{ display:'flex', alignItems:'center', gap:7 }}>
           <span style={{ fontFamily:FONT, fontWeight:700, fontSize:10, textTransform:'uppercase', letterSpacing:'0.1em', color:T.text }}>🗺 Operações Ativas</span>
           {Object.keys(cnt).length>0 && <span style={{ background:T.laranjaLight, border:`1px solid ${T.laranja}50`, borderRadius:20, padding:'1px 7px', color:T.laranja, fontSize:9, fontWeight:700, fontFamily:FONT }}>{Object.keys(cnt).length} estados</span>}
         </div>
         <div style={{ display:'flex', gap:5 }}>
-          {[{f:'#F0EDE8',s:'#CEC8C0',l:'0'},{f:'rgba(243,112,33,0.35)',s:'#F37021',l:'1'},{f:'rgba(243,112,33,0.65)',s:'#C24003',l:'2–3'},{f:'rgba(194,64,3,0.88)',s:'#8B2500',l:'4+'}].map(l=>(
+          {[{f:'#E8F0EE',s:'#004042',l:'0'},{f:'rgba(243,112,33,0.3)',s:'#F37021',l:'1'},{f:'rgba(243,112,33,0.6)',s:'#C24003',l:'2–3'},{f:'rgba(194,64,3,0.85)',s:'#8B2500',l:'4+'}].map(l=>(
             <div key={l.l} style={{ display:'flex', alignItems:'center', gap:2 }}>
               <div style={{ width:8, height:8, background:l.f, border:`1px solid ${l.s}`, borderRadius:2 }}/>
               <span style={{ fontSize:8, color:T.textMuted, fontFamily:FONT }}>{l.l}</span>
@@ -312,50 +293,89 @@ export function BrazilMap({ cards }) {
           ))}
         </div>
       </div>
-      {hov && cnt[hov] && (
-        <div style={{ background:T.verde, color:'white', borderRadius:T.rSm, padding:'3px 10px', marginBottom:4, fontFamily:FONT, fontSize:11, fontWeight:700, display:'inline-flex', gap:8, alignItems:'center', flexShrink:0, position:'relative', zIndex:1 }}>
-          <span>{hov} — {cnt[hov]} operaç{cnt[hov]>1?'ões':'ão'}</span>
-          {types[hov] && [...types[hov]].map(t=><span key={t} style={{ fontSize:12 }}>{CARD_TYPES[t]?.icon}</span>)}
-        </div>
-      )}
-      <svg viewBox="60 80 560 510" style={{ flex:1, width:'100%', position:'relative', zIndex:1, minHeight:0 }}>
-        <defs>
-          <filter id="glow"><feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#F37021" floodOpacity="0.6"/></filter>
-          <filter id="shadow2"><feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#00000022"/></filter>
-        </defs>
-        {BR_STATES.map(s => {
-          const {fill,stroke}=getColor(s.id)
-          const isActive=!!cnt[s.id], isHov=hov===s.id
-          return (
-            <g key={s.id} onMouseEnter={()=>setHov(s.id)} onMouseLeave={()=>setHov(null)} style={{ cursor:isActive?'pointer':'default' }}>
-              {isActive && <circle cx={s.x} cy={s.y} r={isHov?24:19} fill={fill} opacity={0.2}/>}
-              <circle cx={s.x} cy={s.y} r={isActive?(isHov?14:12):8} fill={fill} stroke={stroke}
-                strokeWidth={isActive?(isHov?2.5:2):1.5}
-                filter={isActive&&isHov?'url(#glow)':isActive?'url(#shadow2)':undefined}
-                style={{ transition:'all .18s' }}/>
-              <text x={s.x} y={s.y+(isActive?-15:-9)} textAnchor="middle"
-                fill={isActive?T.text:T.textSec}
-                fontSize={isActive?(isHov?10:9):7} fontWeight={isActive?'700':'400'}
-                fontFamily="IBM Plex Sans, sans-serif" style={{ pointerEvents:'none' }}>{s.id}</text>
-              {isActive && <text x={s.x} y={s.y+4} textAnchor="middle" fill="white"
-                fontSize={isHov?10:9} fontWeight="700" fontFamily="IBM Plex Sans, sans-serif"
-                style={{ pointerEvents:'none' }}>{cnt[s.id]}</text>}
-            </g>
-          )
-        })}
-        {Object.entries(routes).map(([key,rts])=>{
-          const oId=rts[0].originState||rts[0].origin, dId=rts[0].destState||rts[0].destination
-          const o=getS(toSigla(oId)), d=getS(toSigla(dId)); if(!o||!d) return null
-          const ct=CARD_TYPES[rts[0].type], mx=(o.x+d.x)/2, my=(o.y+d.y)/2-28
-          return (
-            <g key={key}>
-              <path d={`M${o.x},${o.y} Q${mx},${my} ${d.x},${d.y}`} stroke={ct?.color} strokeWidth={rts.length>1?2.5:1.5} fill="none" strokeDasharray={rts.length>1?'none':'5,4'} opacity={0.7}/>
-              <circle cx={mx} cy={my} r={rts.length>1?9:5} fill={rts.length>1?T.amarelo:ct?.bg} stroke={ct?.color} strokeWidth={1.5}/>
-              <text x={mx} y={my+4} textAnchor="middle" fill={rts.length>1?'#000':ct?.color} fontSize={rts.length>1?9:7} fontWeight="700" fontFamily="IBM Plex Sans, sans-serif">{rts.length>1?rts.length:ct?.icon?.slice(0,1)}</text>
-            </g>
-          )
-        })}
-      </svg>
+
+      <div style={{ flex:1, position:'relative', minHeight:0, display:'flex' }}>
+        <svg viewBox="60 80 560 510" style={{ flex:1, width:'100%', position:'relative', zIndex:1 }}>
+          <defs>
+            <filter id="glow"><feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#F37021" floodOpacity="0.6"/></filter>
+            <filter id="shadow2"><feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#00000022"/></filter>
+          </defs>
+
+          {/* Linhas de divisa entre estados próximos */}
+          {BR_STATES.map(s =>
+            BR_STATES.filter(n => n.id!==s.id && Math.sqrt((n.x-s.x)**2+(n.y-s.y)**2) < 120).map(n => (
+              <line key={`${s.id}-${n.id}`} x1={s.x} y1={s.y} x2={n.x} y2={n.y}
+                stroke="#004042" strokeWidth="0.5" opacity="0.15" strokeDasharray="3,5"/>
+            ))
+          )}
+
+          {/* Pontos dos estados */}
+          {BR_STATES.map(s => {
+            const {fill,stroke}=getColor(s.id)
+            const isActive=!!cnt[s.id], isHov=hov===s.id
+            return (
+              <g key={s.id} onMouseEnter={()=>setHov(s.id)} onMouseLeave={()=>setHov(null)} style={{ cursor:isActive?'pointer':'default' }}>
+                {isActive && <circle cx={s.x} cy={s.y} r={isHov?26:21} fill={fill} opacity={0.15}/>}
+                <circle cx={s.x} cy={s.y} r={isActive?(isHov?14:12):8} fill={fill} stroke={stroke}
+                  strokeWidth={isActive?(isHov?2.5:2):1.5}
+                  filter={isActive&&isHov?'url(#glow)':isActive?'url(#shadow2)':undefined}
+                  style={{ transition:'all .18s' }}/>
+                <text x={s.x} y={s.y+(isActive?-15:-10)} textAnchor="middle"
+                  fill={isActive?T.text:'#004042'}
+                  fontSize={isActive?(isHov?10:9):7} fontWeight={isActive?'700':'500'}
+                  fontFamily="IBM Plex Sans, sans-serif" style={{ pointerEvents:'none' }}>{s.id}</text>
+                {isActive && <text x={s.x} y={s.y+4} textAnchor="middle" fill="white"
+                  fontSize={isHov?10:9} fontWeight="700" fontFamily="IBM Plex Sans, sans-serif"
+                  style={{ pointerEvents:'none' }}>{cnt[s.id]}</text>}
+              </g>
+            )
+          })}
+
+          {/* Rotas */}
+          {Object.entries(routes).map(([key,rts])=>{
+            const oId=toSigla(rts[0].originState||rts[0].origin), dId=toSigla(rts[0].destState||rts[0].destination)
+            const o=getS(oId), d=getS(dId); if(!o||!d) return null
+            const ct=CARD_TYPES[rts[0].type], mx=(o.x+d.x)/2, my=(o.y+d.y)/2-28
+            return (
+              <g key={key}>
+                <path d={`M${o.x},${o.y} Q${mx},${my} ${d.x},${d.y}`} stroke={ct?.color} strokeWidth={rts.length>1?2.5:1.5} fill="none" strokeDasharray={rts.length>1?'none':'5,4'} opacity={0.75}/>
+                <circle cx={mx} cy={my} r={rts.length>1?9:5} fill={rts.length>1?T.amarelo:ct?.bg} stroke={ct?.color} strokeWidth={1.5}/>
+                <text x={mx} y={my+4} textAnchor="middle" fill={rts.length>1?'#000':ct?.color} fontSize={rts.length>1?9:7} fontWeight="700" fontFamily="IBM Plex Sans, sans-serif">{rts.length>1?rts.length:ct?.icon?.slice(0,1)}</text>
+              </g>
+            )
+          })}
+        </svg>
+
+        {/* Pop-up detalhes ao hover */}
+        <AnimatePresence>
+          {hov && hovCards.length>0 && (
+            <motion.div initial={{ opacity:0, x:10 }} animate={{ opacity:1, x:0 }} exit={{ opacity:0, x:10 }}
+              style={{ position:'absolute', right:0, top:0, width:200, background:T.surface, border:`1.5px solid ${T.verde}`, borderRadius:T.rLg, boxShadow:T.shadowLg, zIndex:10, overflow:'hidden' }}>
+              <div style={{ background:T.verde, padding:'8px 12px' }}>
+                <div style={{ color:'white', fontFamily:FONT, fontWeight:700, fontSize:12 }}>{hov} — {hovCards.length} operaç{hovCards.length>1?'ões':'ão'}</div>
+              </div>
+              <div style={{ maxHeight:200, overflowY:'auto', padding:'6px 0' }}>
+                {hovCards.map(c => {
+                  const ct = CARD_TYPES[c.type]
+                  return (
+                    <div key={c.id} style={{ padding:'7px 12px', borderBottom:`1px solid ${T.border}` }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:3 }}>
+                        <span style={{ fontSize:12 }}>{ct?.icon}</span>
+                        <span style={{ color:ct?.color, fontSize:9, fontWeight:700, fontFamily:FONT, textTransform:'uppercase' }}>{ct?.short}</span>
+                      </div>
+                      <div style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:11, marginBottom:2 }}>{c.client||'—'}</div>
+                      {c.nInterno && <div style={{ color:T.info, fontFamily:FONT, fontSize:9, fontWeight:600 }}>🔢 {c.nInterno}</div>}
+                      {c.driver   && <div style={{ color:T.verde, fontFamily:FONT, fontSize:9, fontWeight:600 }}>👤 {c.driver}</div>}
+                      <div style={{ color:T.textMuted, fontFamily:FONT, fontSize:9 }}>📅 {c.startDate?c.startDate.split('-').reverse().join('/'):'—'}</div>
+                    </div>
+                  )
+                })}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
       <div style={{ display:'flex', gap:10, marginTop:5, flexShrink:0, flexWrap:'wrap', position:'relative', zIndex:1 }}>
         {Object.entries(CARD_TYPES).map(([k,v])=>(
           <div key={k} style={{ display:'flex', alignItems:'center', gap:4 }}>
