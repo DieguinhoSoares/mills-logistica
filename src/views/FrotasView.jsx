@@ -390,7 +390,7 @@ function WeekView({ cards, baseDate, conflicts, onEdit, onAddCard, onMoveCard })
             <div key={day}
               onDragOver={e=>{e.preventDefault();setDragOver(day);}} onDragLeave={()=>setDragOver(null)}
               onDrop={e=>{e.preventDefault();if(dragCard&&day!==dragCard.startDate)setPending({card:dragCard,tgt:day});setDragCard(null);setDragOver(null);}}
-              style={{ background:isDO?'#FFF3E8':isToday?'#FFFAF5':T.surface, border:`1.5px solid ${isToday?T.laranja:isDO?T.laranja:T.border}`, borderRadius:T.r, padding:9, minHeight:110, display:'flex', flexDirection:'column', overflowY:'auto', boxShadow:isToday?`0 0 0 1px ${T.laranja}40,${T.shadow}`:T.shadow, transition:'all .1s' }}>
+              style={{ background:isDO?'#FFF3E8':isToday?'#FFFAF5':T.surface, border:`1.5px solid ${isToday?T.laranja:isDO?T.laranja:T.border}`, borderRadius:T.r, padding:9, minHeight:70, display:'flex', flexDirection:'column', overflowY:'auto', boxShadow:isToday?`0 0 0 1px ${T.laranja}40,${T.shadow}`:T.shadow, transition:'all .1s' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:7, flexShrink:0 }}>
                 <div>
                   <div style={{ color:T.textMuted, fontSize:9, fontWeight:700, fontFamily:FONT, textTransform:'uppercase', letterSpacing:'0.06em' }}>{WD_SHORT[idx]}</div>
@@ -709,7 +709,7 @@ export function FrotasView() {
 
       {/* AGENDA TAB */}
       {activeTab==='agenda'&&<>
-        <div style={{ flex:'0 0 45%', overflow:'hidden', padding:'12px 20px 6px', display:'flex', flexDirection:'column', minHeight:0 }}>
+        <div style={{ flex:'0 0 35%', overflow:'hidden', padding:'12px 20px 6px', display:'flex', flexDirection:'column', minHeight:0 }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10, flexShrink:0 }}>
             <div style={{ display:'flex', alignItems:'center', gap:8 }}>
               <button onClick={()=>view==='semana'?navWeek(-1):view==='mes'?navMonth(-1):setYr(y=>y-1)} style={NB}>‹</button>
@@ -742,7 +742,7 @@ export function FrotasView() {
         </div>
 
         {/* Bottom: Mapa maior + KPIs + solicitações rápidas */}
-        <div style={{ flex:'1 1 52%', display:'grid', gridTemplateColumns:'1fr 340px', gap:12, padding:'0 20px 14px', minHeight:0, overflow:'hidden' }}>
+        <div style={{ flex:'1 1 62%', display:'grid', gridTemplateColumns:'1fr 340px', gap:12, padding:'0 20px 14px', minHeight:0, overflow:'hidden' }}>
           {/* MAPA — agora ocupa mais espaço */}
           <BrazilMap cards={cards}/>
           <div style={{ display:'flex', flexDirection:'column', gap:8, overflow:'hidden' }}>
