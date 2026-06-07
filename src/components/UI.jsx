@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { T, FONT, CARD_TYPES, URGENCY, BR_STATES, MUNICIPIOS } from '../lib/constants'
+import { T, FONT, CARD_TYPES, URGENCY, BR_STATES } from '../lib/constants'
 import { fmt } from '../lib/utils'
 
 export function MillsLogo({ height=32 }) {
@@ -66,21 +66,31 @@ export function useToasts() {
 
 export function NotificationBell({ notifications, unreadCount, onMarkAllRead }) {
   const [open, setOpen] = useState(false)
+
+  const handleOpen = () => {
+    setOpen(o => !o)
+    if (unreadCount > 0) onMarkAllRead()
+  }
+
   return (
     <div style={{ position:'relative' }}>
-      <button onClick={()=>{ setOpen(o=>!o); if(unreadCount) onMarkAllRead() }}
-        style={{ background:unreadCount?T.laranjaLight:T.surfaceAlt, border:`1px solid ${unreadCount?T.laranja+'60':T.border}`,
-          borderRadius:T.r, color:unreadCount?T.laranja:T.textSec, padding:'6px 12px', cursor:'pointer', position:'relative', fontFamily:FONT }}>
+      <button onClick={handleOpen}
+        style={{ background:unreadCount>0?T.laranjaLight:T.surfaceAlt, border:`1px solid ${unreadCount>0?T.laranja+'60':T.border}`,
+          borderRadius:T.r, color:unreadCount>0?T.laranja:T.textSec, padding:'6px 12px', cursor:'pointer', position:'relative', fontFamily:FONT, transition:'all .2s' }}>
         🔔
-        {unreadCount>0 && <span style={{ position:'absolute', top:-4, right:-4, background:T.perigo, color:'white', borderRadius:20, fontSize:9, fontWeight:800, padding:'1px 5px', fontFamily:FONT }}>{unreadCount}</span>}
+        {unreadCount > 0 && (
+          <span style={{ position:'absolute', top:-4, right:-4, background:T.perigo, color:'white', borderRadius:20, fontSize:9, fontWeight:800, padding:'1px 5px', fontFamily:FONT }}>
+            {unreadCount}
+          </span>
+        )}
       </button>
       <AnimatePresence>
         {open && (
           <motion.div initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:8 }}
             style={{ position:'absolute', right:0, top:'calc(100% + 8px)', width:320, background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.rLg, boxShadow:T.shadowLg, zIndex:999 }}>
-            <div style={{ padding:'11px 14px', borderBottom:`1px solid ${T.border}`, display:'flex', justifyContent:'space-between' }}>
+            <div style={{ padding:'11px 14px', borderBottom:`1px solid ${T.border}`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
               <span style={{ fontFamily:FONT, fontWeight:800, fontSize:12, color:T.text }}>Notificações</span>
-              {notifications.length>0 && <button onClick={onMarkAllRead} style={{ background:'none', border:'none', cursor:'pointer', color:T.laranja, fontSize:11, fontFamily:FONT, fontWeight:700 }}>Marcar todas lidas</button>}
+              <button onClick={()=>{ onMarkAllRead(); setOpen(false) }} style={{ background:'none', border:'none', cursor:'pointer', color:T.laranja, fontSize:11, fontFamily:FONT, fontWeight:700 }}>✓ Marcar todas lidas</button>
             </div>
             <div style={{ maxHeight:280, overflowY:'auto' }}>
               {notifications.length===0 && <p style={{ padding:14, color:T.textMuted, fontFamily:FONT, fontSize:12, margin:0, textAlign:'center' }}>Nenhuma notificação.</p>}
@@ -117,7 +127,7 @@ export function ClientInput({ value, onChange, simClients }) {
               onMouseLeave={e=>e.currentTarget.style.background=T.surface}>
               <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:T.text }}>{c.name}</div>
               <div style={{ fontFamily:FONT, fontSize:10, color:T.textMuted }}>
-                {c.city?`${c.city} — `:''}{c.state} · {c.segment} · {c.machines} máq.
+                {c.city?`${c.city} — `:''}{c.state} · {c.machines} máq.
                 {c.nInternos?.length>0 && <span style={{ color:T.info }}> · N°: {c.nInternos.slice(0,3).join(', ')}</span>}
               </div>
             </div>
@@ -129,8 +139,8 @@ export function ClientInput({ value, onChange, simClients }) {
 }
 
 export function FrotaInput({ value, onChange, simClients }) {
-  const [search, setSearch]   = useState(value||'')
-  const [open, setOpen]       = useState(false)
+  const [search, setSearch]     = useState(value||'')
+  const [open, setOpen]         = useState(false)
   const [notFound, setNotFound] = useState(false)
   const allFrotas = simClients.flatMap(c=>(c.nInternos||[]).map(n=>({ nInterno:n, client:c.name, state:c.state })))
   const filtered  = search.length>=2 ? allFrotas.filter(f=>f.nInterno.toLowerCase().includes(search.toLowerCase())).slice(0,8) : []
@@ -138,7 +148,7 @@ export function FrotaInput({ value, onChange, simClients }) {
   const handleBlur = () => {
     setTimeout(()=>{
       setOpen(false)
-      if (search.length>=2 && filtered.length===0) setNotFound(true)
+      if (search.length>=2 && allFrotas.length>0 && filtered.length===0) setNotFound(true)
       else setNotFound(false)
     }, 180)
   }
@@ -182,7 +192,7 @@ export function MunicipioInput({ value, onChange, placeholder='Cidade...' }) {
     if (texto.length < 2) { setResults([]); return }
     setLoading(true)
     try {
-      const res = await fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/municipios?orderBy=nome`)
+      const res = await fetch('https://servicodados.ibge.gov.br/api/v1/localidades/municipios?orderBy=nome')
       const data = await res.json()
       const filtered = data
         .filter(m => m.nome.toLowerCase().includes(texto.toLowerCase()))
@@ -198,20 +208,18 @@ export function MunicipioInput({ value, onChange, placeholder='Cidade...' }) {
   return (
     <div style={{ position:'relative' }}>
       <input value={search}
-        onChange={e => { setSearch(e.target.value); setOpen(true); buscar(e.target.value); if(!e.target.value) onChange(null) }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 180)}
+        onChange={e=>{ setSearch(e.target.value); setOpen(true); buscar(e.target.value); if(!e.target.value) onChange(null) }}
+        onFocus={()=>setOpen(true)} onBlur={()=>setTimeout(()=>setOpen(false),180)}
         placeholder={placeholder}
-        style={{ width:'100%', background:T.surfaceAlt, border:`1px solid ${T.border}`, borderRadius:8, padding:'9px 12px', color:T.text, fontSize:13, fontFamily:FONT, boxSizing:'border-box', outline:'none' }}
-        autoComplete="off"/>
+        style={{ width:'100%', background:T.surfaceAlt, border:`1px solid ${T.border}`, borderRadius:8, padding:'9px 12px', color:T.text, fontSize:13, fontFamily:FONT, boxSizing:'border-box', outline:'none' }} autoComplete="off"/>
       {loading && <div style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', fontSize:12 }}>⏳</div>}
-      {open && results.length > 0 && (
+      {open && results.length>0 && (
         <div style={{ position:'absolute', top:'100%', left:0, right:0, background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.r, boxShadow:T.shadowLg, zIndex:500, maxHeight:220, overflowY:'auto' }}>
           {results.map((m,i) => (
-            <div key={i} onMouseDown={() => { onChange(m); setSearch(`${m.m} (${m.s})`); setOpen(false) }}
+            <div key={i} onMouseDown={()=>{ onChange(m); setSearch(`${m.m} (${m.s})`); setOpen(false) }}
               style={{ padding:'9px 13px', cursor:'pointer', borderBottom:`1px solid ${T.border}` }}
-              onMouseEnter={e => e.currentTarget.style.background = T.laranjaXLight}
-              onMouseLeave={e => e.currentTarget.style.background = T.surface}>
+              onMouseEnter={e=>e.currentTarget.style.background=T.laranjaXLight}
+              onMouseLeave={e=>e.currentTarget.style.background=T.surface}>
               <span style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:T.text }}>{m.m}</span>
               <span style={{ fontFamily:FONT, fontSize:10, color:T.textMuted }}> — {m.s}</span>
             </div>
@@ -273,10 +281,10 @@ export function BrazilMap({ cards }) {
   const getS = id => BR_STATES.find(s=>s.id===id)
   const getColor = id => {
     const n=cnt[id]||0
-    if(!n)  return { fill:'rgba(243,112,33,0.06)', stroke:'rgba(243,112,33,0.18)' }
-    if(n===1) return { fill:'rgba(243,112,33,0.28)', stroke:'rgba(243,112,33,0.8)' }
-    if(n<=3)  return { fill:'rgba(243,112,33,0.65)', stroke:'rgba(194,64,3,0.9)' }
-    return         { fill:'rgba(194,64,3,0.88)',    stroke:'rgba(140,30,0,1)' }
+    if(!n)    return { fill:'rgba(243,112,33,0.06)', stroke:'rgba(243,112,33,0.18)' }
+    if(n===1) return { fill:'rgba(243,112,33,0.28)', stroke:'rgba(243,112,33,0.8)'  }
+    if(n<=3)  return { fill:'rgba(243,112,33,0.65)', stroke:'rgba(194,64,3,0.9)'    }
+    return           { fill:'rgba(194,64,3,0.88)',   stroke:'rgba(140,30,0,1)'       }
   }
 
   return (
