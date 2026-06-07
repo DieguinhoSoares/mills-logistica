@@ -173,23 +173,45 @@ export function FrotaInput({ value, onChange, simClients }) {
 }
 
 export function MunicipioInput({ value, onChange, placeholder='Cidade...' }) {
-  const [open, setOpen]     = useState(false)
-  const [search, setSearch] = useState(value ? `${value.m} (${value.s})` : '')
-  const filtered = search.length>1 ? MUNICIPIOS.filter(m=>m.m.toLowerCase().includes(search.toLowerCase())).slice(0,8) : []
+  const [open, setOpen]       = useState(false)
+  const [search, setSearch]   = useState(value ? `${value.m} (${value.s})` : '')
+  const [results, setResults] = useState([])
+  const [loading, setLoading] = useState(false)
+
+  const buscar = async (texto) => {
+    if (texto.length < 2) { setResults([]); return }
+    setLoading(true)
+    try {
+      const res = await fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/municipios?orderBy=nome`)
+      const data = await res.json()
+      const filtered = data
+        .filter(m => m.nome.toLowerCase().includes(texto.toLowerCase()))
+        .slice(0, 10)
+        .map(m => ({ m: m.nome, s: m.microrregiao.mesorregiao.UF.sigla }))
+      setResults(filtered)
+    } catch {
+      setResults([])
+    }
+    setLoading(false)
+  }
+
   return (
     <div style={{ position:'relative' }}>
       <input value={search}
-        onChange={e=>{ setSearch(e.target.value); setOpen(true); if(!e.target.value) onChange(null) }}
-        onFocus={()=>setOpen(true)} onBlur={()=>setTimeout(()=>setOpen(false),180)}
+        onChange={e => { setSearch(e.target.value); setOpen(true); buscar(e.target.value); if(!e.target.value) onChange(null) }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 180)}
         placeholder={placeholder}
-        style={{ width:'100%', background:T.surfaceAlt, border:`1px solid ${T.border}`, borderRadius:8, padding:'9px 12px', color:T.text, fontSize:13, fontFamily:FONT, boxSizing:'border-box', outline:'none' }} autoComplete="off"/>
-      {open && filtered.length>0 && (
+        style={{ width:'100%', background:T.surfaceAlt, border:`1px solid ${T.border}`, borderRadius:8, padding:'9px 12px', color:T.text, fontSize:13, fontFamily:FONT, boxSizing:'border-box', outline:'none' }}
+        autoComplete="off"/>
+      {loading && <div style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', fontSize:12 }}>⏳</div>}
+      {open && results.length > 0 && (
         <div style={{ position:'absolute', top:'100%', left:0, right:0, background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.r, boxShadow:T.shadowLg, zIndex:500, maxHeight:220, overflowY:'auto' }}>
-          {filtered.map((m,i) => (
-            <div key={i} onMouseDown={()=>{ onChange(m); setSearch(`${m.m} (${m.s})`); setOpen(false) }}
+          {results.map((m,i) => (
+            <div key={i} onMouseDown={() => { onChange(m); setSearch(`${m.m} (${m.s})`); setOpen(false) }}
               style={{ padding:'9px 13px', cursor:'pointer', borderBottom:`1px solid ${T.border}` }}
-              onMouseEnter={e=>e.currentTarget.style.background=T.laranjaXLight}
-              onMouseLeave={e=>e.currentTarget.style.background=T.surface}>
+              onMouseEnter={e => e.currentTarget.style.background = T.laranjaXLight}
+              onMouseLeave={e => e.currentTarget.style.background = T.surface}>
               <span style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:T.text }}>{m.m}</span>
               <span style={{ fontFamily:FONT, fontSize:10, color:T.textMuted }}> — {m.s}</span>
             </div>
