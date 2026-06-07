@@ -5,11 +5,13 @@ export const fmt       = d  => { if (!d) return '—'; const [y,m,dd] = d.split(
 export const uid       = () => `${Date.now()}_${Math.random().toString(36).slice(2,8)}`
 
 export const getWeekDays = base => {
-  const d = new Date(base), day = d.getDay()
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
-  const mon = new Date(d.setDate(diff))
+  const [y, m, d] = base.split('-').map(Number)
+  const date = new Date(y, m-1, d)
+  const day  = date.getDay()
+  const diff = day === 0 ? -6 : 1 - day
+  const mon  = new Date(y, m-1, d + diff)
   return Array.from({length:7}, (_,i) => {
-    const x = new Date(mon); x.setDate(mon.getDate() + i)
+    const x = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + i)
     return x.toISOString().split('T')[0]
   })
 }
