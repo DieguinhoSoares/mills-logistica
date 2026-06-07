@@ -4,13 +4,11 @@ import { T, FONT, CARD_TYPES, URGENCY, BR_STATES } from '../lib/constants'
 import { fmt } from '../lib/utils'
 
 export function MillsLogo({ height=32 }) {
-  const scale = height / 50
   return (
-    <svg height={height} viewBox="0 0 160 50" fill="none" style={{ flexShrink:0 }}>
-      <rect width="160" height="50" rx="8" fill="#F37021"/>
-      <text x="12" y="37" fontFamily="Nunito, Arial Rounded MT Bold, sans-serif"
-        fontWeight="900" fontSize="34" fill="white" letterSpacing="-1">mills</text>
-      <rect x="98" y="7" width="8" height="8" rx="1.5" fill="white"/>
+    <svg height={height} viewBox="0 0 180 52" fill="none" style={{ flexShrink:0 }}>
+      <text x="0" y="44" fontFamily="Nunito, Arial Rounded MT Bold, sans-serif"
+        fontWeight="900" fontSize="48" fill="#F37021" letterSpacing="-2">mills</text>
+      <rect x="108" y="4" width="10" height="10" rx="2" fill="#F37021"/>
     </svg>
   )
 }
