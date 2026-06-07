@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth }        from '../contexts/AuthContext'
-import { useCards, useRequests, useNotifications, useSimClients, useConfig } from '../hooks/useFirestore'
+import { useCards, useRequests, useNotifications, useSimClients, useConfig, useDrivers } from '../hooks/useFirestore'
 import { MillsLogo, ToastContainer, useToasts, ServiceCard, BrazilMap, MoveModal, NotificationBell, ClientInput } from '../components/UI'
 import { T, FONT, CARD_TYPES, CARD_SUBTYPES, URGENCY, BR_STATES, FILIAIS, MONTH_NAMES, WD_SHORT, BS, IS, LS, NB } from '../lib/constants'
 import { fmt, todayStr, getWeekDays, getMonthWeeks, cardsForDay, detectConflicts, buildReport, downloadTxt, sendTeamsNotification, parseSIMCsv, getSubtypeLabel } from '../lib/utils'
@@ -574,7 +574,133 @@ function CsvUploadModal({ onLoaded, onClose }) {
     </div>
   )
 }
+/* ══ DRIVERS MODAL ═══════════════════════════════════════════════════════════ */
+function DriversModal({ drivers, onSave, onDelete, onClose }) {
+  const blank = { name:'', cnh:'', category:'', phone:'', unit:'', active:true }
+  const [form, setForm]     = useState(blank)
+  const [editing, setEdit]  = useState(null)
+  const [saving, setSaving] = useState(false)
+  const set = (k,v) => setForm(p=>({...p,[k]:v}))
+  const handleSave = async () => {
+    if (!form.name.trim()) return
+    setSaving(true)
+    await onSave(editing ? { ...form, id: editing } : form)
+    setForm(blank); setEdit(null); setSaving(false)
+  }
+  const handleEdit = d => { setEdit(d.id); setForm({ name:d.name, cnh:d.cnh||'', category:d.category||'', phone:d.phone||'', unit:d.unit||'', active:d.active!==false }) }
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.55)', zIndex:3500, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)' }}>
+      <motion.div initial={{ scale:.95, opacity:0 }} animate={{ scale:1, opacity:1 }}
+        style={{ background:T.surface, borderRadius:T.rLg, padding:28, width:640, maxHeight:'88vh', display:'flex', gap:20, boxShadow:T.shadowLg, border:`1px solid ${T.border}` }}>
+        <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+          <h3 style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:16, margin:'0 0 12px' }}>👤 Motoristas Cadastrados</h3>
+          <div style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', gap:7 }}>
+            {drivers.length===0 && <div style={{ color:T.textMuted, fontFamily:FONT, fontSize:12, textAlign:'center', padding:'20px 0' }}>Nenhum motorista cadastrado.</div>}
+            {drivers.map(d => (
+              <div key={d.id} style={{ background:T.surfaceAlt, border:`1px solid ${T.border}`, borderRadius:T.r, padding:'10px 13px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <div>
+                  <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:T.text }}>{d.name}</div>
+                  <div style={{ fontFamily:FONT, fontSize:10, color:T.textMuted }}>{d.cnh&&`CNH: ${d.cnh} · `}{d.category&&`Cat. ${d.category} · `}{d.phone&&`📱 ${d.phone}`}</div>
+                  <div style={{ fontFamily:FONT, fontSize:10, color:T.textMuted }}>{d.unit||'—'}</div>
+                </div>
+                <div style={{ display:'flex', gap:6 }}>
+                  <button onClick={()=>handleEdit(d)} style={{ ...BS, background:T.infoLight, color:T.info, border:`1px solid ${T.info}30`, fontSize:10, padding:'4px 10px' }}>✏️ Editar</button>
+                  <button onClick={()=>onDelete(d.id)} style={{ ...BS, background:T.perigoLight, color:T.perigo, border:`1px solid ${T.perigo}30`, fontSize:10, padding:'4px 10px' }}>🗑</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{ width:240, flexShrink:0 }}>
+          <h3 style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:16, margin:'0 0 12px' }}>{editing?'✏️ Editar':'➕ Novo'} Motorista</h3>
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            <div><label style={LS}>Nome completo *</label><input value={form.name} onChange={e=>set('name',e.target.value)} style={IS} placeholder="Nome do motorista"/></div>
+            <div><label style={LS}>CNH</label><input value={form.cnh} onChange={e=>set('cnh',e.target.value)} style={IS} placeholder="00000000000"/></div>
+            <div><label style={LS}>Categoria CNH</label>
+              <select value={form.category} onChange={e=>set('category',e.target.value)} style={IS}>
+                <option value="">—</option>
+                {['A','B','C','D','E','AB','AC','AD','AE'].map(c=><option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div><label style={LS}>Telefone</label><input value={form.phone} onChange={e=>set('phone',e.target.value)} style={IS} placeholder="(11) 99999-9999"/></div>
+            <div><label style={LS}>Filial</label>
+              <select value={form.unit} onChange={e=>set('unit',e.target.value)} style={IS}>
+                <option value="">— selecione —</option>
+                {FILIAIS.map(f=><option key={f} value={f}>{f}</option>)}
+              </select>
+            </div>
+            <div style={{ display:'flex', gap:8, marginTop:4 }}>
+              {editing && <button onClick={()=>{ setEdit(null); setForm(blank) }} style={{ ...BS, flex:1, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}`, fontSize:11 }}>Cancelar</button>}
+              <button onClick={handleSave} disabled={saving||!form.name.trim()}
+                style={{ ...BS, flex:1, background:form.name.trim()?T.laranja:T.borderMid, color:'white', fontWeight:700, fontSize:11 }}>
+                {saving?'⏳...':editing?'💾 Salvar':'➕ Adicionar'}
+              </button>
+            </div>
+          </div>
+          <div style={{ marginTop:16 }}>
+            <button onClick={onClose} style={{ ...BS, width:'100%', background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>Fechar</button>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
 
+/* ══ ASSIGN DRIVER MODAL ════════════════════════════════════════════════════ */
+function AssignDriverModal({ req, drivers, onConfirm, onCancel }) {
+  const [driverId, setDriverId] = useState('')
+  const [date, setDate]         = useState(req?.desiredDate || todayStr())
+  const [note, setNote]         = useState('')
+  const selectedDriver = drivers.find(d=>d.id===driverId)
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.55)', zIndex:2500, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)' }}>
+      <motion.div initial={{ scale:.95, opacity:0 }} animate={{ scale:1, opacity:1 }}
+        style={{ background:T.surface, borderRadius:T.rLg, padding:28, width:480, boxShadow:T.shadowLg, border:`2px solid ${T.verde}` }}>
+        <h2 style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:20, margin:'0 0 6px' }}>✅ Aceitar Solicitação</h2>
+        <p style={{ color:T.textMuted, fontFamily:FONT, fontSize:12, margin:'0 0 18px' }}>
+          Defina o motorista e a data para <strong style={{ color:T.laranja }}>{req?.clientName||req?.requesterName}</strong>.
+        </p>
+        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+          <div>
+            <label style={LS}>Motorista responsável</label>
+            <select value={driverId} onChange={e=>setDriverId(e.target.value)} style={IS}>
+              <option value="">— selecione o motorista —</option>
+              {drivers.filter(d=>d.active!==false).map(d=>(
+                <option key={d.id} value={d.id}>{d.name}{d.unit?` · ${d.unit.replace(/ \(.*\)/,'')}`:''}{d.category?` (CNH ${d.category})`:''}</option>
+              ))}
+            </select>
+            {drivers.length===0 && <div style={{ marginTop:5, color:T.amarelo, fontSize:11, fontFamily:FONT }}>⚠️ Cadastre motoristas em ⚙️ → Motoristas.</div>}
+          </div>
+          <div>
+            <label style={LS}>Data de execução</label>
+            <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={IS}/>
+          </div>
+          <div>
+            <label style={LS}>Observação para o solicitante</label>
+            <textarea value={note} onChange={e=>setNote(e.target.value)}
+              placeholder="Ex: Motorista confirmado, saída às 07h..."
+              style={{ ...IS, height:68, resize:'vertical' }}/>
+          </div>
+          {selectedDriver && (
+            <div style={{ padding:'10px 13px', background:T.verdeLight, borderRadius:T.r, border:`1px solid ${T.verde}30` }}>
+              <div style={{ color:T.verde, fontFamily:FONT, fontWeight:700, fontSize:12 }}>👤 {selectedDriver.name}</div>
+              <div style={{ color:T.textSec, fontFamily:FONT, fontSize:10, marginTop:2 }}>
+                {selectedDriver.cnh&&`CNH: ${selectedDriver.cnh} · `}Cat. {selectedDriver.category||'—'} · {selectedDriver.phone||'—'}
+              </div>
+            </div>
+          )}
+        </div>
+        <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:20 }}>
+          <button onClick={onCancel} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>Cancelar</button>
+          <button onClick={()=>onConfirm({ driverId, driverName:selectedDriver?.name||'', date, note })}
+            style={{ ...BS, background:T.verde, color:'white', fontWeight:700 }}>
+            ✅ Confirmar e criar no calendário
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
 /* ══ MAIN FROTAS VIEW ════════════════════════════════════════════════════════ */
 export function FrotasView() {
   const { profile, logout }              = useAuth()
@@ -596,7 +722,9 @@ export function FrotasView() {
   const [exportModal,  setExportModal]  = useState(false)
   const [csvModal,     setCsvModal]     = useState(false)
   const [settingsModal,setSettingsModal]= useState(false)
-
+  const { drivers, saveDriver, deleteDriver } = useDrivers()
+  const [driversModal,  setDriversModal]  = useState(false)
+  const [assignModal,   setAssignModal]   = useState(null)
   const conflicts = detectConflicts(cards)
   const weekDays  = getWeekDays(baseDate)
   const pending   = requests.filter(r=>r.status==='pendente').length
@@ -609,36 +737,42 @@ export function FrotasView() {
   const handleMoveCard   = async (id, ns, ne, reason) => { await moveCard(id, ns, ne, reason); addToast('Serviço reagendado com justificativa.', 'success') }
 
   const handleRespond = async (id, status, note, webhook) => {
-    await respondRequest(id, status, note, webhook)
-    if (status === 'aceito') {
-      const req = requests.find(r => r.id === id)
-      if (req) {
-        await saveCard({
-          type:        req.type,
-          subtype:     req.subtype || '',
-          client:      req.clientName || req.requesterName || '',
-          plantaObra:  req.clientName || '',
-          nInterno:    req.nInterno || '',
-          machine:     req.machine || '',
-          urgency:     req.urgency || 'medio',
-          origin:      req.origin || '',
-          destination: req.destination || '',
-          originCity:  req.originCityName || '',
-          destCity:    req.destCityName || '',
-          startDate:   req.desiredDate || todayStr(),
-          endDate:     req.desiredDate || todayStr(),
-          driver:      '',
-          unit:        req.unit || profile?.unit || '',
-          notes:       req.description || '',
-          requestId:   id,
-          status:      'confirmado',
-        })
-        addToast('✅ Solicitação aceita — serviço criado no calendário!', 'accepted')
-      }
-    } else {
-      addToast('❌ Solicitação recusada — solicitante notificado.', 'info')
-    }
+  if (status === 'aceito') {
+    const req = requests.find(r => r.id === id)
+    setAssignModal({ req, id, note, webhook })
+  } else {
+    await respondRequest(id, 'recusado', note, webhook)
+    addToast('❌ Solicitação recusada — solicitante notificado.', 'info')
   }
+}
+
+const handleAssignConfirm = async ({ driverId, driverName, date, note }) => {
+  const { req, id, webhook } = assignModal
+  await respondRequest(id, 'aceito', note || `Motorista: ${driverName} · Data: ${date}`, webhook)
+  await saveCard({
+    type:        req.type,
+    subtype:     req.subtype || '',
+    client:      req.clientName || req.requesterName || '',
+    plantaObra:  req.clientName || '',
+    nInterno:    req.nInterno || '',
+    machine:     req.machine || '',
+    urgency:     req.urgency || 'medio',
+    origin:      req.origin || '',
+    destination: req.destination || '',
+    originCity:  req.originCityName || '',
+    destCity:    req.destCityName || '',
+    startDate:   date,
+    endDate:     date,
+    driver:      driverName,
+    driverId:    driverId,
+    unit:        req.unit || profile?.unit || '',
+    notes:       req.description || '',
+    requestId:   id,
+    status:      'confirmado',
+  })
+  setAssignModal(null)
+  addToast(`✅ Serviço aceito e atribuído a ${driverName||'motorista'}!`, 'accepted')
+}
 
   return (
     <div style={{ background:T.bg, height:'100vh', display:'flex', flexDirection:'column', overflow:'hidden', fontFamily:FONT }}>
@@ -785,6 +919,8 @@ export function FrotasView() {
         {exportModal&&<ExportModal cards={cards} weekDays={weekDays} conflicts={conflicts} onClose={()=>setExportModal(false)}/>}
         {csvModal&&<CsvUploadModal onLoaded={async clients=>{await uploadClients(clients);setCsvModal(false);addToast(`${clients.length} registros sincronizados.`,'success');}} onClose={()=>setCsvModal(false)}/>}
         {settingsModal&&<SettingsModal config={config} onSave={saveConfig} onClose={()=>setSettingsModal(false)}/>}
+        {driversModal&&<DriversModal drivers={drivers} onSave={saveDriver} onDelete={deleteDriver} onClose={()=>setDriversModal(false)}/>}
+{assignModal&&<AssignDriverModal req={assignModal.req} drivers={drivers} onConfirm={handleAssignConfirm} onCancel={()=>setAssignModal(null)}/>}
       </AnimatePresence>
     </div>
   )
