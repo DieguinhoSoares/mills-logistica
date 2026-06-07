@@ -4,11 +4,11 @@ import { T, FONT, FILIAIS, IS, LS } from '../lib/constants'
 
 function MillsLogoFull() {
   return (
-    <svg height="44" viewBox="0 0 130 44" fill="none">
-      <rect width="130" height="44" rx="8" fill="#F37021"/>
-      <text x="10" y="30" fontFamily="Nunito, Arial Rounded MT Bold, sans-serif"
-        fontWeight="900" fontSize="26" fill="white" letterSpacing="-0.5">mills</text>
-      <rect x="76" y="8" width="7" height="7" rx="1.5" fill="white" opacity="0.9"/>
+    <svg height="50" viewBox="0 0 160 50" fill="none">
+      <rect width="160" height="50" rx="8" fill="#F37021"/>
+      <text x="12" y="36" fontFamily="Nunito, Arial Rounded MT Bold, sans-serif"
+        fontWeight="900" fontSize="32" fill="white" letterSpacing="-1">mills</text>
+      <rect x="96" y="9" width="8" height="8" rx="2" fill="white"/>
     </svg>
   )
 }
@@ -87,7 +87,7 @@ export function LoginScreen() {
             <div style={{ marginBottom:12 }}>
               <label style={LS}>Perfil de acesso</label>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
-                {[['solicitante','👤','Solicitante'],['frotas','🚛','Frotas'],['master','⭐','Master']].map(([v,ic,l]) => (
+                {[['solicitante','👤','Solicitante'],['frotas','🚛','Frotas']].map(([v,ic,l]) => (
                   <div key={v} onClick={() => setRole(v)}
                     style={{ border:`2px solid ${role===v?T.laranja:T.border}`, borderRadius:T.r, padding:'9px 6px', cursor:'pointer', textAlign:'center',
                       background:role===v?T.laranjaXLight:T.surface, transition:'all .12s' }}>
@@ -125,7 +125,7 @@ export function LoginScreen() {
           </button>
         </div>
         <div style={{ textAlign:'center', marginTop:16, color:'rgba(255,255,255,0.45)', fontSize:10, fontFamily:FONT, letterSpacing:'0.08em' }}>
-          mills infraestrutura · Segurança para sonhar mais alto
+          Mills Pesados Locação, Serviços e Logística S.A. · Segurança para sonhar mais alto
         </div>
       </div>
     </div>
