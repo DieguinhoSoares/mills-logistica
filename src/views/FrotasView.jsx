@@ -709,7 +709,7 @@ export function FrotasView() {
 
       {/* AGENDA TAB */}
       {activeTab==='agenda'&&<>
-        <div style={{ flex:'1 1 62%', overflow:'hidden', padding:'12px 20px 6px', display:'flex', flexDirection:'column', minHeight:0 }}>
+        <div style={{ flex:'0 0 45%', overflow:'hidden', padding:'12px 20px 6px', display:'flex', flexDirection:'column', minHeight:0 }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10, flexShrink:0 }}>
             <div style={{ display:'flex', alignItems:'center', gap:8 }}>
               <button onClick={()=>view==='semana'?navWeek(-1):view==='mes'?navMonth(-1):setYr(y=>y-1)} style={NB}>‹</button>
@@ -742,7 +742,7 @@ export function FrotasView() {
         </div>
 
         {/* Bottom: Mapa maior + KPIs + solicitações rápidas */}
-        <div style={{ flex:'0 0 35%', display:'grid', gridTemplateColumns:'1fr 340px', gap:12, padding:'0 20px 14px', minHeight:0, overflow:'hidden' }}>
+        <div style={{ flex:'1 1 52%', display:'grid', gridTemplateColumns:'1fr 340px', gap:12, padding:'0 20px 14px', minHeight:0, overflow:'hidden' }}>
           {/* MAPA — agora ocupa mais espaço */}
           <BrazilMap cards={cards}/>
           <div style={{ display:'flex', flexDirection:'column', gap:8, overflow:'hidden' }}>
