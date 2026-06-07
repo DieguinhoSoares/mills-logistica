@@ -93,11 +93,7 @@ function RequestForm({ simClients, onSubmit, onClose, profile }) {
           <label style={LS}>🔍 Planta / Obra (base SIM)</label>
           <ClientInput
             value={form.clientName ? {name:form.clientName} : null}
-            onChange={c => {
-              set('clientName', c?.name||'')
-              if (c?.state) set('destCity', {m:c.city||'', s:c.state})
-              if (c?.nInternos?.length) set('nInterno', c.nInternos[0])
-            }}
+            onChange={c=>{ set('clientName',c?.name||''); if(c?.state){ set('destCity',{m:c.city||'',s:c.state}) } if(c?.nInternos?.length){ set('nInterno',c.nInternos[0]) } }}
             simClients={simClients||[]}
           />
           {form.clientName && <div style={{ marginTop:4, color:T.verde, fontSize:11, fontFamily:FONT, fontWeight:700 }}>✓ {form.clientName}</div>}
