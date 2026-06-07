@@ -148,7 +148,7 @@ export function FrotaInput({ value, onChange, simClients }) {
       <input value={search}
         onChange={e=>{ setSearch(e.target.value); setOpen(true); onChange(e.target.value); setNotFound(false) }}
         onFocus={()=>setOpen(true)} onBlur={handleBlur}
-        placeholder="Ex: 1234"
+        placeholder="Ex: XXX01234"
         style={{ width:'100%', background:T.surfaceAlt, border:`1px solid ${notFound?T.perigo:T.border}`, borderRadius:8, padding:'9px 12px', color:T.text, fontSize:13, fontFamily:FONT, boxSizing:'border-box', outline:'none' }} autoComplete="off"/>
       {notFound && (
         <div style={{ marginTop:5, padding:'7px 10px', background:T.perigoLight, borderRadius:T.rSm, color:T.perigo, fontSize:11, fontFamily:FONT, fontWeight:700 }}>
