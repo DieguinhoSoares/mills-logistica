@@ -111,9 +111,17 @@ function RequestForm({ simClients, onSubmit, onClose, profile }) {
                     {n}
                   </div>
                 ))}
+              <div>
+            <label style={LS}>N° Interno (Frota)</label>
+            <FrotaInput 
+              value={form.nInterno} 
+              onChange={v=>set('nInterno',v)} 
+              simClients={form.selectedClient ? [form.selectedClient] : (simClients||[])}
+            />
+            {form.selectedClient?.nInternos?.length > 0 && !form.nInterno && (
+              <div style={{ marginTop:4, color:T.textMuted, fontSize:10, fontFamily:FONT }}>
+                {form.selectedClient.nInternos.length} frota(s) vinculada(s) a esta planta
               </div>
-            ) : (
-              <FrotaInput value={form.nInterno} onChange={v=>set('nInterno',v)} simClients={simClients||[]}/>
             )}
           </div>
           <div>
