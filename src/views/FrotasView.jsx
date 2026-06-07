@@ -656,10 +656,37 @@ export function FrotasView() {
   const handleSaveCard   = async f => { await saveCard(f); setModal(null); setEditCard(null); addToast(`Serviço de ${f.client||'novo'} salvo.`, 'success') }
   const handleDeleteCard = async id => { await deleteCard(id); setModal(null); setEditCard(null); addToast('Serviço removido.', 'info') }
   const handleMoveCard   = async (id, ns, ne, reason) => { await moveCard(id, ns, ne, reason); addToast('Serviço reagendado com justificativa.', 'success') }
-  const handleRespond    = async (id, status, note, webhook) => {
-    await respondRequest(id, status, note, webhook)
-    addToast(status==='aceito'?'✅ Solicitação aceita — solicitante notificado.':'❌ Solicitação recusada — solicitante notificado.', status==='aceito'?'accepted':'info')
+  const handleRespond = async (id, status, note, webhook) => {
+  await respondRequest(id, status, note, webhook)
+  if (status === 'aceito') {
+    const req = requests.find(r => r.id === id)
+    if (req) {
+      await saveCard({
+        type:        req.type,
+        subtype:     req.subtype || '',
+        client:      req.clientName || req.requesterName || '',
+        plantaObra:  req.clientName || '',
+        nInterno:    req.nInterno || '',
+        machine:     req.machine || '',
+        urgency:     req.urgency || 'medio',
+        origin:      req.origin || '',
+        destination: req.destination || '',
+        originCity:  req.originCityName || '',
+        destCity:    req.destCityName || '',
+        startDate:   req.desiredDate || todayStr(),
+        endDate:     req.desiredDate || todayStr(),
+        driver:      '',
+        unit:        req.unit || profile?.unit || '',
+        notes:       req.description || '',
+        requestId:   id,
+        status:      'confirmado',
+      })
+      addToast('✅ Solicitação aceita — serviço criado no calendário!', 'accepted')
+    }
+  } else {
+    addToast('❌ Solicitação recusada — solicitante notificado.', 'info')
   }
+}
 
   return (
     <div style={{ background:T.bg, height:'100vh', display:'flex', flexDirection:'column', overflow:'hidden', fontFamily:FONT }}>
