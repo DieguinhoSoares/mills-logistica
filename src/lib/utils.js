@@ -163,7 +163,7 @@ export function parseSIMCsv(text, Papa) {
   })
 
   const clients = Object.values(map)
-    .map(c => ({ ...c, families:[...c.families].slice(0,5), nInternos:[...c.nInternos].slice(0,10) }))
+    .map(c => ({ name:c.name, state:c.state, city:c.city, segment:c.segment, machines:c.machines, families:Array.from(c.families).slice(0,5), nInternos:Array.from(c.nInternos).slice(0,10) }))
     .sort((a,b) => b.machines - a.machines)
 
   console.log('Clients parsed:', clients.length)
