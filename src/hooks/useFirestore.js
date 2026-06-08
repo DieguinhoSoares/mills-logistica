@@ -79,33 +79,31 @@ export const saveCard = async (cardData) => {
     }
   }
 
-  const moveCard = async (id, startDate, endDate, reason) => {
-    try {
-      const ref = doc(db, 'cards', id)
-      const snap = await getDoc(ref)
-      if (!snap.exists()) throw new Error('Agendamento não encontrado.')
-      
-      const prev = snap.data()
-      await updateDoc(ref, {
-        startDate,
-        endDate,
-        updatedAt: serverTimestamp(),
-        history: [
-          ...(prev.history || []),
-          { 
-            date: new Date().toISOString(), 
-            user: 'Logística', 
-            reason: reason || 'Remanejamento de rota', 
-            from: prev.startDate, 
-            to: startDate 
-          }
-        ]
-      })
-    } catch (err) {
-      console.error('Erro ao mover agendamento:', err)
-      throw err
-    }
+ export const moveCard = async (cardId, destinationLane, userEmail) => {
+  try {
+    const ref = doc(db, 'cards', cardId);
+    
+    // Cria o registro do histórico usando o e-mail de quem moveu o card
+    const historyEntry = {
+      toLane: destinationLane,
+      movedAt: new Date().toISOString(),
+      user: userEmail || 'Sistema (Logística)' // Se não achar o e-mail, usa o padrão
+    };
+
+    // Busca o card atual para não apagar o histórico que já existia
+    const cardSnap = await getDoc(ref);
+    const currentHistory = cardSnap.exists() ? (cardSnap.data().history || []) : [];
+
+    await updateDoc(ref, {
+      laneId: destinationLane,
+      history: [...currentHistory, historyEntry],
+      updatedAt: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('Erro ao mover o card:', err);
+    throw err;
   }
+};
 
   return { cards, loading, saveCard, deleteCard, moveCard }
 }
