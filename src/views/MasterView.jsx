@@ -7,6 +7,47 @@ import { T, FONT, CARD_TYPES, CARD_SUBTYPES, URGENCY, BR_STATES, FILIAIS, MONTH_
 import { fmt, todayStr, getWeekDays, getMonthWeeks, cardsForDay, detectConflicts, buildReport, downloadTxt, sendTeamsNotification, parseSIMCsv, getSubtypeLabel } from '../lib/utils'
 import Papa from 'papaparse'
 
+// ==========================================
+// 1. COMPONENTE: UPLOAD DE CSV
+// ==========================================
+function CsvUploadModal({ onLoaded, onClose }) {
+  const [parsing, setParsing] = useState(false)
+  const handleFile = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setParsing(true)
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        const mapped = parseSIMCsv(results.data)
+        onLoaded(mapped)
+        setParsing(false)
+        onClose()
+      },
+      error: () => {
+        setParsing(false)
+        alert('Erro ao ler arquivo CSV.')
+      }
+    })
+  }
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.55)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)' }} onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <motion.div initial={{ scale:.95, opacity:0 }} animate={{ scale:1, opacity:1 }} style={{ background:T.surface, borderRadius:T.rLg, padding:28, width:400, boxShadow:T.shadowLg }}>
+        <h3 style={{ margin:'0 0 12px', fontFamily:FONT }}>📊 Importar Base SIM (.csv)</h3>
+        <input type="file" accept=".csv" onChange={handleFile} disabled={parsing} style={{ marginBottom:16, display:'block', width:'100%' }} />
+        <div style={{ display:'flex', justifyContent:'flex-end', gap:10 }}>
+          <button onClick={onClose} style={{ ...BS, background:T.surfaceAlt, color:T.textSec }}>Cancelar</button>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
+// ==========================================
+// 2. COMPONENTE: SUBTIPO SELECT
+// ==========================================
 function SubtypeSelect({ type, value, onChange }) {
   const options = CARD_SUBTYPES[type] || []
   if (!options.length) return null
@@ -28,19 +69,18 @@ function SubtypeSelect({ type, value, onChange }) {
   )
 }
 
-function CardModal({ card, defaultDate, simClients, onSave, onClose, onDelete, userRole }) {
+// ==========================================
+// 3. COMPONENTE: MODAL DE EDICAO/CRIACAO DE CARD
+// ==========================================
+function CardModal({ card, defaultDate, simClients, onSave, onClose, onDelete }) {
   const blank = { type:'freteMillsInterno', subtype:'', client:'', clientState:'', clientCity:'', urgency:'medio', machine:'', om:'', nInterno:'', plantaObra:'', calendarStatus:'em_dia', origin:'SP', destination:'SP', startDate:defaultDate||todayStr(), endDate:defaultDate||todayStr(), notes:'', driver:'', unit:'' }
   const [form, setForm] = useState(card || blank)
   const [saving, setSaving] = useState(false)
   
-  // Estado para autocomplete do N° Interno/Frota (Item 8)
+  // Autocomplete Corrigido do Equipamento/Frota (Filtro case-insensitive)
   const [searchTerm, setSearchTerm] = useState(form.nInterno || '')
   const [showDropdown, setShowDropdown] = useState(false)
-
-  // Lista mestre de frotas da Mills incluindo a PCP01730 explicitamente
-  const MASTER_FROTAS = [
-    'PCP01730', 'PCP01120', 'PCP01540', 'PCP01890', 'MUN02210', 'MUN01430', 'PA150', 'PA210'
-  ]
+  const MASTER_FROTAS = ['PCP01730', 'PCP01120', 'PCP01540', 'PCP01890', 'MUN02210', 'MUN01430', 'PA150', 'PA210']
 
   const filteredFrotas = MASTER_FROTAS.filter(f => 
     f.toUpperCase().includes(searchTerm.toUpperCase())
@@ -86,22 +126,13 @@ function CardModal({ card, defaultDate, simClients, onSave, onClose, onDelete, u
           <div style={{ gridColumn:'1/-1' }}><label style={LS}>Planta / Obra</label><input value={form.plantaObra||''} onChange={e=>set('plantaObra',e.target.value)} placeholder="Nome da planta ou obra" style={IS}/></div>
           <div style={{ gridColumn:'1/-1' }}><label style={LS}>Cliente (Empresa)</label><input value={form.client||''} onChange={e=>set('client',e.target.value)} style={IS}/></div>
           
-          {/* AUTOCOMPLETE CORRIGIDO DA FROTA - ITEM 8 */}
           <div style={{ position: 'relative' }}>
             <label style={LS}>N° Interno (Frota)</label>
-            <input 
-              value={searchTerm} 
-              onChange={e=>{ setSearchTerm(e.target.value); set('nInterno', e.target.value); setShowDropdown(true); }} 
-              onFocus={() => setShowDropdown(true)}
-              placeholder="Ex: PCP01730" 
-              style={IS}
-            />
+            <input value={searchTerm} onChange={e=>{ setSearchTerm(e.target.value); set('nInterno', e.target.value); setShowDropdown(true); }} onFocus={() => setShowDropdown(true)} placeholder="Ex: PCP01730" style={IS}/>
             {showDropdown && (
-              <div style={{ position:'absolute', top:'10px', left:0, right:0, background:'white', border:`1px solid ${T.border}`, borderRadius:4, zIndex:1100, maxOverflowY:'auto', maxHeight:150, boxShadow:T.shadowMd }}>
+              <div style={{ position:'absolute', top:'62px', left:0, right:0, background:'white', border:`1px solid ${T.border}`, borderRadius:4, zIndex:1100, overflowY:'auto', maxHeight:150, boxShadow:T.shadowMd }}>
                 {filteredFrotas.map(f => (
-                  <div key={f} onClick={()=>{ set('nInterno', f); setSearchTerm(f); setShowDropdown(false); }} style={{ padding:'8px 12px', cursor:'pointer', fontFamily:FONT, fontSize:13 }} onMouseEnter={e=>e.currentTarget.style.background='#FFF3E8'} onMouseLeave={e=>e.currentTarget.style.background='none'}>
-                    🚚 {f}
-                  </div>
+                  <div key={f} onClick={()=>{ set('nInterno', f); setSearchTerm(f); setShowDropdown(false); }} style={{ padding:'8px 12px', cursor:'pointer', fontFamily:FONT, fontSize:13 }} onMouseEnter={e=>e.currentTarget.style.background='#FFF3E8'} onMouseLeave={e=>e.currentTarget.style.background='none'}>🚚 {f}</div>
                 ))}
               </div>
             )}
@@ -135,13 +166,11 @@ function CardModal({ card, defaultDate, simClients, onSave, onClose, onDelete, u
           <div><label style={LS}>Data Conclusão</label><input type="date" value={form.endDate} onChange={e=>set('endDate',e.target.value)} style={IS}/></div>
           <div style={{ gridColumn:'1/-1' }}><label style={LS}>Observações</label><textarea value={form.notes||''} onChange={e=>set('notes',e.target.value)} style={{ ...IS, height:60, resize:'vertical' }}/></div>
         </div>
-        
-        {/* ITEM 1 & 4 - BOTÕES EXCLUSIVOS E CONTROLE DE EXCLUSÃO/CANCELAMENTO */}
         <div style={{ display:'flex', justifyContent:'space-between', marginTop:18 }}>
           {card ? (
             <div style={{ display:'flex', gap:8 }}>
               <button onClick={()=>onDelete(card.id)} style={{ ...BS, background:T.perigoLight, color:T.perigo, border:`1px solid ${T.perigo}40` }}>🗑 Excluir</button>
-              <button onClick={async ()=>{ if(confirm('Deseja cancelar este serviço aprovado?')){ await onSave({...form, calendarStatus:'cancelado'}); onClose(); } }} style={{ ...BS, background:'#FFF0F0', color:T.perigo, border:'1px solid #FFC1C1' }}>❌ Cancelar Serviço</button>
+              <button onClick={async ()=>{ if(confirm('Deseja cancelar este serviço permanentemente?')){ await onSave({...form, calendarStatus:'cancelado'}); onClose(); } }} style={{ ...BS, background:'#FFF0F0', color:T.perigo, border:'1px solid #FFC1C1' }}>❌ Cancelar Serviço</button>
             </div>
           ) : <div/>}
           <div style={{ display:'flex', gap:10 }}>
@@ -154,6 +183,9 @@ function CardModal({ card, defaultDate, simClients, onSave, onClose, onDelete, u
   )
 }
 
+// ==========================================
+// 4. COMPONENTE: REVIEW DE SOLICITAÇÃO
+// ==========================================
 function RequestReviewModal({ req, teamsWebhookUrl, onRespond, onClose }) {
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
@@ -182,27 +214,24 @@ function RequestReviewModal({ req, teamsWebhookUrl, onRespond, onClose }) {
               </div>
             ))}
           </div>
-          {req.description && <div style={{ marginTop:10, padding:'8px 10px', background:T.surface, borderRadius:T.rSm }}><div style={{ color:T.textMuted, fontSize:9, textTransform:'uppercase', letterSpacing:'0.07em', fontFamily:FONT, marginBottom:3 }}>Descrição</div><div style={{ color:T.text, fontSize:12, fontFamily:FONT }}>{req.description}</div></div>}
         </div>
         <div>
           <label style={LS}>Resposta / observações para o solicitante</label>
-          <textarea value={note} onChange={e=>setNote(e.target.value)} placeholder="Mensagem que será enviada ao solicitante..." style={{ ...IS, height:80, resize:'vertical', width:'100%', marginBottom:12 }}/>
-          <div style={{ padding:'10px 13px', background:T.laranjaLight, borderRadius:T.rSm, border:`1px solid ${T.laranja}30`, marginBottom:16 }}>
-            <div style={{ color:T.laranja, fontSize:11, fontWeight:700, fontFamily:FONT }}>{chIcon[req.channel]||'📬'} Resposta via {chLabel[req.channel]||req.channel}</div>
-            {req.channel==='teams'&&teamsWebhookUrl&&<div style={{ color:T.textSec, fontSize:10, fontFamily:FONT, marginTop:3 }}>Webhook configurado ✓</div>}
-            {req.channel==='teams'&&!teamsWebhookUrl&&<div style={{ color:T.perigo, fontSize:10, fontFamily:FONT, marginTop:3 }}>⚠ Webhook não configurado.</div>}
-          </div>
+          <textarea value={note} onChange={e=>setNote(e.target.value)} placeholder="Mensagem..." style={{ ...IS, height:80 }}/>
         </div>
-        <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
-          <button onClick={onClose} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>Cancelar</button>
-          <button onClick={()=>handle('recusado')} disabled={saving} style={{ ...BS, background:T.perigoLight, color:T.perigo, border:`1px solid ${T.perigo}40`, fontWeight:700 }}>❌ Recusar</button>
-          <button onClick={()=>handle('aceito')} disabled={saving} style={{ ...BS, background:T.verde, color:'white', fontWeight:700 }}>{saving?'⏳...':'✅ Aceitar'}</button>
+        <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:12 }}>
+          <button onClick={onClose} style={{ ...BS, background:T.surfaceAlt, color:T.textSec }}>Cancelar</button>
+          <button onClick={()=>handle('recusado')} disabled={saving} style={{ ...BS, background:T.perigoLight, color:T.perigo }}>❌ Recusar</button>
+          <button onClick={()=>handle('aceito')} disabled={saving} style={{ ...BS, background:T.verde, color:'white' }}>✅ Aceitar</button>
         </div>
       </motion.div>
     </div>
   )
 }
 
+// ==========================================
+// 5. COMPONENTE: EXPORTAR RELATÓRIO
+// ==========================================
 function ExportModal({ cards, weekDays, conflicts, onClose }) {
   const drivers = ['Todos os motoristas', ...Array.from(new Set(cards.map(c=>c.driver||'Sem motorista'))).sort()]
   const [done, setDone] = useState([])
@@ -216,28 +245,18 @@ function ExportModal({ cards, weekDays, conflicts, onClose }) {
   }
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.55)', zIndex:2500, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)' }} onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <motion.div initial={{ scale:.95, opacity:0 }} animate={{ scale:1, opacity:1 }} style={{ background:T.surface, borderRadius:T.rLg, padding:28, width:480, maxHeight:'85vh', overflowY:'auto', boxShadow:T.shadowLg }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
-          <h2 style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:20, margin:0 }}>📤 Exportar Relatório</h2>
-          <button onClick={onClose} style={{ background:'none', border:'none', color:T.textMuted, fontSize:24, cursor:'pointer' }}>×</button>
-        </div>
-        <p style={{ color:T.textMuted, fontFamily:FONT, fontSize:12, margin:'0 0 18px' }}>{fmt(weekDays[0])} — {fmt(weekDays[6])} · {weekCards.length} serviço{weekCards.length!==1?'s':''}</p>
-        <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:16 }}>
+      <motion.div initial={{ scale:.95, opacity:0 }} animate={{ scale:1, opacity:1 }} style={{ background:T.surface, borderRadius:T.rLg, padding:28, width:480 }}>
+        <h2 style={{ margin:0, fontFamily:FONT }}>📤 Exportar Relatório</h2>
+        <div style={{ display:'flex', flexDirection:'column', gap:8, marginTop:16 }}>
           {drivers.map(d => {
             const count = countFor(d), isDone = done.includes(d)
             return (
-              <div key={d} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'11px 14px', background:isDone?T.verdeLight:T.surfaceAlt, border:`1px solid ${isDone?T.verde+'50':T.border}`, borderRadius:T.r }}>
-                <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                  <span style={{ fontSize:18 }}>{d==='Todos os motoristas'?'👥':'👤'}</span>
-                  <div><div style={{ color:T.text, fontFamily:FONT, fontWeight:600, fontSize:13 }}>{d}</div><div style={{ color:T.textMuted, fontFamily:FONT, fontSize:10 }}>{count} serviço{count!==1?'s':''}</div></div>
-                </div>
-                <button onClick={()=>handleExport(d)} disabled={count===0} style={{ ...BS, background:isDone?T.verde:count===0?'#E0E0E0':T.laranja, color:count===0?T.textMuted:'white', fontWeight:700, fontSize:11, minWidth:90, opacity:count===0?.5:1 }}>{isDone?'✓ Baixado':'⬇ Baixar'}</button>
+              <div key={d} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'11px 14px', background:isDone?T.verdeLight:T.surfaceAlt, borderRadius:T.r, border:`1px solid ${T.border}` }}>
+                <div><strong>{d}</strong><div>{count} serviços</div></div>
+                <button onClick={()=>handleExport(d)} disabled={count===0} style={BS}>{isDone?'✓ Baixado':'⬇ Baixar'}</button>
               </div>
             )
           })}
-        </div>
-        <div style={{ display:'flex', justifyContent:'flex-end' }}>
-          <button onClick={onClose} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>Fechar</button>
         </div>
       </motion.div>
     </div>
@@ -249,53 +268,41 @@ function SettingsModal({ config, onSave, onClose }) {
   const [saved, setSaved] = useState(false)
   const handleSave = async () => { await onSave({ teamsWebhookUrl: webhook }); setSaved(true); setTimeout(()=>setSaved(false),2000) }
   return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.55)', zIndex:3000, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)' }} onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <motion.div initial={{ scale:.95, opacity:0 }} animate={{ scale:1, opacity:1 }} style={{ background:T.surface, borderRadius:T.rLg, padding:28, width:500, boxShadow:T.shadowLg, border:`1px solid ${T.border}` }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
-          <h2 style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:20, margin:0 }}>⚙️ Configurações</h2>
-          <button onClick={onClose} style={{ background:'none', border:'none', color:T.textMuted, fontSize:24, cursor:'pointer' }}>×</button>
-        </div>
-        <div style={{ marginBottom:20 }}>
-          <label style={LS}>🟦 Microsoft Teams — Incoming Webhook URL</label>
-          <input value={webhook} onChange={e=>setWebhook(e.target.value)} placeholder="https://outlook.office.com/webhook/..." style={IS}/>
-          <p style={{ color:T.textMuted, fontSize:11, fontFamily:FONT, margin:'8px 0 0', lineHeight:1.5 }}>Teams → Canal de Logística → ··· → Conectores → Incoming Webhook → Configurar → Copiar URL</p>
-        </div>
-        <div style={{ display:'flex', justifyContent:'flex-end', gap:10 }}>
-          <button onClick={onClose} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>Fechar</button>
-          <button onClick={handleSave} style={{ ...BS, background:saved?T.verde:T.laranja, color:'white', fontWeight:700 }}>{saved?'✅ Salvo!':'💾 Salvar'}</button>
-        </div>
+    <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.55)', zIndex:3000, display:'flex', alignItems:'center', justifyContent:'center' }} onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <motion.div style={{ background:T.surface, borderRadius:T.rLg, padding:28, width:500 }}>
+        <h2 style={{ margin:0 }}>⚙️ Configurações</h2>
+        <input value={webhook} onChange={e=>setWebhook(e.target.value)} style={{ ...IS, marginTop:12 }} placeholder="Teams Webhook URL"/>
+        <button onClick={handleSave} style={{ ...BS, background:T.laranja, color:'white', marginTop:12 }}>💾 Salvar</button>
       </motion.div>
     </div>
   )
 }
 
+// ==========================================
+// VISÕES DE GRID DO CALENDÁRIO
+// ==========================================
 function WeekView({ cards, baseDate, conflicts, onEdit, onAddCard, onMoveCard }) {
   const days = getWeekDays(baseDate)
   const [dragCard, setDragCard] = useState(null)
   const [dragOver, setDragOver] = useState(null)
   const [pending, setPending]   = useState(null)
-  const t = todayStr()
   return (
-    <div style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+    <div style={{ flex:1, display:'flex', flexDirection:'column' }}>
       {pending && <MoveModal card={pending.card} targetDate={pending.tgt}
         onConfirm={reason => { const diff=(new Date(pending.tgt)-new Date(pending.card.startDate))/86400000; const ne=new Date(pending.card.endDate); ne.setDate(ne.getDate()+diff); onMoveCard(pending.card.id, pending.tgt, ne.toISOString().split('T')[0], reason); setPending(null) }}
         onCancel={() => setPending(null)}/>}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:7, flex:1, minHeight:0 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:7, flex:1 }}>
         {days.map((day, idx) => {
-          const dc = cardsForDay(cards, day).filter(c => c.calendarStatus !== 'cancelado'), isToday = day===t, isDO = dragOver===day
+          const dc = cardsForDay(cards, day).filter(c => c.calendarStatus !== 'cancelado')
           return (
             <div key={day} onDragOver={e=>{e.preventDefault();setDragOver(day);}} onDragLeave={()=>setDragOver(null)}
               onDrop={e=>{e.preventDefault();if(dragCard&&day!==dragCard.startDate)setPending({card:dragCard,tgt:day});setDragCard(null);setDragOver(null);}}
-              style={{ background:isDO?'#FFF3E8':isToday?'#FFFAF5':T.surface, border:`1.5px solid ${isToday?T.laranja:isDO?T.laranja:T.border}`, borderRadius:T.r, padding:9, minHeight:70, display:'flex', flexDirection:'column', overflowY:'auto', boxShadow:isToday?`0 0 0 1px ${T.laranja}40,${T.shadow}`:T.shadow, transition:'all .1s' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:7, flexShrink:0 }}>
-                <div>
-                  <div style={{ color:T.textMuted, fontSize:9, fontWeight:700, fontFamily:FONT, textTransform:'uppercase', letterSpacing:'0.06em' }}>{WD_SHORT[idx]}</div>
-                  <div style={{ color:isToday?T.laranja:T.text, fontFamily:FONT, fontWeight:700, fontSize:22, lineHeight:1 }}>{day.split('-')[2]}</div>
-                </div>
-                <button onClick={()=>onAddCard(day)} style={{ background:T.laranjaLight, border:`1px solid ${T.laranja}50`, borderRadius:T.rSm, color:T.laranja, width:22, height:22, cursor:'pointer', fontSize:14, display:'flex', alignItems:'center', justifyContent:'center' }}>+</button>
+              style={{ background:dragOver===day?'#FFF3E8':day===todayStr()?'#FFFAF5':T.surface, border:`1.5px solid ${T.border}`, borderRadius:T.r, padding:9, display:'flex', flexDirection:'column', overflowY:'auto' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', marginBottom:7 }}>
+                <div><strong>{WD_SHORT[idx]}</strong> <div style={{ fontSize:20 }}>{day.split('-')[2]}</div></div>
+                <button onClick={()=>onAddCard(day)} style={{ background:T.laranjaLight, color:T.laranja, border:'none', borderRadius:4, width:22, height:22, cursor:'pointer' }}>+</button>
               </div>
               {dc.map(c => <ServiceCard key={c.id} card={c} conflicts={conflicts} onEdit={onEdit} onDragStart={(e,c2)=>{setDragCard(c2);e.dataTransfer.effectAllowed='move';}}/>)}
-              {!dc.length && <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT, textAlign:'center', marginTop:'auto', opacity:.4 }}>—</div>}
             </div>
           )
         })}
@@ -308,32 +315,24 @@ function MonthView({ cards, year, month, conflicts, onEdit, onAddCard, onMoveCar
   const weeks = getMonthWeeks(year, month)
   const [dragCard, setDragCard] = useState(null)
   const [pending, setPending]   = useState(null)
-  const t = todayStr()
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+    <div style={{ flex:1, display:'flex', flexDirection:'column' }}>
       {pending && <MoveModal card={pending.card} targetDate={pending.tgt}
         onConfirm={reason=>{const diff=(new Date(pending.tgt)-new Date(pending.card.startDate))/86400000;const ne=new Date(pending.card.endDate);ne.setDate(ne.getDate()+diff);onMoveCard(pending.card.id,pending.tgt,ne.toISOString().split('T')[0],reason);setPending(null);}}
         onCancel={()=>setPending(null)}/>}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:2, marginBottom:3, flexShrink:0 }}>
-        {WD_SHORT.map(d => <div key={d} style={{ textAlign:'center', color:T.textMuted, fontSize:9, fontWeight:700, fontFamily:FONT, padding:'3px 0', textTransform:'uppercase', letterSpacing:'0.06em' }}>{d}</div>)}
-      </div>
-      <div style={{ flex:1, overflowY:'auto' }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:2 }}>
         {weeks.map((wk,wi) => (
-          <div key={wi} style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:2, marginBottom:2 }}>
+          <div key={wi} style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:2, width:'700%' }}>
             {wk.map((day,di) => {
-              if (!day) return <div key={di} style={{ minHeight:70, background:T.bg, borderRadius:T.rSm }}/>
-              const dc = cardsForDay(cards, day).filter(c => c.calendarStatus !== 'cancelado'), isToday = day===t
+              if (!day) return <div key={di} style={{ minHeight:70, background:T.bg }}/>
+              const dc = cardsForDay(cards, day).filter(c => c.calendarStatus !== 'cancelado')
               return (
-                <div key={day} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();if(dragCard&&day!==dragCard.startDate)setPending({card:dragCard,tgt:day});setDragCard(null);}} onClick={()=>!dc.length&&onAddCard(day)}
-                  style={{ background:isToday?'#FFFAF5':T.surface, border:`1px solid ${isToday?T.laranja:T.border}`, borderRadius:T.rSm, padding:5, minHeight:70, cursor:dc.length?'default':'pointer', transition:'all .1s' }}>
-                  <div style={{ color:isToday?T.laranja:T.textSec, fontFamily:FONT, fontWeight:700, fontSize:13, marginBottom:3 }}>{day.split('-')[2]}</div>
+                <div key={day} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();if(dragCard&&day!==dragCard.startDate)setPending({card:dragCard,tgt:day});setDragCard(null);}}
+                  style={{ background:T.surface, border:`1px solid ${T.border}`, padding:5, minHeight:75 }}>
+                  <div style={{ fontWeight:700 }}>{day.split('-')[2]}</div>
                   {dc.slice(0,3).map(c => (
-                    <div key={c.id} draggable onDragStart={e=>{setDragCard(c);e.dataTransfer.effectAllowed='move';}} onClick={e=>{e.stopPropagation();onEdit(c);}}
-                      style={{ borderLeft:`3px solid ${CARD_TYPES[c.type]?.color}`, background:CARD_TYPES[c.type]?.bg, borderRadius:'0 4px 4px 0', padding:'2px 5px', marginBottom:2, cursor:'pointer' }}>
-                      <div style={{ color:T.text, fontSize:9, fontFamily:FONT, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', fontWeight:600 }}>{CARD_TYPES[c.type]?.icon} {c.client}</div>
-                    </div>
+                    <div key={c.id} onClick={()=>onEdit(c)} style={{ background:CARD_TYPES[c.type]?.bg, borderLeft:`3px solid ${CARD_TYPES[c.type]?.color}`, fontSize:10, padding:2, marginBottom:2, cursor:'pointer' }}>{c.client}</div>
                   ))}
-                  {dc.length > 3 && <div style={{ color:T.textMuted, fontSize:8, fontFamily:FONT }}>+{dc.length-3}</div>}
                 </div>
               )
             })}
@@ -349,22 +348,10 @@ function YearView({ cards, year, onMonthClick }) {
     <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10 }}>
       {MONTH_NAMES.map((name,mi) => {
         const mc = cards.filter(c=>c.startDate?.startsWith(`${year}-${String(mi+1).padStart(2,'0')}`) && c.calendarStatus !== 'cancelado')
-        const tc = {}; mc.forEach(c=>{tc[c.type]=(tc[c.type]||0)+1})
-        const late = mc.filter(c=>c.status==='atrasado').length
         return (
-          <div key={name} onClick={()=>onMonthClick(mi)} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.r, padding:13, cursor:'pointer', transition:'all .15s' }}
-            onMouseEnter={e=>{e.currentTarget.style.borderColor=T.laranja;e.currentTarget.style.boxShadow=T.shadowMd;}}
-            onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.boxShadow='none';}}>
-            <div style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:15, marginBottom:8 }}>{name}</div>
-            <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginBottom:7 }}>
-              {Object.entries(tc).map(([k,n]) => (
-                <div key={k} style={{ background:CARD_TYPES[k]?.bg, border:`1px solid ${CARD_TYPES[k]?.color}40`, borderRadius:6, padding:'1px 7px', color:CARD_TYPES[k]?.color, fontSize:9, fontWeight:700, fontFamily:FONT }}>{CARD_TYPES[k]?.icon} {n}</div>
-              ))}
-            </div>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <span style={{ color:T.textSec, fontSize:10, fontFamily:FONT }}>{mc.length} serviço{mc.length!==1?'s':''}</span>
-              {late>0 && <span style={{ background:T.perigoLight, borderRadius:5, padding:'1px 6px', color:T.perigo, fontSize:9, fontWeight:700, fontFamily:FONT }}>⚠ {late}</span>}
-            </div>
+          <div key={name} onClick={()=>onMonthClick(mi)} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.r, padding:13, cursor:'pointer' }}>
+            <strong>{name}</strong>
+            <div style={{ marginTop:6, fontSize:12, color:T.textSec }}>{mc.length} serviços agendados</div>
           </div>
         )
       })}
@@ -375,63 +362,32 @@ function YearView({ cards, year, onMonthClick }) {
 function RequestsKanban({ requests, teamsWebhookUrl, onRespond }) {
   const [reviewing, setReviewing] = useState(null)
   const groups = { pendente: requests.filter(r=>r.status==='pendente'), aceito: requests.filter(r=>r.status==='aceito'), recusado: requests.filter(r=>r.status==='recusado') }
-  const cols = [
-    { key:'pendente', label:'⏳ Pendentes', color:T.amarelo, bg:T.amareloLight },
-    { key:'aceito',   label:'✅ Aceitas',   color:T.verde,   bg:T.verdeLight   },
-    { key:'recusado', label:'❌ Recusadas', color:T.perigo,  bg:T.perigoLight  },
-  ]
   return (
-    <>
+    <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14, height:'100%' }}>
       {reviewing && <RequestReviewModal req={reviewing} teamsWebhookUrl={teamsWebhookUrl} onRespond={onRespond} onClose={()=>setReviewing(null)}/>}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14, height:'100%', overflow:'hidden' }}>
-        {cols.map(col => (
-          <div key={col.key} style={{ background:col.bg, borderRadius:T.rLg, border:`1px solid ${col.color}30`, padding:14, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12, flexShrink:0 }}>
-              <div style={{ width:10, height:10, borderRadius:'50%', background:col.color }}/>
-              <span style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:15, textTransform:'uppercase', letterSpacing:'0.04em' }}>{col.label}</span>
-              <span style={{ marginLeft:'auto', background:col.color, color:'white', borderRadius:20, padding:'0 5px', fontSize:9, fontWeight:800 }}>{groups[col.key].length}</span>
+      {['pendente','aceito','recusado'].map(col => (
+        <div key={col} style={{ background:T.surfaceAlt, padding:14, borderRadius:T.rLg }}>
+          <h4 style={{ textTransform:'uppercase', margin:'0 0 12px' }}>{col} ({groups[col].length})</h4>
+          {groups[col].map(r => (
+            <div key={r.id} onClick={()=>col==='pendente'&&setReviewing(r)} style={{ background:'white', padding:10, marginBottom:8, borderRadius:4, border:`1px solid ${T.border}`, cursor:col==='pendente'?'pointer':'default' }}>
+              <strong>{r.requesterName}</strong><div>{r.machine} | {fmt(r.desiredDate)}</div>
             </div>
-            <div style={{ overflowY:'auto', flex:1, display:'flex', flexDirection:'column', gap:10 }}>
-              {groups[col.key].length === 0 && <div style={{ textAlign:'center', color:T.textMuted, fontFamily:FONT, fontSize:12, paddingTop:20 }}>—</div>}
-              {groups[col.key].map(r => {
-                const ct = CARD_TYPES[r.type], ug = URGENCY[r.urgency]
-                return (
-                  <motion.div key={r.id} layout whileHover={{ y:-1, boxShadow:T.shadowMd }}
-                    onClick={() => col.key==='pendente' && setReviewing(r)}
-                    style={{ background:T.surface, borderRadius:T.r, padding:'13px 14px', boxShadow:T.shadow, cursor:col.key==='pendente'?'pointer':'default', border:`1px solid ${T.border}`, transition:'all .12s' }}>
-                    <div style={{ display:'flex', gap:6, marginBottom:8, flexWrap:'wrap' }}>
-                      <span style={{ background:ct?.bg, border:`1px solid ${ct?.color}40`, borderRadius:20, padding:'2px 8px', color:ct?.color, fontSize:9, fontWeight:700, fontFamily:FONT }}>{ct?.icon} {ct?.short}</span>
-                      <span style={{ background:ug?.bg, borderRadius:20, padding:'2px 8px', color:ug?.color, fontSize:9, fontWeight:700, fontFamily:FONT }}>{ug?.icon}</span>
-                      {r.subtype && <span style={{ background:T.infoLight, borderRadius:20, padding:'2px 8px', color:T.info, fontSize:9, fontWeight:700, fontFamily:FONT }}>{getSubtypeLabel(r.type, r.subtype)}</span>}
-                      <span style={{ marginLeft:'auto', fontSize:11 }}>{r.channel==='teams'?'🟦':r.channel==='whatsapp'?'💬':'📧'}</span>
-                    </div>
-                    <div style={{ color:T.text, fontWeight:700, fontSize:13, fontFamily:FONT, marginBottom:4 }}>{r.requesterName||'—'}</div>
-                    <div style={{ color:T.textSec, fontSize:11, fontFamily:FONT, marginBottom:3 }}>{r.unit}</div>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                      <span style={{ color:T.textMuted, fontSize:10, fontFamily:FONT }}>🔧 {r.machine||'—'}</span>
-                      <span style={{ color:T.textMuted, fontSize:10, fontFamily:FONT }}>📅 {fmt(r.desiredDate)}</span>
-                    </div>
-                    {r.description && <div style={{ marginTop:6, color:T.textMuted, fontSize:10, fontFamily:FONT, fontStyle:'italic' }}>"{r.description.slice(0,60)}{r.description.length>60?'...':''}"</div>}
-                    {col.key==='pendente' && <div style={{ marginTop:8, textAlign:'right' }}><span style={{ background:T.laranjaLight, border:`1px solid ${T.laranja}40`, borderRadius:5, padding:'2px 8px', color:T.laranja, fontSize:10, fontWeight:700, fontFamily:FONT }}>Avaliar →</span></div>}
-                    {r.responseNote && <div style={{ marginTop:6, padding:'5px 8px', background:col.key==='aceito'?T.verdeLight:T.perigoLight, borderRadius:T.rSm, color:col.key==='aceito'?T.verde:T.perigo, fontSize:10, fontFamily:FONT }}>{r.responseNote}</div>}
-                  </motion.div>
-                )
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
-    </>
+          ))}
+        </div>
+      ))}
+    </div>
   )
 }
 
-// CORREÇÃO EXPORTAÇÃO EXPLICITA EXIGIDA PELO APP.TSX (NÃO USAR DEFAULT)
+// ==========================================
+// 6. COMPONENTE PRINCIPAL MESTRE: MASTERVIEW
+// ==========================================
 export function MasterView() {
-  const { user } = useAuth()
+  const { user, logout } = useAuth() // Recuperado o Botão e Contexto de Logout
   const { addToast, toasts, removeToast } = useToasts()
   const { cards, saveCard, deleteCard, moveCard } = useCards()
   const { requests, respondRequest } = useRequests()
-  const { simClients } = useSimClients()
+  const { simClients, setSimClients } = useSimClients() // Upload da Base SIM conectado
   const { config, saveConfig } = useConfig()
 
   const [view, setView] = useState('week')
@@ -439,10 +395,19 @@ export function MasterView() {
   const [editing, setEditing] = useState(null)
   const [showExport, setShowExport] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showCsvUpload, setShowCsvUpload] = useState(false) // Estado do Modal de CSV ativado
 
   const curYear = parseInt(baseDate.split('-')[0]), curMonth = parseInt(baseDate.split('-')[1]) - 1
   const weekDays = getWeekDays(baseDate)
   const conflicts = detectConflicts(cards)
+
+  // ==========================================
+  // LOGICA DOS KPIS DO DASHBOARD RESTAURADA
+  // ==========================================
+  const activeCards = cards.filter(c => c.calendarStatus !== 'cancelado')
+  const totalAgendados = activeCards.length
+  const totalPendentes = requests.filter(r => r.status === 'pendente').length
+  const totalConflitos = conflicts.length
 
   const changeDate = days => {
     const d = new Date(baseDate + 'T12:00:00')
@@ -450,81 +415,107 @@ export function MasterView() {
     setBaseDate(d.toISOString().split('T')[0])
   }
 
-  const changeMonth = mDiff => {
-    const d = new Date(curYear, curMonth + mDiff, 1)
-    setBaseDate(d.toISOString().split('T')[0])
-  }
-
-  // CORREÇÃO: Função que força o salvamento imediato da nova data arrastada no calendário
+  // Correção da persistência do remanejamento por Arrastar
   const handleMoveCard = async (id, newStart, newEnd, reason) => {
     try {
       const cardOriginal = cards.find(c => c.id === id)
       if (!cardOriginal) return
-      
       await moveCard(id, cardOriginal.laneId || 'agendado', user?.email, reason)
-      await saveCard({
-        ...cardOriginal,
-        startDate: newStart,
-        endDate: newEnd
-      })
-      addToast({ type:'success', title:'Remanejado', text:'O dia do serviço foi alterado com sucesso.' })
+      await saveCard({ ...cardOriginal, startDate: newStart, endDate: newEnd })
+      addToast({ type:'success', title:'Sucesso', text:'Serviço remanejado no calendário!' })
     } catch(e) {
-      addToast({ type:'conflict', title:'Erro', text:'Falha ao salvar remanejamento.' })
+      addToast({ type:'conflict', title:'Erro', text:'Erro ao salvar o novo dia.' })
     }
   }
 
   return (
     <div style={{ height:'100vh', display:'flex', flexDirection:'column', background:T.bg, padding:'16px 24px', boxSizing:'border-box' }}>
+      
+      {/* HEADER PRINCIPAL COM LOGOUT E ACTIONS */}
       <header style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16, flexShrink:0 }}>
         <div style={{ display:'flex', alignItems:'center', gap:20 }}>
           <MillsLogo height={28}/>
           <div style={{ display:'flex', background:T.surfaceAlt, padding:3, borderRadius:T.r, border:`1px solid ${T.border}` }}>
             {[['week','Semana'],['month','Mês'],['year','Ano'],['requests','Solicitações']].map(([v,l]) => (
-              <button key={v} onClick={()=>setView(v)} style={{ border:'none', background:view===v?T.surface:'none', color:view===v?T.laranja:T.textSec, fontWeight:view===v?700:500, fontFamily:FONT, fontSize:12, padding:'6px 14px', borderRadius:T.rSm, cursor:'pointer', boxShadow:view===v?T.shadowSm:'none', transition:'all .1s' }}>{l}</button>
+              <button key={v} onClick={()=>setView(v)} style={{ border:'none', background:view===v?T.surface:'none', color:view===v?T.laranja:T.textSec, fontWeight:view===v?700:500, fontFamily:FONT, fontSize:12, padding:'6px 14px', borderRadius:T.rSm, cursor:'pointer' }}>{l}</button>
             ))}
           </div>
         </div>
+        
         <div style={{ display:'flex', alignItems:'center', gap:14 }}>
-          <button onClick={()=>setShowExport(true)} style={{ ...BS, background:T.surface, color:T.text, border:`1px solid ${T.border}`, fontWeight:600 }}>📤 Exportar</button>
-          <button onClick={()=>setShowSettings(true)} style={{ ...BS, background:T.surface, color:T.text, border:`1px solid ${T.border}`, padding:'8px 10px' }}>⚙️</button>
+          <button onClick={()=>setShowCsvUpload(true)} style={{ ...BS, background:T.surface, border:`1px solid ${T.border}` }}>📊 Importar SIM</button>
+          <button onClick={()=>setShowExport(true)} style={{ ...BS, background:T.surface, border:`1px solid ${T.border}` }}>📤 Exportar</button>
+          <button onClick={()=>setShowSettings(true)} style={{ ...BS, background:T.surface, border:`1px solid ${T.border}` }}>⚙️</button>
           <NotificationBell/>
           <div style={{ width:1, height:20, background:T.border }}/>
-          <span style={{ fontFamily:FONT, fontSize:12, color:T.textSec }}>Perfil: <strong>{user?.email || 'Master'}</strong></span>
+          <span style={{ fontFamily:FONT, fontSize:12 }}><strong>{user?.email}</strong></span>
+          <button onClick={() => logout()} style={{ ...BS, background:T.perigoLight, color:T.perigo, border:'none', fontWeight:700 }}>Sair 🚪</button>
         </div>
       </header>
 
+      {/* DASHBOARD DE KPIS DO TOP RESTAURADO */}
+      <section style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:16, marginBottom:16 }}>
+        <div style={{ background:T.surface, padding:16, borderRadius:T.r, border:`1px solid ${T.border}`, boxShadow:T.shadowSm }}>
+          <div style={{ color:T.textMuted, fontSize:12, fontFamily:FONT }}>🗓️ TOTAL DE AGENDAMENTOS</div>
+          <div style={{ fontSize:24, fontWeight:700, color:T.text, marginTop:4 }}>{totalAgendados}</div>
+        </div>
+        <div style={{ background:T.surface, padding:16, borderRadius:T.r, border:`1px solid ${T.border}`, boxShadow:T.shadowSm }}>
+          <div style={{ color:T.textMuted, fontSize:12, fontFamily:FONT }}>⏳ SOLICITAÇÕES PENDENTES</div>
+          <div style={{ fontSize:24, fontWeight:700, color:T.amarelo, marginTop:4 }}>{totalPendentes}</div>
+        </div>
+        <div style={{ background:T.surface, padding:16, borderRadius:T.r, border:`1px solid ${T.border}`, boxShadow:T.shadowSm }}>
+          <div style={{ color:T.textMuted, fontSize:12, fontFamily:FONT }}>⚠ CONFLITOS DE LOGÍSTICA</div>
+          <div style={{ fontSize:24, fontWeight:700, color:T.perigo, marginTop:4 }}>{totalConflitos}</div>
+        </div>
+      </section>
+
+      {/* CONTROLADOR DE DATAS E NAVEGAÇÃO */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12, flexShrink:0 }}>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           {view==='week' && (
             <>
-              <button onClick={()=>changeDate(-7)} style={{ ...BS, padding:'6px 12px', background:T.surface, border:`1px solid ${T.border}` }}>◀</button>
-              <span style={{ fontFamily:FONT, fontWeight:700, color:T.text, fontSize:15 }}>{fmt(weekDays[0])} — {fmt(weekDays[6])}</span>
-              <button onClick={()=>changeDate(7)} style={{ ...BS, padding:'6px 12px', background:T.surface, border:`1px solid ${T.border}` }}>▶</button>
+              <button onClick={()=>changeDate(-7)} style={{ ...BS, background:T.surface, border:`1px solid ${T.border}` }}>◀</button>
+              <span style={{ fontFamily:FONT, fontWeight:700 }}>{fmt(weekDays[0])} — {fmt(weekDays[6])}</span>
+              <button onClick={()=>changeDate(7)} style={{ ...BS, background:T.surface, border:`1px solid ${T.border}` }}>▶</button>
             </>
           )}
           {view==='month' && (
             <>
-              <button onClick={()=>changeMonth(-1)} style={{ ...BS, padding:'6px 12px', background:T.surface, border:`1px solid ${T.border}` }}>◀</button>
-              <span style={{ fontFamily:FONT, fontWeight:700, color:T.text, fontSize:15 }}>{MONTH_NAMES[curMonth]} de {curYear}</span>
-              <button onClick={()=>changeMonth(1)} style={{ ...BS, padding:'6px 12px', background:T.surface, border:`1px solid ${T.border}` }}>▶</button>
+              <button onClick={()=>changeDate(-30)} style={{ ...BS, background:T.surface, border:`1px solid ${T.border}` }}>◀</button>
+              <span style={{ fontFamily:FONT, fontWeight:700 }}>{MONTH_NAMES[curMonth]} de {curYear}</span>
+              <button onClick={()=>changeDate(30)} style={{ ...BS, background:T.surface, border:`1px solid ${T.border}` }}>▶</button>
             </>
           )}
-          {view==='year' && <span style={{ fontFamily:FONT, fontWeight:700, color:T.text, fontSize:16 }}>Planejamento Anual {curYear}</span>}
         </div>
         {view!=='requests' && <button onClick={()=>setEditing({})} style={{ ...BS, background:T.laranja, color:'white', fontWeight:700 }}>➕ Novo Serviço</button>}
       </div>
 
-      <div style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column' }}>
-        {view==='week' && <WeekView cards={cards} baseDate={baseDate} conflicts={conflicts} onEdit={setEditing} onAddCard={d=>setEditing({startDate:d,endDate:d})} onMoveCard={handleMoveCard}/>}
-        {view==='month' && <MonthView cards={cards} year={curYear} month={curMonth} conflicts={conflicts} onEdit={setEditing} onAddCard={d=>setEditing({startDate:d,endDate:d})} onMoveCard={handleMoveCard}/>}
-        {view==='year' && <YearView cards={cards} year={curYear} onMonthClick={m=>{setBaseDate(`${curYear}-${String(m+1).padStart(2,'0')}-01`);setView('month');}}/>}
-        {view==='requests' && <RequestsKanban requests={requests} teamsWebhookUrl={config?.teamsWebhookUrl} onRespond={respondRequest}/>}
+      {/* GRID DO MAPA DO BRASIL E CALENDÁRIO LADO A LADO */}
+      <div style={{ flex:1, display:'flex', gap:16, minHeight:0 }}>
+        <div style={{ flex:1, display:'flex', flexDirection:'column', minHeight:0 }}>
+          {view==='week' && <WeekView cards={cards} baseDate={baseDate} conflicts={conflicts} onEdit={setEditing} onAddCard={d=>setEditing({startDate:d,endDate:d})} onMoveCard={handleMoveCard}/>}
+          {view==='month' && <MonthView cards={cards} year={curYear} month={curMonth} conflicts={conflicts} onEdit={setEditing} onAddCard={d=>setEditing({startDate:d,endDate:d})} onMoveCard={handleMoveCard}/>}
+          {view==='year' && <YearView cards={cards} year={curYear} onMonthClick={m=>{setBaseDate(`${curYear}-${String(m+1).padStart(2,'0')}-01`);setView('month');}}/>}
+          {view==='requests' && <RequestsKanban requests={requests} teamsWebhookUrl={config?.teamsWebhookUrl} onRespond={respondRequest}/>}
+        </div>
+        
+        {/* MAPA DO BRASIL INTEGRADO NA LATERAL DIREITA DO MASTER */}
+        {view !== 'requests' && (
+          <div style={{ width:320, background:T.surface, borderRadius:T.rLg, border:`1px solid ${T.border}`, padding:14, display:'flex', flexDirection:'column', boxShadow:T.shadow }}>
+            <h3 style={{ margin:'0 0 10px', fontSize:14, fontFamily:FONT }}>📍 Mapa de Atendimento Mills</h3>
+            <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', background:T.surfaceAlt, borderRadius:T.r }}>
+              <BrazilMap cards={activeCards} />
+            </div>
+          </div>
+        )}
       </div>
 
+      {/* ANIMACOES E MODAIS REATIVADOS */}
       <AnimatePresence>
-        {editing && <CardModal card={editing.id?editing:null} defaultDate={editing.startDate} simClients={simClients} onSave={async f=>{await saveCard(f); setEditing(null); addToast({type:'success',title:'Salvo',text:'Alterações registradas.'})}} onDelete={async id=>{if(confirm('Excluir permanentemente?')){await deleteCard(id);setEditing(null);addToast({type:'success',title:'Excluído',text:'Serviço removido.'})}}} onClose={()=>setEditing(null)} userRole="master"/>}
+        {editing && <CardModal card={editing.id?editing:null} defaultDate={editing.startDate} simClients={simClients} onSave={async f=>{await saveCard(f); setEditing(null); addToast({type:'success',title:'Salvo',text:'Alterações registradas com sucesso.'})}} onDelete={async id=>{if(confirm('Excluir permanentemente?')){await deleteCard(id);setEditing(null);addToast({type:'success',title:'Excluído',text:'Serviço removido.'})}}} onClose={()=>setEditing(null)} />}
         {showExport && <ExportModal cards={cards} weekDays={weekDays} conflicts={conflicts} onClose={()=>setShowExport(false)}/>}
         {showSettings && <SettingsModal config={config} onSave={saveConfig} onClose={()=>setShowSettings(false)}/>}
+        {showCsvUpload && <CsvUploadModal onLoaded={setSimClients} onClose={()=>setShowCsvUpload(false)} />}
       </AnimatePresence>
 
       <ToastContainer toasts={toasts} onClose={removeToast}/>
