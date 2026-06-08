@@ -35,22 +35,37 @@ export function useCards() {
     )
     return unsub
   }, [])
+export const saveCard = async (cardData) => {
+  try {
+    // Função interna para limpar valores 'undefined' ou vazios
+    const limparDados = (obj) => {
+      const novoObj = {};
+      Object.keys(obj).forEach((key) => {
+        if (obj[key] !== undefined && obj[key] !== null && obj[key] !== '') {
+          novoObj[key] = obj[key];
+        }
+      });
+      return novoObj;
+    };
 
-  const saveCard = async card => {
-    try {
-      const { id, ...data } = card
-      const dadosLimpos = limparDados(data)
-      dadosLimpos.updatedAt = serverTimestamp()
+    const dadosLimpos = limparDados({
+      ...cardData,
+      updatedAt: new Date().toISOString()
+    });
 
-      if (id && id.length > 10) {
-        await updateDoc(doc(db, 'cards', id), dadosLimpos)
-      } else {
-        dadosLimpos.createdAt = serverTimestamp()
-        await addDoc(collection(db, 'cards'), dadosLimpos)
-      }
-    } catch (err) {
-      console.error('Erro ao salvar agendamento:', err)
-      alert('Não foi possível salvar o agendamento no banco de dados. Verifique a conexão ou permissões.')
+    if (cardData.id) {
+      const ref = doc(db, 'cards', cardData.id);
+      await updateDoc(ref, dadosLimpos);
+    } else {
+      const ref = collection(db, 'cards');
+      await addDoc(ref, {
+        ...dadosLimpos,
+        createdAt: new Date().toISOString()
+      });
+    }
+  } catch (err) {
+    console.error('Erro ao salvar o card:', err);
+    alert('Não foi possível salvar o agendamento no banco de dados. Verifique a conexão ou permissões.')
       throw err
     }
   }
