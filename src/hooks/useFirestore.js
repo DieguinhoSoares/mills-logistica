@@ -175,7 +175,43 @@ export function useDrivers() {
   const deleteDriver = id => deleteDoc(doc(db,'drivers',id))
   return { drivers, saveDriver, deleteDriver }
 }
+export function usePendingUsers() {
+  const [pendingUsers, setPendingUsers] = useState([])
+  useEffect(() => {
+    const q = query(collection(db, 'users'), where('status', '==', 'pendente'), orderBy('createdAt', 'asc'))
+    const unsub = onSnapshot(q,
+      snap => setPendingUsers(snap.docs.map(d => ({ id:d.id, ...d.data() }))),
+      () => {}
+    )
+    return unsub
+  }, [])
 
+  const approveUser = async (userId, role) => {
+    await updateDoc(doc(db, 'users', userId), {
+      status: 'ativo',
+      role,
+      approvedAt: new Date().toISOString(),
+    })
+    // Notifica o usuário
+    await addDoc(collection(db, 'notifications'), {
+      userId,
+      type:    'account_approved',
+      title:   '✅ Acesso liberado!',
+      message: `Seu cadastro foi aprovado. Perfil: ${role === 'frotas' ? 'Gestão de Frotas' : 'Solicitante'}.`,
+      read:    false,
+      createdAt: serverTimestamp(),
+    })
+  }
+
+  const refuseUser = async (userId) => {
+    await updateDoc(doc(db, 'users', userId), {
+      status:   'recusado',
+      refusedAt: new Date().toISOString(),
+    })
+  }
+
+  return { pendingUsers, approveUser, refuseUser }
+}
 export async function runDailyBackup(cards, requests) {
   try {
     const today = new Date().toISOString().split('T')[0]
