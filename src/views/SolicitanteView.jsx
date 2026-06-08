@@ -13,7 +13,7 @@ const STATUS_CONFIG = {
 }
 
 const URGENCY_SLA = {
-  critico: 'até 4h',
+  critico: 'até 8h',
   alto:    'até 24h',
   medio:   'até 3 dias',
   baixo:   'até 7 dias',
