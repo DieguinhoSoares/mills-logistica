@@ -1,6 +1,5 @@
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import * as XLSX from 'xlsx'
 import { useAuth }        from '../contexts/AuthContext'
 import { useCards, useRequests, useNotifications, useSimClients, useConfig, useDrivers } from '../hooks/useFirestore'
 import { MillsLogo, ToastContainer, useToasts, ServiceCard, BrazilMap, MoveModal, NotificationBell, ClientInput } from '../components/UI'
@@ -174,7 +173,8 @@ function ExportModal({ cards, onClose }) {
     return inRange && inDriver
   })
 
-  const handleExport = () => {
+    const handleExport = async () => {
+    const XLSX = await import('xlsx')
     const wb = XLSX.utils.book_new()
 
     const hGreen  = { font:{ bold:true, color:{ rgb:'FFFFFF' }, name:'Arial', sz:13 }, fill:{ fgColor:{ rgb:'004042' } }, alignment:{ horizontal:'center', vertical:'center' } }
