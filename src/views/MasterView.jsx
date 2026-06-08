@@ -43,38 +43,37 @@ function CsvUploadModal({ onLoaded }) {
         </label>
       </div>
       {status === 'loading' && <p style={{ fontFamily: FONT, color: '#F37021' }}>Processando linhas da planilha...</p>}
-      {status === 'done' && <p style={{ fontFamily: FONT, color: '#2E7D32' }}>✅ {count} registros carregados! Primeiros 500 serão salvos por segurança.</p>}
-      {status === 'error' && <p style={{ fontFamily: FONT, color: '#C62828' }}>❌ Erro ao ler o arquivo. Verifique a formatação.</p>}
+      {status === 'done' && <p style={{ fontFamily: FONT, color: '#2E7D32' }}>✅ {count} registros carregados!</p>}
+      {status === 'error' && <p style={{ fontFamily: FONT, color: '#C62828' }}>❌ Erro ao ler o arquivo.</p>}
     </div>
   )
 }
 
-// ─── VISÃO MASTER DA LOGÍSTICA (KANBAN PRINCIPAL) ───────────────────────────
+// ─── VISÃO MASTER DA LOGÍSTICA PRINCIPAL ────────────────────────────────────
 export default function MasterView() {
   const { user } = useAuth()
   const { addToast, toasts, removeToast } = useToasts()
-  const { cards, saveCard, moveCard, deleteCard } = useCards()
+  const { cards, saveCard, moveCard } = useCards()
   const { requests, respondRequest } = useRequests()
   const { uploadClients } = useSimClients()
 
-  // Controle de Abas e Estados
   const [activeTab, setActiveTab] = useState('kanban')
   const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0])
   const [showCsvModal, setShowCsvModal] = useState(false)
   
-  // Estados para o controle do Modal de Reprogramação / Justificativa
+  // Controle do Modal de Reprogramação
   const [showReasonModal, setShowReasonModal] = useState(false)
   const [pendingMove, setPendingMove] = useState(null)
   const [reasonText, setReasonText] = useState('')
+  const [novaDataAlvo, setNovaDataAlvo] = useState('') // Guarda a data para onde o card vai
 
-  // Executa rotina de backup diário se houver cards e requests na tela
   useEffect(() => {
     if (cards.length > 0) {
       runDailyBackup(cards, requests)
     }
   }, [cards, requests])
 
-  // Definição rígida das 5 colunas padrão da Mills solicitadas
+  // As 5 colunas rígidas oficiais da Mills
   const LANES = [
     { id: 'solicitacoes', title: 'Solicitações' },
     { id: 'agendado', title: 'Agendado' },
@@ -83,51 +82,48 @@ export default function MasterView() {
     { id: 'retornado', title: 'Retornado' }
   ]
 
-  // Filtra os cards para exibir apenas os do dia selecionado no menu superior
   const cardsDoDia = cards.filter(c => c.startDate === currentDate)
 
-  // Disparado quando o usuário solta o card em alguma coluna
+  // Disparado ao soltar o card
   const handleDragEnd = (card, targetLaneId) => {
-    // Se soltou na mesma coluna, não faz nada
-    if (card.laneId === targetLaneId) return
-
-    // REGRA DE OURO: Só pede justificativa se mudar a data ou se voltar o card para a coluna 'Agendado'
+    // Se arrastou para a coluna de agendados, abre o modal perguntando a nova data e o motivo
     if (targetLaneId === 'agendado') {
-      setPendingMove({ card, targetLaneId, targetDate: currentDate })
+      setPendingMove({ card, targetLaneId })
+      setNovaDataAlvo(card.startDate || currentDate) // pré-seleciona a data atual do card
       setReasonText('')
       setShowReasonModal(true)
     } else {
-      // Movimentações normais de fluxo (Trânsito, Cliente, Retornado) salvam direto sem travar a tela
-      moveCard(card.id, targetLaneId, user?.email, 'Avanço de status na linha do tempo')
+      // Movimentação de fluxo normal dentro do mesmo dia
+      moveCard(card.id, targetLaneId, user?.email, 'Avanço de status operacional')
     }
   }
 
-  // Confirmar a alteração dentro do Modal de Justificativa
+  // EXECUTA A MUDANÇA REAL DE COLUNA E DATA
   const handleConfirmReprogramacao = async () => {
     if (!reasonText.trim()) {
-      alert('Por favor, insira uma justificativa válida para a alteração.')
+      alert('Por favor, insira uma justificativa.')
       return
     }
 
     try {
-      const { card, targetLaneId, targetDate } = pendingMove
+      const { card, targetLaneId } = pendingMove
 
-      // 1. Atualiza a coluna e o histórico de auditoria no Firestore
+      // 1. Grava a movimentação e o motivo de auditoria no histórico do Firestore
       await moveCard(card.id, targetLaneId, user?.email, reasonText)
 
-      // 2. CORREÇÃO CRUCIAL: Atualiza e força o card a mudar de data de verdade na tela
+      // 2. SOLUÇÃO DO BUG: Atualiza a coluna E força a nova data de operação diretamente no card
       await saveCard({
         ...card,
         laneId: targetLaneId,
-        startDate: targetDate
+        startDate: novaDataAlvo // Sobrescreve o dia antigo com o novo escolhido no modal!
       })
 
-      addToast({ type: 'success', title: 'Sucesso', text: 'Agendamento reprogramado com sucesso!' })
+      addToast({ type: 'success', title: 'Sucesso', text: 'Card reprogramado e movido de dia!' })
       setShowReasonModal(false)
       setPendingMove(null)
     } catch (err) {
       console.error(err)
-      addToast({ type: 'conflict', title: 'Erro', text: 'Não foi possível mover o card.' })
+      addToast({ type: 'conflict', title: 'Erro', text: 'Não foi possível salvar a alteração.' })
     }
   }
 
@@ -143,14 +139,14 @@ export default function MasterView() {
           </nav>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <span style={{ fontFamily: FONT, color: '#686258' }}>Olá, <strong>{user?.email || 'Logística Mills'}</strong></span>
+          <span style={{ fontFamily: FONT, color: '#686258' }}>Logado como: <strong>{user?.email || 'Logística Mills'}</strong></span>
           <NotificationBell />
         </div>
       </header>
 
-      {/* Seletor de Data Superior */}
+      {/* Seletor de Data da Tela Principal */}
       <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <span style={{ fontFamily: FONT, color: '#686258', fontWeight: 'bold' }}>Filtrar Data de Operação:</span>
+        <span style={{ fontFamily: FONT, color: '#686258', fontWeight: 'bold' }}>Visualizando o Dia:</span>
         <input type="date" value={currentDate} onChange={e => setCurrentDate(e.target.value)} style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid #E2DDD6', fontFamily: FONT }} />
       </div>
 
@@ -174,11 +170,10 @@ export default function MasterView() {
               </h3>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {/* Renderização Especial da Coluna de Solicitações Recebidas da Frota */}
                 {lane.id === 'solicitacoes' && requests.filter(r => r.status === 'pendente').map(req => (
-                  <div key={req.id} style={{ background: 'white', padding: 14, borderRadius: 8, boxShadow: '0 2px 4px rgba(0,0,0,0.04)', borderLeft: '4px solid #F37021' }}>
-                    <p style={{ margin: '0 0 6px 0', fontWeight: 'bold', fontFamily: FONT }}>{req.client || 'Cliente não informado'}</p>
-                    <p style={{ margin: '0 0 10px 0', fontSize: 13, color: '#686258' }}>Equipamento: {req.machine || '—'}</p>
+                  <div key={req.id} style={{ background: 'white', padding: 14, borderRadius: 8, borderLeft: '4px solid #F37021' }}>
+                    <p style={{ margin: '0 0 4px 0', fontWeight: 'bold', fontFamily: FONT }}>{req.client || 'Cliente'}</p>
+                    <p style={{ margin: '0 0 10px 0', fontSize: 12, color: '#686258' }}>Equipamento: {req.machine || '—'}</p>
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button onClick={() => respondRequest(req.id, 'aprovado')} style={{ background: '#2E7D32', color: 'white', border: 'none', padding: '4px 8px', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>Aprovar</button>
                       <button onClick={() => respondRequest(req.id, 'rejeitado')} style={{ background: '#C62828', color: 'white', border: 'none', padding: '4px 8px', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>Recusar</button>
@@ -186,7 +181,6 @@ export default function MasterView() {
                   </div>
                 ))}
 
-                {/* Renderização dos Cards Kanban operacionais da Mills */}
                 {lane.id !== 'solicitacoes' && cardsDoDia.filter(c => c.laneId === lane.id).map(card => (
                   <div 
                     key={card.id}
@@ -194,13 +188,13 @@ export default function MasterView() {
                     onDragStart={e => e.dataTransfer.setData('application/json', JSON.stringify(card))}
                     style={{ background: 'white', padding: 14, borderRadius: 8, boxShadow: '0 2px 4px rgba(0,0,0,0.05)', cursor: 'grab', border: '1px solid #E2DDD6' }}
                   >
-                    <div style={{ fontSize: 11, color: '#F37021', fontWeight: 'bold', marginBottom: 4 }}>{card.type || 'INTERNO'}</div>
+                    <div style={{ fontSize: 11, color: '#F37021', fontWeight: 'bold', marginBottom: 4 }}>{card.type || 'LOGÍSTICA'}</div>
                     <p style={{ margin: '0 0 4px 0', fontWeight: 'bold', fontFamily: FONT, fontSize: 14 }}>{card.client || '—'}</p>
                     <p style={{ margin: '0 0 4px 0', fontSize: 12, color: '#686258' }}>🛠️ {card.machine || 'Sem máquina'}</p>
-                    <p style={{ margin: '0 0 0 0', fontSize: 12, color: '#686258' }}>🚚 Motorista: {card.driver || 'Não atribuído'}</p>
+                    <p style={{ margin: '0 0 0 0', fontSize: 12, color: '#686258' }}>🚚 {card.driver || 'Não atribuído'}</p>
                     {card.lastMoveReason && (
                       <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px dashed #E2DDD6', fontSize: 11, color: '#8C857B', fontStyle: 'italic' }}>
-                        Justificativa: {card.lastMoveReason}
+                        Motivo: {card.lastMoveReason}
                       </div>
                     )}
                   </div>
@@ -213,21 +207,36 @@ export default function MasterView() {
         <KPIView />
       )}
 
-      {/* MODAL COLOCO EM TELA PARA CAPTURAR A REPROGRAMAÇÃO */}
+      {/* MODAL CORRIGIDO: ESCOLHA DA DATA + JUSTIFICATIVA */}
       {showReasonModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}>
-          <div style={{ background: 'white', padding: 24, borderRadius: 12, width: 450, boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
-            <h3 style={{ fontFamily: FONT, margin: '0 0 12px 0', color: '#4A453F' }}>Motivo da Reprogramação</h3>
-            <p style={{ fontFamily: FONT, color: '#686258', fontSize: 13, marginBottom: 16 }}>Identificamos uma alteração de prazo ou retorno de fluxo. Por favor, registre a justificativa operacional para o histórico da auditoria da Mills:</p>
-            <textarea 
-              value={reasonText} 
-              onChange={e => setReasonText(e.target.value)}
-              placeholder="Digite aqui detalhadamente o motivo..." 
-              style={{ width: '100%', height: 100, padding: 10, borderRadius: 6, border: '1px solid #E2DDD6', fontFamily: FONT, boxSizing: 'border-box', marginBottom: 16, resize: 'none' }}
-            />
+          <div style={{ background: 'white', padding: 24, borderRadius: 12, width: 450 }}>
+            <h3 style={{ fontFamily: FONT, margin: '0 0 12px 0', color: '#4A453F' }}>Reprogramar Agendamento</h3>
+            
+            {/* NOVO CAMPO: Altera explicitamente o dia em que o card vai operar */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontFamily: FONT, fontSize: 13, fontWeight: 'bold', display: 'block', marginBottom: 6, color: '#686258' }}>Nova Data de Execução:</label>
+              <input 
+                type="date" 
+                value={novaDataAlvo} 
+                onChange={e => setNovaDataAlvo(e.target.value)} 
+                style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid #E2DDD6', fontFamily: FONT, boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontFamily: FONT, fontSize: 13, fontWeight: 'bold', display: 'block', marginBottom: 6, color: '#686258' }}>Justificativa Operacional:</label>
+              <textarea 
+                value={reasonText} 
+                onChange={e => setReasonText(e.target.value)}
+                placeholder="Ex: Cliente solicitou alteração devido a chuvas na obra..." 
+                style={{ width: '100%', height: 90, padding: 10, borderRadius: 6, border: '1px solid #E2DDD6', fontFamily: FONT, boxSizing: 'border-box', resize: 'none' }}
+              />
+            </div>
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
               <button onClick={() => { setShowReasonModal(false); setPendingMove(null); }} style={{ background: 'transparent', border: 'none', color: '#686258', cursor: 'pointer', fontWeight: 'bold' }}>Cancelar</button>
-              <button onClick={handleConfirmReprogramacao} style={{ background: '#F37021', border: 'none', color: 'white', padding: '8px 16px', borderRadius: 6, cursor: 'pointer', fontWeight: 'bold' }}>Confirmar Alteração</button>
+              <button onClick={handleConfirmReprogramacao} style={{ background: '#F37021', border: 'none', color: 'white', padding: '8px 16px', borderRadius: 6, cursor: 'pointer', fontWeight: 'bold' }}>Salvar Alterações</button>
             </div>
           </div>
         </div>
