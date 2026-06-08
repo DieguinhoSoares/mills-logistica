@@ -57,9 +57,12 @@ export function useToasts() {
   return { toasts, add, dismiss }
 }
 
-export function NotificationBell({ notifications, unreadCount, onMarkAllRead }) {
+export function NotificationBell({ notifications, unreadCount, onMarkAllRead, onMarkRead }) {
   const [open, setOpen] = useState(false)
-  const handleOpen = () => { setOpen(o=>!o); if(unreadCount>0) onMarkAllRead() }
+  const handleOpen = () => {
+    setOpen(o => !o)
+    if (unreadCount > 0) onMarkAllRead()
+  }
   return (
     <div style={{ position:'relative' }}>
       <button onClick={handleOpen}
@@ -79,8 +82,16 @@ export function NotificationBell({ notifications, unreadCount, onMarkAllRead }) 
             <div style={{ maxHeight:280, overflowY:'auto' }}>
               {notifications.length===0 && <p style={{ padding:14, color:T.textMuted, fontFamily:FONT, fontSize:12, margin:0, textAlign:'center' }}>Nenhuma notificação.</p>}
               {notifications.slice(0,10).map(n => (
-                <div key={n.id} style={{ padding:'10px 14px', borderBottom:`1px solid ${T.border}`, background:n.read?T.surface:T.laranjaXLight }}>
-                  <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:T.text }}>{n.title}</div>
+                <div key={n.id}
+                  onClick={() => { if (!n.read && onMarkRead) onMarkRead(n.id) }}
+                  style={{ padding:'10px 14px', borderBottom:`1px solid ${T.border}`,
+                    background: n.read ? T.surface : T.laranjaXLight,
+                    cursor: n.read ? 'default' : 'pointer',
+                    transition:'background .15s' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8 }}>
+                    <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:T.text }}>{n.title}</div>
+                    {!n.read && <div style={{ width:7, height:7, borderRadius:'50%', background:T.laranja, flexShrink:0, marginTop:3 }}/>}
+                  </div>
                   <div style={{ fontFamily:FONT, fontSize:11, color:T.textSec }}>{n.message}</div>
                 </div>
               ))}
