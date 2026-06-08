@@ -343,7 +343,7 @@ function RequestsKanban({ requests, teamsWebhookUrl, onRespond }) {
             <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12, flexShrink:0 }}>
               <div style={{ width:10, height:10, borderRadius:'50%', background:col.color }}/>
               <span style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:15, textTransform:'uppercase', letterSpacing:'0.04em' }}>{col.label}</span>
-              <span style={{ marginLeft:'auto', background:col.color, color:'white', borderRadius:20, padding:'1px 8px', fontSize:11, fontWeight:800, fontFamily:FONT }}>{groups[col.key].length}</span>
+              <span style={{ marginLeft:'auto', background:col.color, color:'white', borderRadius:20, padding:'0 5px', fontSize:9, fontWeight:800 }}>{groups[col.key].length}</span>
             </div>
             <div style={{ overflowY:'auto', flex:1, display:'flex', flexDirection:'column', gap:10 }}>
               {groups[col.key].length === 0 && <div style={{ textAlign:'center', color:T.textMuted, fontFamily:FONT, fontSize:12, paddingTop:20 }}>—</div>}
