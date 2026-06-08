@@ -100,18 +100,17 @@ export function useRequests(type) {
   const [requests, setRequests] = useState([])
 
   useEffect(() => {
-    const q = type 
-      ? query(collection(db, 'requests'), where('targetModule', '==', type), orderBy('createdAt', 'desc'))
-      : query(collection(db, 'requests'), orderBy('createdAt', 'desc'))
+    // Essa linha abaixo agora busca TODOS os serviços do banco, sem esconder nada por perfil
+    const q = query(collection(db, 'requests'), orderBy('createdAt', 'desc'))
       
     const unsub = onSnapshot(q, 
       snap => setRequests(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
       err => console.error('Erro ao buscar solicitações:', err)
     )
     return unsub
-  }, [type])
+  }, []) // Removemos o "type" daqui para não travar a busca
 
-  const respondRequest = async (id, status, note, teamsWebhookUrl) => {
+  const respondRequest = async (id, status, note) => {
     try {
       const ref = doc(db, 'requests', id)
       await updateDoc(ref, { 
