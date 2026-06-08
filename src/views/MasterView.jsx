@@ -50,7 +50,8 @@ function CsvUploadModal({ onLoaded }) {
 }
 
 // ─── VISÃO MASTER DA LOGÍSTICA PRINCIPAL ────────────────────────────────────
-export default function MasterView() {
+// Correção do build: Mudado de 'export default' para 'export function'
+export function MasterView() {
   const { user } = useAuth()
   const { addToast, toasts, removeToast } = useToasts()
   const { cards, saveCard, moveCard } = useCards()
@@ -65,7 +66,7 @@ export default function MasterView() {
   const [showReasonModal, setShowReasonModal] = useState(false)
   const [pendingMove, setPendingMove] = useState(null)
   const [reasonText, setReasonText] = useState('')
-  const [novaDataAlvo, setNovaDataAlvo] = useState('') // Guarda a data para onde o card vai
+  const [novaDataAlvo, setNovaDataAlvo] = useState('')
 
   useEffect(() => {
     if (cards.length > 0) {
@@ -84,21 +85,17 @@ export default function MasterView() {
 
   const cardsDoDia = cards.filter(c => c.startDate === currentDate)
 
-  // Disparado ao soltar o card
   const handleDragEnd = (card, targetLaneId) => {
-    // Se arrastou para a coluna de agendados, abre o modal perguntando a nova data e o motivo
     if (targetLaneId === 'agendado') {
       setPendingMove({ card, targetLaneId })
-      setNovaDataAlvo(card.startDate || currentDate) // pré-seleciona a data atual do card
+      setNovaDataAlvo(card.startDate || currentDate)
       setReasonText('')
       setShowReasonModal(true)
     } else {
-      // Movimentação de fluxo normal dentro do mesmo dia
       moveCard(card.id, targetLaneId, user?.email, 'Avanço de status operacional')
     }
   }
 
-  // EXECUTA A MUDANÇA REAL DE COLUNA E DATA
   const handleConfirmReprogramacao = async () => {
     if (!reasonText.trim()) {
       alert('Por favor, insira uma justificativa.')
@@ -107,15 +104,11 @@ export default function MasterView() {
 
     try {
       const { card, targetLaneId } = pendingMove
-
-      // 1. Grava a movimentação e o motivo de auditoria no histórico do Firestore
       await moveCard(card.id, targetLaneId, user?.email, reasonText)
-
-      // 2. SOLUÇÃO DO BUG: Atualiza a coluna E força a nova data de operação diretamente no card
       await saveCard({
         ...card,
         laneId: targetLaneId,
-        startDate: novaDataAlvo // Sobrescreve o dia antigo com o novo escolhido no modal!
+        startDate: novaDataAlvo
       })
 
       addToast({ type: 'success', title: 'Sucesso', text: 'Card reprogramado e movido de dia!' })
@@ -144,7 +137,6 @@ export default function MasterView() {
         </div>
       </header>
 
-      {/* Seletor de Data da Tela Principal */}
       <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 12 }}>
         <span style={{ fontFamily: FONT, color: '#686258', fontWeight: 'bold' }}>Visualizando o Dia:</span>
         <input type="date" value={currentDate} onChange={e => setCurrentDate(e.target.value)} style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid #E2DDD6', fontFamily: FONT }} />
@@ -207,33 +199,19 @@ export default function MasterView() {
         <KPIView />
       )}
 
-      {/* MODAL CORRIGIDO: ESCOLHA DA DATA + JUSTIFICATIVA */}
+      {/* MODAL DE JUSTIFICATIVA */}
       {showReasonModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}>
           <div style={{ background: 'white', padding: 24, borderRadius: 12, width: 450 }}>
             <h3 style={{ fontFamily: FONT, margin: '0 0 12px 0', color: '#4A453F' }}>Reprogramar Agendamento</h3>
-            
-            {/* NOVO CAMPO: Altera explicitamente o dia em que o card vai operar */}
             <div style={{ marginBottom: 16 }}>
               <label style={{ fontFamily: FONT, fontSize: 13, fontWeight: 'bold', display: 'block', marginBottom: 6, color: '#686258' }}>Nova Data de Execução:</label>
-              <input 
-                type="date" 
-                value={novaDataAlvo} 
-                onChange={e => setNovaDataAlvo(e.target.value)} 
-                style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid #E2DDD6', fontFamily: FONT, boxSizing: 'border-box' }}
-              />
+              <input type="date" value={novaDataAlvo} onChange={e => setNovaDataAlvo(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid #E2DDD6', fontFamily: FONT, boxSizing: 'border-box' }} />
             </div>
-
             <div style={{ marginBottom: 16 }}>
               <label style={{ fontFamily: FONT, fontSize: 13, fontWeight: 'bold', display: 'block', marginBottom: 6, color: '#686258' }}>Justificativa Operacional:</label>
-              <textarea 
-                value={reasonText} 
-                onChange={e => setReasonText(e.target.value)}
-                placeholder="Ex: Cliente solicitou alteração devido a chuvas na obra..." 
-                style={{ width: '100%', height: 90, padding: 10, borderRadius: 6, border: '1px solid #E2DDD6', fontFamily: FONT, boxSizing: 'border-box', resize: 'none' }}
-              />
+              <textarea value={reasonText} onChange={e => setReasonText(e.target.value)} placeholder="Ex: Cliente solicitou alteração..." style={{ width: '100%', height: 90, padding: 10, borderRadius: 6, border: '1px solid #E2DDD6', fontFamily: FONT, boxSizing: 'border-box', resize: 'none' }} />
             </div>
-
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
               <button onClick={() => { setShowReasonModal(false); setPendingMove(null); }} style={{ background: 'transparent', border: 'none', color: '#686258', cursor: 'pointer', fontWeight: 'bold' }}>Cancelar</button>
               <button onClick={handleConfirmReprogramacao} style={{ background: '#F37021', border: 'none', color: 'white', padding: '8px 16px', borderRadius: 6, cursor: 'pointer', fontWeight: 'bold' }}>Salvar Alterações</button>
@@ -242,7 +220,7 @@ export default function MasterView() {
         </div>
       )}
 
-      {/* MODAL DO UPLOAD DO EXCEL / SIM */}
+      {/* MODAL DO CSV */}
       {showCsvModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}>
           <div style={{ background: 'white', padding: 24, borderRadius: 12, position: 'relative' }}>
