@@ -193,7 +193,7 @@ function ExportModal({ cards, onClose }) {
     wsR['!merges'] = []
 
     wsR['!merges'].push({ s:{r:0,c:0}, e:{r:0,c:5} })
-    setCell(wsR, 'A1', 'mills infraestrutura · Gestão de Frotas — Logística', hGreen)
+    setCell(wsR, 'A1', 'Mills Pesados · Gestão de Frotas — Logística', hGreen)
     wsR['!merges'].push({ s:{r:1,c:0}, e:{r:1,c:5} })
     setCell(wsR, 'A2', `Relatório de Operações · ${fmt(dateFrom)} a ${fmt(dateTo)}`, subInfo)
     wsR['!merges'].push({ s:{r:2,c:0}, e:{r:2,c:5} })
