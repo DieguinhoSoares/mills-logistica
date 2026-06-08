@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc,
-  query, orderBy, where, serverTimestamp, setDoc, getDoc,
+  query, orderBy, serverTimestamp, setDoc, getDoc,
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 
@@ -9,7 +9,7 @@ import { db } from '../lib/firebase'
 const limparDados = (obj) => {
   const limpo = {}
   Object.keys(obj).forEach(chave => {
-    if (obj[chave] !== undefined) {
+    if (obj[chave] !== undefined && obj[chave] !== null && obj[chave] !== '') {
       limpo[chave] = obj[chave]
     }
   })
@@ -35,37 +35,27 @@ export function useCards() {
     )
     return unsub
   }, [])
-export const saveCard = async (cardData) => {
-  try {
-    // Função interna para limpar valores 'undefined' ou vazios
-    const limparDados = (obj) => {
-      const novoObj = {};
-      Object.keys(obj).forEach((key) => {
-        if (obj[key] !== undefined && obj[key] !== null && obj[key] !== '') {
-          novoObj[key] = obj[key];
-        }
-      });
-      return novoObj;
-    };
 
-    const dadosLimpos = limparDados({
-      ...cardData,
-      updatedAt: new Date().toISOString()
-    });
+  const saveCard = async (cardData) => {
+    try {
+      const dadosLimpos = limparDados({
+        ...cardData,
+        updatedAt: new Date().toISOString()
+      })
 
-    if (cardData.id) {
-      const ref = doc(db, 'cards', cardData.id);
-      await updateDoc(ref, dadosLimpos);
-    } else {
-      const ref = collection(db, 'cards');
-      await addDoc(ref, {
-        ...dadosLimpos,
-        createdAt: new Date().toISOString()
-      });
-    }
-  } catch (err) {
-    console.error('Erro ao salvar o card:', err);
-    alert('Não foi possível salvar o agendamento no banco de dados. Verifique a conexão ou permissões.')
+      if (cardData.id) {
+        const ref = doc(db, 'cards', cardData.id)
+        await updateDoc(ref, dadosLimpos)
+      } else {
+        const ref = collection(db, 'cards')
+        await addDoc(ref, {
+          ...dadosLimpos,
+          createdAt: new Date().toISOString()
+        })
+      }
+    } catch (err) {
+      console.error('Erro ao salvar o card:', err)
+      alert('Não foi possível salvar o agendamento no banco de dados. Verifique a conexão ou permissões.')
       throw err
     }
   }
@@ -79,41 +69,38 @@ export const saveCard = async (cardData) => {
     }
   }
 
- export const moveCard = async (cardId, destinationLane, userEmail) => {
-  try {
-    const ref = doc(db, 'cards', cardId);
-    
-    // Cria o registro do histórico usando o e-mail de quem moveu o card
-    const historyEntry = {
-      toLane: destinationLane,
-      movedAt: new Date().toISOString(),
-      user: userEmail || 'Sistema (Logística)' // Se não achar o e-mail, usa o padrão
-    };
+  const moveCard = async (cardId, destinationLane, userEmail) => {
+    try {
+      const ref = doc(db, 'cards', cardId)
+      
+      const historyEntry = {
+        toLane: destinationLane,
+        movedAt: new Date().toISOString(),
+        user: userEmail || 'Sistema (Logística)'
+      }
 
-    // Busca o card atual para não apagar o histórico que já existia
-    const cardSnap = await getDoc(ref);
-    const currentHistory = cardSnap.exists() ? (cardSnap.data().history || []) : [];
+      const cardSnap = await getDoc(ref)
+      const currentHistory = cardSnap.exists() ? (cardSnap.data().history || []) : []
 
-    await updateDoc(ref, {
-      laneId: destinationLane,
-      history: [...currentHistory, historyEntry],
-      updatedAt: new Date().toISOString()
-    });
-  } catch (err) {
-    console.error('Erro ao mover o card:', err);
-    throw err;
+      await updateDoc(ref, {
+        laneId: destinationLane,
+        history: [...currentHistory, historyEntry],
+        updatedAt: new Date().toISOString()
+      })
+    } catch (err) {
+      console.error('Erro ao mover o card:', err)
+      throw err
+    }
   }
-};
 
   return { cards, loading, saveCard, deleteCard, moveCard }
 }
 
 // ─── GERENCIADOR DE SOLICITAÇÕES ───────────────────────────────────────────
-export function useRequests(type) {
+export function useRequests() {
   const [requests, setRequests] = useState([])
 
   useEffect(() => {
-    // Essa linha abaixo agora busca TODOS os serviços do banco, sem esconder nada por perfil
     const q = query(collection(db, 'requests'), orderBy('createdAt', 'desc'))
       
     const unsub = onSnapshot(q, 
@@ -121,7 +108,7 @@ export function useRequests(type) {
       err => console.error('Erro ao buscar solicitações:', err)
     )
     return unsub
-  }, []) // Removemos o "type" daqui para não travar a busca
+  }, [])
 
   const respondRequest = async (id, status, note) => {
     try {
@@ -173,7 +160,6 @@ export function useSimClients() {
 
   const uploadClients = async clients => {
     try {
-      // Pega no máximo os primeiros 500 registros para não derrubar ou travar o sistema
       for (const chunk of clients.slice(0, 500)) { 
         if (!chunk.name) continue
         const docId = chunk.name.replace(/[/.]/g, '_')
@@ -233,7 +219,6 @@ export function useDrivers() {
     try {
       const { id, ...data } = driver
       
-      // Garante que se o campo tiver vazio na tela, salve como texto vazio em vez de quebrar
       const payload = {
         name: data.name || '',
         cnh: data.cnh || '',
@@ -272,6 +257,9 @@ export function useDrivers() {
 // ─── ROTINA DE BACKUP AUTOMÁTICO ──────────────────────────────────────────────
 export async function runDailyBackup(cards, requests) {
   try {
+    // Correção: impede a criação de backups vazios se o sistema ainda não carregou os dados
+    if (!cards || cards.length === 0) return
+
     const today = new Date().toISOString().split('T')[0]
     const ref = doc(db, 'backups', today)
     const existing = await getDoc(ref)
