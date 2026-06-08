@@ -108,4 +108,85 @@ export function useNotifications() {
     return unsub
   }, [user])
   const markRead    = id => updateDoc(doc(db,'notifications',id), { read:true })
-  const markAllRead = () => notificat
+  const markAllRead = () => notifications.filter(n=>!n.read).forEach(n=>markRead(n.id))
+  const unreadCount = notifications.filter(n=>!n.read).length
+  return { notifications, unreadCount, markRead, markAllRead }
+}
+
+export function useSimClients() {
+  const [simClients, setSimClients] = useState([])
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db,'config','simClients'), async snap => {
+      if (!snap.exists()) return
+      const { batches, clients } = snap.data()
+      if (clients && clients.length > 0) { setSimClients(clients); return }
+      if (batches) {
+        const all = []
+        for (let i = 0; i < batches; i++) {
+          const bSnap = await getDoc(doc(db,'config',`simClients_${i}`))
+          if (bSnap.exists()) all.push(...(bSnap.data().clients||[]))
+        }
+        setSimClients(all)
+      }
+    }, ()=>{})
+    return unsub
+  }, [])
+
+  const uploadClients = async clients => {
+    const BATCH = 50
+    const batches = []
+    for (let i = 0; i < clients.length; i += BATCH) batches.push(clients.slice(i, i+BATCH))
+    await setDoc(doc(db,'config','simClients'), { total:clients.length, batches:batches.length, updatedAt:serverTimestamp() })
+    for (let i = 0; i < batches.length; i++) {
+      await setDoc(doc(db,'config',`simClients_${i}`), { clients:batches[i], updatedAt:serverTimestamp() })
+    }
+  }
+  return { simClients, uploadClients }
+}
+
+export function useConfig() {
+  const [config, setConfig] = useState({})
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db,'config','settings'), snap=>{ if(snap.exists()) setConfig(snap.data()) }, ()=>{})
+    return unsub
+  }, [])
+  const saveConfig = data => setDoc(doc(db,'config','settings'), { ...config, ...data, updatedAt:serverTimestamp() }, { merge:true })
+  return { config, saveConfig }
+}
+
+export function useDrivers() {
+  const [drivers, setDrivers] = useState([])
+  useEffect(() => {
+    const q = query(collection(db,'drivers'), orderBy('name','asc'))
+    const unsub = onSnapshot(q,
+      snap => setDrivers(snap.docs.map(d=>({ id:d.id, ...d.data() }))),
+      () => {}
+    )
+    return unsub
+  }, [])
+
+  const saveDriver = async driver => {
+    const { id, ...data } = driver
+    data.updatedAt = serverTimestamp()
+    if (id) await updateDoc(doc(db,'drivers',id), data)
+    else { data.createdAt = serverTimestamp(); await addDoc(collection(db,'drivers'), data) }
+  }
+
+  const deleteDriver = id => deleteDoc(doc(db,'drivers',id))
+  return { drivers, saveDriver, deleteDriver }
+}
+
+export async function runDailyBackup(cards, requests) {
+  try {
+    const today = new Date().toISOString().split('T')[0]
+    const ref = doc(db,'backups',today)
+    const existing = await getDoc(ref)
+    if (existing.exists()) return
+    await setDoc(ref, {
+      date:today, createdAt:serverTimestamp(),
+      cardsCount:cards.length, requestsCount:requests.length,
+      cards:cards.map(c=>({...c})), requests:requests.map(r=>({...r})),
+    })
+    console.log(`✅ Backup: ${today}`)
+  } catch(e) { console.warn('Backup error:', e) }
+}
