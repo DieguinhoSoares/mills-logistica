@@ -13,7 +13,7 @@ const STATUS_CONFIG = {
 }
 
 const URGENCY_SLA = {
-  critico: 'até 8h',
+  critico: 'até 4h',
   alto:    'até 24h',
   medio:   'até 3 dias',
   baixo:   'até 7 dias',
@@ -42,14 +42,12 @@ function ChipInput({ label, placeholder, values, onChange, hint }) {
             <span onClick={()=>remove(v)} style={{ cursor:'pointer', fontSize:14, lineHeight:1, opacity:0.8 }}>×</span>
           </span>
         ))}
-        <input
-          value={input}
+        <input value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key==='Enter'||e.key===','){ e.preventDefault(); add() } }}
           onBlur={add}
           placeholder={values.length===0 ? placeholder : '+ adicionar'}
-          style={{ border:'none', background:'transparent', outline:'none', fontSize:12, fontFamily:FONT, color:T.text, minWidth:120, flex:1 }}
-        />
+          style={{ border:'none', background:'transparent', outline:'none', fontSize:12, fontFamily:FONT, color:T.text, minWidth:120, flex:1 }}/>
       </div>
       {hint && <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT, marginTop:3 }}>{hint}</div>}
     </div>
@@ -83,7 +81,7 @@ function SubtypeSelect({ type, value, onChange, error }) {
   )
 }
 
-function RequestForm({ simClients, onSubmit, onClose, profile }) {
+function RequestForm({ simClients, onSubmit, onClose, profile, initialData }) {
   const blank = {
     type:'freteCliente', subtype:'', machine:'',
     nInternos:[], originCity:null, destCity:null,
@@ -93,7 +91,26 @@ function RequestForm({ simClients, onSubmit, onClose, profile }) {
     podeEmbarcar:null, destinoOficina:'',
     nfsRetorno:[],
   }
-  const [form,   setForm]   = useState(blank)
+
+  const initial = initialData ? {
+    type:          initialData.type           || 'freteCliente',
+    subtype:       initialData.subtype        || '',
+    machine:       initialData.machine        || '',
+    nInternos:     initialData.nInternos      || (initialData.nInterno ? [initialData.nInterno] : []),
+    originCity:    initialData.originCity     || (initialData.originCityName ? { m:initialData.originCityName, s:initialData.origin } : null),
+    destCity:      initialData.destCity       || (initialData.destCityName   ? { m:initialData.destCityName,   s:initialData.destination } : null),
+    selectedClient:null,
+    clientName:    initialData.clientName     || '',
+    desiredDate:   initialData.desiredDate    || todayStr(),
+    urgency:       initialData.urgency        || 'medio',
+    description:   initialData.description   || '',
+    channel:       initialData.channel       || 'teams',
+    podeEmbarcar:  initialData.podeEmbarcar   || null,
+    destinoOficina:initialData.destinoOficina || '',
+    nfsRetorno:    initialData.nfsRetorno     || [],
+  } : blank
+
+  const [form,   setForm]   = useState(initial)
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
   const set = (k,v) => { setForm(p=>({...p,[k]:v})); setErrors(p=>({...p,[k]:undefined})) }
@@ -104,13 +121,13 @@ function RequestForm({ simClients, onSubmit, onClose, profile }) {
 
   const validate = () => {
     const e = {}
-    if (!form.subtype)             e.subtype     = true
-    if (!form.clientName)          e.clientName  = true
-    if (form.nInternos.length===0) e.nInternos   = true
-    if (!form.originCity)          e.originCity  = true
-    if (!form.destCity)            e.destCity    = true
-    if (!form.machine)             e.machine     = true
-    if (needsEmbarque && form.podeEmbarcar===null) e.podeEmbarcar = true
+    if (!form.subtype)             e.subtype      = true
+    if (!form.clientName)          e.clientName   = true
+    if (form.nInternos.length===0) e.nInternos    = true
+    if (!form.originCity)          e.originCity   = true
+    if (!form.destCity)            e.destCity     = true
+    if (!form.machine)             e.machine      = true
+    if (needsEmbarque && form.podeEmbarcar===null) e.podeEmbarcar   = true
     if (needsOficina  && !form.destinoOficina)     e.destinoOficina = true
     setErrors(e)
     return Object.keys(e).length === 0
@@ -129,6 +146,7 @@ function RequestForm({ simClients, onSubmit, onClose, profile }) {
       destination:   form.destCity?.s   || '',
       originCityName:form.originCity?.m || '',
       destCityName:  form.destCity?.m   || '',
+      ...(initialData ? { reaberturaDe: initialData.id } : {}),
     })
     setSaving(false)
     onClose()
@@ -145,7 +163,9 @@ function RequestForm({ simClients, onSubmit, onClose, profile }) {
 
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}>
           <div>
-            <h2 style={{ color:T.text, fontFamily:FONT, fontWeight:900, fontSize:20, margin:0 }}>➕ Solicitar Serviço</h2>
+            <h2 style={{ color:T.text, fontFamily:FONT, fontWeight:900, fontSize:20, margin:0 }}>
+              {initialData ? '🔄 Ajustar Solicitação' : '➕ Solicitar Serviço'}
+            </h2>
             <p style={{ color:T.textMuted, fontFamily:FONT, fontSize:12, margin:'3px 0 0' }}>
               Solicitando como: <strong style={{ color:T.verde }}>{profile?.name}</strong> · {profile?.unit}
             </p>
@@ -153,7 +173,19 @@ function RequestForm({ simClients, onSubmit, onClose, profile }) {
           <button onClick={onClose} style={{ background:'none', border:'none', color:T.textMuted, fontSize:24, cursor:'pointer' }}>×</button>
         </div>
 
-        {/* Tipo de Serviço */}
+        {initialData && (
+          <div style={{ marginBottom:14, padding:'10px 13px', background:T.amareloLight, borderRadius:T.r, border:`1px solid ${T.amarelo}40` }}>
+            <div style={{ color:'#B8860B', fontFamily:FONT, fontSize:11, fontWeight:700 }}>
+              🔄 Reabertura — ajuste os campos necessários e envie novamente.
+            </div>
+            {initialData.responseNote && (
+              <div style={{ color:T.textSec, fontFamily:FONT, fontSize:11, marginTop:4 }}>
+                Motivo da recusa: <em>{initialData.responseNote}</em>
+              </div>
+            )}
+          </div>
+        )}
+
         <div style={{ marginBottom:14 }}>
           <label style={LS}>Tipo de Serviço <span style={{ color:T.perigo }}>*</span></label>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
@@ -168,10 +200,10 @@ function RequestForm({ simClients, onSubmit, onClose, profile }) {
           </div>
         </div>
 
-        {/* Subtipo */}
-        <SubtypeSelect type={form.type} value={form.subtype} onChange={v=>{ set('subtype',v); set('podeEmbarcar',null); set('destinoOficina','') }} error={errors.subtype}/>
+        <SubtypeSelect type={form.type} value={form.subtype}
+          onChange={v=>{ set('subtype',v); set('podeEmbarcar',null); set('destinoOficina','') }}
+          error={errors.subtype}/>
 
-        {/* Planta/Obra */}
         <div style={{ marginBottom:14, padding:'11px 13px', background:T.laranjaXLight, borderRadius:T.r, border:`1px solid ${errors.clientName ? T.perigo : T.laranja}20` }}>
           <label style={{ ...LS, color: errors.clientName ? T.perigo : T.textMuted }}>
             🔍 Planta / Obra (base SIM) <span style={{ color:T.perigo }}>*</span>
@@ -190,7 +222,6 @@ function RequestForm({ simClients, onSubmit, onClose, profile }) {
           {fieldErr('clientName')}
         </div>
 
-        {/* N° Internos (chips) */}
         <div style={{ marginBottom:14 }}>
           <ChipInput
             label={<>N° Interno (Frota) <span style={{ color:T.perigo }}>*</span></>}
@@ -201,7 +232,6 @@ function RequestForm({ simClients, onSubmit, onClose, profile }) {
               ? `${form.selectedClient.nInternos.length} frota(s) vinculada(s) — sugestões aparecem ao digitar`
               : 'Pressione Enter ou vírgula para adicionar cada N° interno'}
           />
-          {/* Autocomplete vinculado à planta */}
           {form.clientName && form.selectedClient?.nInternos?.length > 0 && (
             <div style={{ display:'flex', flexWrap:'wrap', gap:5, marginTop:6 }}>
               {form.selectedClient.nInternos
@@ -216,11 +246,10 @@ function RequestForm({ simClients, onSubmit, onClose, profile }) {
               }
             </div>
           )}
-          {errors.nInternos && <div style={errStyle}>⚠ Informe ao menos um N° interno</div>}
+          {errors.nInternos && <div style={{ color:T.perigo, fontSize:10, fontFamily:FONT, marginTop:3 }}>⚠ Informe ao menos um N° interno</div>}
         </div>
 
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14 }}>
-          {/* Urgência com SLA */}
           <div>
             <label style={LS}>Urgência <span style={{ color:T.perigo }}>*</span></label>
             <select value={form.urgency} onChange={e=>set('urgency',e.target.value)} style={IS}>
@@ -229,8 +258,6 @@ function RequestForm({ simClients, onSubmit, onClose, profile }) {
               ))}
             </select>
           </div>
-
-          {/* Equipamento */}
           <div>
             <label style={{ ...LS, color: errors.machine ? T.perigo : T.textMuted }}>
               Equipamento <span style={{ color:T.perigo }}>*</span>
@@ -240,8 +267,6 @@ function RequestForm({ simClients, onSubmit, onClose, profile }) {
               placeholder="Ex: Carregadeira 924K, PA150..."/>
             {fieldErr('machine')}
           </div>
-
-          {/* Origem */}
           <div>
             <label style={{ ...LS, color: errors.originCity ? T.perigo : T.textMuted }}>
               Cidade de Origem <span style={{ color:T.perigo }}>*</span>
@@ -249,8 +274,6 @@ function RequestForm({ simClients, onSubmit, onClose, profile }) {
             <MunicipioInput value={form.originCity} onChange={v=>set('originCity',v)} placeholder="Cidade de origem..."/>
             {fieldErr('originCity')}
           </div>
-
-          {/* Destino */}
           <div>
             <label style={{ ...LS, color: errors.destCity ? T.perigo : T.textMuted }}>
               Cidade de Destino <span style={{ color:T.perigo }}>*</span>
@@ -258,14 +281,10 @@ function RequestForm({ simClients, onSubmit, onClose, profile }) {
             <MunicipioInput value={form.destCity} onChange={v=>set('destCity',v)} placeholder="Cidade de destino..."/>
             {fieldErr('destCity')}
           </div>
-
-          {/* Data */}
           <div>
             <label style={LS}>Data desejada <span style={{ color:T.perigo }}>*</span></label>
             <input type="date" value={form.desiredDate} onChange={e=>set('desiredDate',e.target.value)} style={IS}/>
           </div>
-
-          {/* Canal */}
           <div>
             <label style={LS}>Canal de resposta</label>
             <select value={form.channel} onChange={e=>set('channel',e.target.value)} style={IS}>
@@ -276,7 +295,6 @@ function RequestForm({ simClients, onSubmit, onClose, profile }) {
           </div>
         </div>
 
-        {/* Regras condicionais por subtipo */}
         <AnimatePresence>
           {needsEmbarque && (
             <motion.div initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:'auto' }} exit={{ opacity:0, height:0 }}
@@ -285,15 +303,16 @@ function RequestForm({ simClients, onSubmit, onClose, profile }) {
                 🚚 A máquina danificada pode ser embarcada normalmente na prancha? <span style={{ color:T.perigo }}>*</span>
               </label>
               <div style={{ display:'flex', gap:10, marginTop:8 }}>
-                {[['sim','✅ Sim, pode embarcar normalmente'], ['nao','⚠️ Não — requer equipamento especial']].map(([v,l]) => (
+                {[['sim','✅ Sim, pode embarcar normalmente'],['nao','⚠️ Não — requer equipamento especial']].map(([v,l]) => (
                   <div key={v} onClick={()=>set('podeEmbarcar',v)}
-                    style={{ flex:1, border:`2px solid ${form.podeEmbarcar===v ? T.laranja : T.border}`, borderRadius:T.r, padding:'8px 12px', cursor:'pointer', textAlign:'center',
+                    style={{ flex:1, border:`2px solid ${form.podeEmbarcar===v ? T.laranja : T.border}`, borderRadius:T.r,
+                      padding:'8px 12px', cursor:'pointer', textAlign:'center',
                       background:form.podeEmbarcar===v ? T.laranjaLight : T.surface, transition:'all .12s' }}>
                     <div style={{ color:T.text, fontFamily:FONT, fontSize:11, fontWeight:form.podeEmbarcar===v?800:500 }}>{l}</div>
                   </div>
                 ))}
               </div>
-              {errors.podeEmbarcar && <div style={errStyle}>⚠ Informe se a máquina pode ser embarcada normalmente</div>}
+              {errors.podeEmbarcar && <div style={{ color:T.perigo, fontSize:10, fontFamily:FONT, marginTop:4 }}>⚠ Informe se a máquina pode ser embarcada normalmente</div>}
             </motion.div>
           )}
 
@@ -304,15 +323,16 @@ function RequestForm({ simClients, onSubmit, onClose, profile }) {
                 🔧 Destino da máquina em garantia <span style={{ color:T.perigo }}>*</span>
               </label>
               <div style={{ display:'flex', gap:10, marginTop:8 }}>
-                {[['mills','🏭 Oficina Mills'], ['concessionaria','🏢 Concessionária']].map(([v,l]) => (
+                {[['mills','🏭 Oficina Mills'],['concessionaria','🏢 Concessionária']].map(([v,l]) => (
                   <div key={v} onClick={()=>set('destinoOficina',v)}
-                    style={{ flex:1, border:`2px solid ${form.destinoOficina===v ? T.info : T.border}`, borderRadius:T.r, padding:'8px 12px', cursor:'pointer', textAlign:'center',
+                    style={{ flex:1, border:`2px solid ${form.destinoOficina===v ? T.info : T.border}`, borderRadius:T.r,
+                      padding:'8px 12px', cursor:'pointer', textAlign:'center',
                       background:form.destinoOficina===v ? T.infoLight : T.surface, transition:'all .12s' }}>
                     <div style={{ color:T.text, fontFamily:FONT, fontSize:11, fontWeight:form.destinoOficina===v?800:500 }}>{l}</div>
                   </div>
                 ))}
               </div>
-              {errors.destinoOficina && <div style={errStyle}>⚠ Informe o destino da máquina</div>}
+              {errors.destinoOficina && <div style={{ color:T.perigo, fontSize:10, fontFamily:FONT, marginTop:4 }}>⚠ Informe o destino da máquina</div>}
             </motion.div>
           )}
 
@@ -324,13 +344,11 @@ function RequestForm({ simClients, onSubmit, onClose, profile }) {
                 placeholder="Digite o número da NF e pressione Enter..."
                 values={form.nfsRetorno}
                 onChange={v=>set('nfsRetorno',v)}
-                hint="Opcional — pode ser informado depois. Pressione Enter após cada número."
-              />
+                hint="Opcional — pode ser informado depois. Pressione Enter após cada número."/>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Descrição */}
         <div style={{ marginBottom:18 }}>
           <label style={LS}>Descrição / Detalhes</label>
           <textarea value={form.description} onChange={e=>set('description',e.target.value)}
@@ -338,7 +356,6 @@ function RequestForm({ simClients, onSubmit, onClose, profile }) {
             placeholder="Descreva a operação, prazos, contato no local..."/>
         </div>
 
-        {/* Erros gerais */}
         {Object.keys(errors).length > 0 && (
           <div style={{ marginBottom:12, padding:'10px 13px', background:T.perigoLight, borderRadius:T.r, border:`1px solid ${T.perigo}40` }}>
             <div style={{ color:T.perigo, fontFamily:FONT, fontSize:11, fontWeight:700 }}>
@@ -351,7 +368,7 @@ function RequestForm({ simClients, onSubmit, onClose, profile }) {
           <button onClick={onClose} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>Cancelar</button>
           <button onClick={handleSubmit} disabled={saving}
             style={{ ...BS, background:saving?T.borderMid:T.laranja, color:'white', fontWeight:900, fontSize:13 }}>
-            {saving ? '⏳ Enviando...' : '📤 Enviar Solicitação'}
+            {saving ? '⏳ Enviando...' : initialData ? '🔄 Reenviar Solicitação' : '📤 Enviar Solicitação'}
           </button>
         </div>
       </motion.div>
@@ -362,42 +379,14 @@ function RequestForm({ simClients, onSubmit, onClose, profile }) {
 export function SolicitanteView({ simClients }) {
   const { profile, logout }         = useAuth()
   const { requests, submitRequest } = useRequests('solicitante')
-  const { notifications, unreadCount, markAllRead } = useNotifications()
+  const { notifications, unreadCount, markAllRead, markRead } = useNotifications()
   const { toasts, add:addToast, dismiss } = useToasts()
-  const [showForm,    setShowForm]    = useState(false)
-  const [reopening,   setReopening]   = useState(null)
+  const [showForm,   setShowForm]   = useState(false)
+  const [reopenData, setReopenData] = useState(null)
 
   const handleSubmit = async form => {
     await submitRequest(form)
     addToast('Solicitação enviada! O time de Frotas foi notificado.', 'success')
-  }
-
-  const handleReopen = async req => {
-    setReopening(req.id)
-    await submitRequest({
-      type:          req.type,
-      subtype:       req.subtype,
-      machine:       req.machine,
-      nInternos:     req.nInternos || [],
-      nInterno:      req.nInterno  || '',
-      clientName:    req.clientName || '',
-      originCity:    req.originCity || null,
-      destCity:      req.destCity   || null,
-      origin:        req.origin,
-      destination:   req.destination,
-      originCityName:req.originCityName || '',
-      destCityName:  req.destCityName   || '',
-      desiredDate:   req.desiredDate,
-      urgency:       req.urgency,
-      description:   req.description || '',
-      channel:       req.channel || 'teams',
-      podeEmbarcar:  req.podeEmbarcar || null,
-      destinoOficina:req.destinoOficina || '',
-      nfsRetorno:    req.nfsRetorno || [],
-      reaberturaDe:  req.id,
-    })
-    setReopening(null)
-    addToast('Solicitação reaberta com sucesso!', 'success')
   }
 
   return (
@@ -415,7 +404,12 @@ export function SolicitanteView({ simClients }) {
           </div>
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <NotificationBell notifications={notifications} unreadCount={unreadCount} onMarkAllRead={markAllRead}/>
+          <NotificationBell
+            notifications={notifications}
+            unreadCount={unreadCount}
+            onMarkAllRead={markAllRead}
+            onMarkRead={markRead}
+          />
           <button onClick={logout} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}`, fontSize:11 }}>Sair</button>
         </div>
       </div>
@@ -461,10 +455,10 @@ export function SolicitanteView({ simClients }) {
 
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
           {requests.map(r => {
-            const sc  = STATUS_CONFIG[r.status] || STATUS_CONFIG.pendente
-            const ct  = CARD_TYPES[r.type]
-            const ug  = URGENCY[r.urgency]
-            const nfs = r.nfsRetorno || []
+            const sc        = STATUS_CONFIG[r.status] || STATUS_CONFIG.pendente
+            const ct        = CARD_TYPES[r.type]
+            const ug        = URGENCY[r.urgency]
+            const nfs       = r.nfsRetorno || []
             const nInternos = r.nInternos || (r.nInterno ? [r.nInterno] : [])
             return (
               <motion.div key={r.id} layout initial={{ opacity:0, y:5 }} animate={{ opacity:1, y:0 }}
@@ -519,11 +513,9 @@ export function SolicitanteView({ simClients }) {
 
                 {r.status==='recusado' && (
                   <div style={{ marginTop:10, display:'flex', justifyContent:'flex-end' }}>
-                    <button
-                      onClick={()=>handleReopen(r)}
-                      disabled={reopening===r.id}
+                    <button onClick={()=>setReopenData(r)}
                       style={{ ...BS, background:T.laranjaLight, color:T.laranja, border:`1px solid ${T.laranja}40`, fontSize:11, fontWeight:700 }}>
-                      {reopening===r.id ? '⏳ Reabrindo...' : '🔄 Reabrir e ajustar'}
+                      🔄 Reabrir e ajustar
                     </button>
                   </div>
                 )}
@@ -533,12 +525,13 @@ export function SolicitanteView({ simClients }) {
         </div>
       </div>
 
-      {showForm && (
+      {(showForm || reopenData) && (
         <RequestForm
           simClients={simClients||[]}
           profile={profile}
+          initialData={reopenData || null}
           onSubmit={handleSubmit}
-          onClose={()=>setShowForm(false)}
+          onClose={()=>{ setShowForm(false); setReopenData(null) }}
         />
       )}
     </div>
