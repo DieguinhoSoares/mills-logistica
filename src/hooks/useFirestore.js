@@ -1,293 +1,111 @@
 import { useState, useEffect } from 'react'
 import {
   collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc,
-  query, orderBy, serverTimestamp, setDoc, getDoc,
+  query, orderBy, where, serverTimestamp, setDoc, getDoc,
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
+import { useAuth } from '../contexts/AuthContext'
 
-// Essa caixinha limpa dados vazios para o Firebase não dar erro
-const limparDados = (obj) => {
-  const limpo = {}
-  Object.keys(obj).forEach(chave => {
-    if (obj[chave] !== undefined && obj[chave] !== null && obj[chave] !== '') {
-      limpo[chave] = obj[chave]
-    }
-  })
-  return limpo
-}
-
-// ─── GERENCIADOR DE AGENDAMENTOS (CARDS) ────────────────────────────────────
 export function useCards() {
-  const [cards, setCards] = useState([])
+  const [cards,   setCards]   = useState([])
   const [loading, setLoading] = useState(true)
-
   useEffect(() => {
-    const q = query(collection(db, 'cards'), orderBy('startDate', 'asc'))
+    const q = query(collection(db,'cards'), orderBy('startDate','asc'))
     const unsub = onSnapshot(q,
-      snap => { 
-        setCards(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-        setLoading(false) 
-      },
-      err => { 
-        console.error('Erro ao buscar cards:', err)
-        setLoading(false) 
-      }
+      snap => { setCards(snap.docs.map(d=>({ id:d.id, ...d.data() }))); setLoading(false) },
+      err  => { console.warn('cards:', err); setLoading(false) }
     )
     return unsub
   }, [])
-
-  const saveCard = async (cardData) => {
-    try {
-      const dadosLimpos = limparDados({
-        ...cardData,
-        updatedAt: new Date().toISOString()
-      })
-
-      if (cardData.id) {
-        const ref = doc(db, 'cards', cardData.id)
-        await updateDoc(ref, dadosLimpos)
-      } else {
-        const ref = collection(db, 'cards')
-        await addDoc(ref, {
-          ...dadosLimpos,
-          createdAt: new Date().toISOString()
-        })
-      }
-    } catch (err) {
-      console.error('Erro ao salvar o card:', err)
-      alert('Não foi possível salvar o agendamento no banco de dados. Verifique a conexão ou permissões.')
-      throw err
-    }
+  const saveCard = async card => {
+    const { id, ...data } = card
+    data.updatedAt = serverTimestamp()
+    if (id && id.length > 10) await updateDoc(doc(db,'cards',id), data)
+    else { data.createdAt = serverTimestamp(); await addDoc(collection(db,'cards'), data) }
   }
-
-  const deleteCard = async id => {
-    try {
-      await deleteDoc(doc(db, 'cards', id))
-    } catch (err) {
-      console.error('Erro ao deletar card:', err)
-      throw err
-    }
+  const deleteCard = id => deleteDoc(doc(db,'cards',id))
+  const moveCard   = async (id, startDate, endDate, reason) => {
+    const ref=doc(db,'cards',id), snap=await getDoc(ref), prev=snap.data()
+    await updateDoc(ref, {
+      startDate, endDate, updatedAt:serverTimestamp(),
+      moveLog:[...(prev?.moveLog||[]), { from:prev?.startDate, to:startDate, reason, at:new Date().toISOString() }],
+    })
   }
-
-  const moveCard = async (cardId, destinationLane, userEmail, motivoReprogramacao) => {
-    try {
-      const ref = doc(db, 'cards', cardId)
-      
-      // Monta a nova entrada do histórico contendo o motivo digitado
-      const historyEntry = {
-        toLane: destinationLane,
-        movedAt: new Date().toISOString(),
-        user: userEmail || 'Sistema (Logística)',
-        reason: motivoReprogramacao || 'Alteração de status'
-      }
-
-      // Busca o histórico antigo para não apagar o passado
-      const cardSnap = await getDoc(ref)
-      const currentHistory = cardSnap.exists() ? (cardSnap.data().history || []) : []
-
-      // Dados que forçam o card a mudar de coluna no Kanban visual
-      const dadosAtualizados = {
-        laneId: destinationLane,
-        history: [...currentHistory, historyEntry],
-        updatedAt: new Date().toISOString()
-      }
-
-      // Se houver motivo, registra também como última justificativa no card
-      if (motivoReprogramacao) {
-        dadosAtualizados.lastMoveReason = motivoReprogramacao
-      }
-
-      await updateDoc(ref, dadosAtualizados)
-    } catch (err) {
-      console.error('Erro ao mover o card:', err)
-      throw err
-    }
-  }
-
   return { cards, loading, saveCard, deleteCard, moveCard }
 }
 
-// ─── GERENCIADOR DE SOLICITAÇÕES ───────────────────────────────────────────
-export function useRequests() {
+export function useRequests(roleFilter) {
+  const { user, profile } = useAuth()
   const [requests, setRequests] = useState([])
-
+  const [loading,  setLoading]  = useState(true)
   useEffect(() => {
-    const q = query(collection(db, 'requests'), orderBy('createdAt', 'desc'))
-      
-    const unsub = onSnapshot(q, 
-      snap => setRequests(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-      err => console.error('Erro ao buscar solicitações:', err)
-    )
-    return unsub
-  }, [])
-
-  const respondRequest = async (id, status, note) => {
-    try {
-      const ref = doc(db, 'requests', id)
-      await updateDoc(ref, { 
-        status, 
-        responseNote: note || '', 
-        respondedAt: serverTimestamp() 
-      })
-    } catch (err) {
-      console.error('Erro ao responder solicitação:', err)
-      throw err
+    if (!user) return
+    let q
+    if (roleFilter === 'solicitante') {
+      q = query(collection(db,'requests'), where('requesterId','==',user.uid), orderBy('createdAt','desc'))
+    } else {
+      q = query(collection(db,'requests'), orderBy('createdAt','desc'))
     }
-  }
-
-  return { requests, respondRequest }
-}
-
-// ─── GERENCIADOR DE NOTIFICAÇÕES ───────────────────────────────────────────
-export function useNotifications() {
-  const [notifications, setNotifications] = useState([])
-  const unreadCount = notifications.filter(n => !n.read).length
-
-  useEffect(() => {
-    const q = query(collection(db, 'notifications'), orderBy('createdAt', 'desc'))
-    const unsub = onSnapshot(q, 
-      snap => setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-      err => console.error('Erro nas notificações:', err)
-    )
-    return unsub
-  }, [])
-
-  const markAllRead = async () => {}
-
-  return { notifications, unreadCount, markAllRead }
-}
-
-// ─── GERENCIADOR DE CLIENTES SIM (PLANILHA) ───────────────────────────────────
-export function useSimClients() {
-  const [simClients, setSimClients] = useState([])
-
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'sim_clients'), 
-      snap => setSimClients(snap.docs.map(d => d.data())),
-      err => console.error('Erro ao carregar clientes SIM:', err)
-    )
-    return unsub
-  }, [])
-
-  const uploadClients = async clients => {
-    try {
-      for (const chunk of clients.slice(0, 500)) { 
-        if (!chunk.name) continue
-        const docId = chunk.name.replace(/[/.]/g, '_')
-        await setDoc(doc(db, 'sim_clients', docId), limparDados(chunk))
-      }
-    } catch (err) {
-      console.error('Erro ao enviar planilha:', err)
-      throw err
-    }
-  }
-
-  return { simClients, uploadClients }
-}
-
-// ─── CONFIGURAÇÕES DO SISTEMA ───────────────────────────────────────────────
-export function useConfig() {
-  const [config, setConfig] = useState(null)
-
-  useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'config', 'global'), 
-      snap => setConfig(snap.data() || null),
-      err => console.error('Erro ao ler configurações globais:', err)
-    )
-    return unsub
-  }, [])
-
-  const saveConfig = async data => {
-    try {
-      await setDoc(doc(db, 'config', 'global'), { 
-        ...config, 
-        ...limparDados(data), 
-        updatedAt: serverTimestamp() 
-      }, { merge: true })
-    } catch (err) {
-      console.error('Erro ao salvar configurações:', err)
-      throw err
-    }
-  }
-
-  return { config, saveConfig }
-}
-
-// ─── GERENCIADOR DE MOTORISTAS ───────────────────────────────────────────────
-export function useDrivers() {
-  const [drivers, setDrivers] = useState([])
-
-  useEffect(() => {
-    const q = query(collection(db, 'drivers'), orderBy('name', 'asc'))
     const unsub = onSnapshot(q,
-      snap => setDrivers(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-      err => console.error('Erro ao escutar motoristas no banco de dados:', err)
+      snap => { setRequests(snap.docs.map(d=>({ id:d.id, ...d.data() }))); setLoading(false) },
+      err  => {
+        if (err.code==='failed-precondition' && roleFilter==='solicitante') {
+          const fb = query(collection(db,'requests'), where('requesterId','==',user.uid))
+          onSnapshot(fb, snap => {
+            setRequests(snap.docs.map(d=>({ id:d.id, ...d.data() })).sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0)))
+            setLoading(false)
+          })
+        } else setLoading(false)
+      }
     )
     return unsub
-  }, [])
+  }, [user, roleFilter])
 
-  const saveDriver = async driver => {
-    try {
-      const { id, ...data } = driver
-      
-      const payload = {
-        name: data.name || '',
-        cnh: data.cnh || '',
-        category: data.category || '',
-        phone: data.phone || '',
-        unit: data.unit || '',
-        active: data.active !== undefined ? data.active : true,
-        updatedAt: serverTimestamp()
-      }
-
-      if (id) {
-        await updateDoc(doc(db, 'drivers', id), payload)
-      } else {
-        payload.createdAt = serverTimestamp()
-        await addDoc(collection(db, 'drivers'), payload)
-      }
-    } catch (err) {
-      console.error('Erro ao salvar motorista no Firebase:', err)
-      alert('Não foi possível salvar o motorista. Verifique o console do navegador.')
-      throw err
-    }
-  }
-
-  const deleteDriver = async id => {
-    try {
-      await deleteDoc(doc(db, 'drivers', id))
-    } catch (err) {
-      console.error('Erro ao remover motorista:', err)
-      throw err
-    }
-  }
-
-  return { drivers, saveDriver, deleteDriver }
-}
-
-// ─── ROTINA DE BACKUP AUTOMÁTICO ──────────────────────────────────────────────
-export async function runDailyBackup(cards, requests) {
-  try {
-    if (!cards || cards.length === 0) return
-
-    const today = new Date().toISOString().split('T')[0]
-    const ref = doc(db, 'backups', today)
-    const existing = await getDoc(ref)
-    if (existing.exists()) return
-
-    await setDoc(ref, {
-      date: today, 
-      createdAt: serverTimestamp(),
-      cardsCount: cards.length, 
-      requestsCount: requests.length,
-      cards: cards.map(c => ({ 
-        id: c.id, 
-        client: c.client || '—', 
-        driver: c.driver || '—', 
-        startDate: c.startDate || '' 
-      }))
+  const submitRequest = async data => {
+    await addDoc(collection(db,'requests'), {
+      ...data,
+      requesterId:   user.uid,
+      requesterName: data.requesterName || profile?.name || '',
+      unit:          data.unit || profile?.unit || '',
+      status:        'pendente',
+      createdAt:     serverTimestamp(),
+      updatedAt:     serverTimestamp(),
     })
-  } catch (e) { 
-    console.warn('Falha silenciosa na rotina automática de backup:', e) 
   }
+
+  const respondRequest = async (id, status, note, teamsWebhookUrl) => {
+    await updateDoc(doc(db,'requests',id), {
+      status, responseNote:note, respondedAt:serverTimestamp(), updatedAt:serverTimestamp(),
+    })
+    const req = requests.find(r=>r.id===id)
+    if (req) {
+      await addDoc(collection(db,'notifications'), {
+        userId:req.requesterId, requestId:id,
+        type:   status==='aceito'?'request_accepted':'request_rejected',
+        title:  status==='aceito'?'✅ Solicitação aceita!':'❌ Solicitação recusada',
+        message:note||(status==='aceito'?'Sua solicitação foi aceita.':'Sua solicitação foi recusada.'),
+        read:false, createdAt:serverTimestamp(),
+      })
+      if (teamsWebhookUrl) {
+        const { sendTeamsNotification } = await import('../lib/utils')
+        await sendTeamsNotification(teamsWebhookUrl,
+          `${status==='aceito'?'✅':'❌'} Solicitação ${status==='aceito'?'Aceita':'Recusada'}`,
+          `Solicitante: ${req.requesterName||req.unit}\nServiço: ${req.type}\nData: ${req.desiredDate}\n\n${note||''}`
+        )
+      }
+    }
+  }
+  return { requests, loading, submitRequest, respondRequest }
 }
+
+export function useNotifications() {
+  const { user } = useAuth()
+  const [notifications, setNotifications] = useState([])
+  useEffect(() => {
+    if (!user) return
+    const q = query(collection(db,'notifications'), where('userId','==',user.uid), orderBy('createdAt','desc'))
+    const unsub = onSnapshot(q, snap=>setNotifications(snap.docs.map(d=>({ id:d.id, ...d.data() }))), ()=>{})
+    return unsub
+  }, [user])
+  const markRead    = id => updateDoc(doc(db,'notifications',id), { read:true })
+  const markAllRead = () => notificat
