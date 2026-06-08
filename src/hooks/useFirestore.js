@@ -69,24 +69,35 @@ export function useCards() {
     }
   }
 
-  const moveCard = async (cardId, destinationLane, userEmail) => {
+  const moveCard = async (cardId, destinationLane, userEmail, motivoReprogramacao) => {
     try {
       const ref = doc(db, 'cards', cardId)
       
+      // Monta a nova entrada do histórico contendo o motivo digitado
       const historyEntry = {
         toLane: destinationLane,
         movedAt: new Date().toISOString(),
-        user: userEmail || 'Sistema (Logística)'
+        user: userEmail || 'Sistema (Logística)',
+        reason: motivoReprogramacao || 'Alteração de status'
       }
 
+      // Busca o histórico antigo para não apagar o passado
       const cardSnap = await getDoc(ref)
       const currentHistory = cardSnap.exists() ? (cardSnap.data().history || []) : []
 
-      await updateDoc(ref, {
+      // Dados que forçam o card a mudar de coluna no Kanban visual
+      const dadosAtualizados = {
         laneId: destinationLane,
         history: [...currentHistory, historyEntry],
         updatedAt: new Date().toISOString()
-      })
+      }
+
+      // Se houver motivo, registra também como última justificativa no card
+      if (motivoReprogramacao) {
+        dadosAtualizados.lastMoveReason = motivoReprogramacao
+      }
+
+      await updateDoc(ref, dadosAtualizados)
     } catch (err) {
       console.error('Erro ao mover o card:', err)
       throw err
@@ -257,7 +268,6 @@ export function useDrivers() {
 // ─── ROTINA DE BACKUP AUTOMÁTICO ──────────────────────────────────────────────
 export async function runDailyBackup(cards, requests) {
   try {
-    // Correção: impede a criação de backups vazios se o sistema ainda não carregou os dados
     if (!cards || cards.length === 0) return
 
     const today = new Date().toISOString().split('T')[0]
