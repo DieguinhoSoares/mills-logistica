@@ -213,17 +213,6 @@ export function usePendingUsers() {
   return { pendingUsers, approveUser, refuseUser }
 }
 
-  const sendMessage = async ({ requestId, text, authorId, authorName, authorRole, type='message', statusEvent=null }) => {
-    await addDoc(collection(db, 'requests', requestId, 'messages'), {
-      text, authorId, authorName, authorRole,
-      type, statusEvent,
-      createdAt: serverTimestamp(),
-    })
-  }
-
-  return { messages, sendMessage }
-}
-
 export function useCancelRequest() {
   const cancelCard = async (cardId, reason, authorName) => {
     await updateDoc(doc(db, 'cards', cardId), {
