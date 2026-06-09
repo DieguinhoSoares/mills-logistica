@@ -252,6 +252,32 @@ export function useCancelRequest() {
   return { cancelCard }
 }
 
+export function useMessages(requestId) {
+  const [messages, setMessages] = useState([])
+  useEffect(() => {
+    if (!requestId) return
+    const q = query(
+      collection(db, 'requests', requestId, 'messages'),
+      orderBy('createdAt', 'asc')
+    )
+    const unsub = onSnapshot(q,
+      snap => setMessages(snap.docs.map(d => ({ id:d.id, ...d.data() }))),
+      () => {}
+    )
+    return unsub
+  }, [requestId])
+
+  const sendMessage = async ({ requestId, text, authorId, authorName, authorRole, type='message', statusEvent=null }) => {
+    await addDoc(collection(db, 'requests', requestId, 'messages'), {
+      text, authorId, authorName, authorRole,
+      type, statusEvent,
+      createdAt: serverTimestamp(),
+    })
+  }
+
+  return { messages, sendMessage }
+}
+
 export async function runDailyBackup(cards, requests) {
   try {
     const today = new Date().toISOString().split('T')[0]
