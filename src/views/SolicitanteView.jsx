@@ -1,19 +1,22 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
-import { useRequests, useNotifications } from '../hooks/useFirestore'
+import { useRequests, useNotifications, useMessages } from '../hooks/useFirestore'
 import { MillsLogo, NotificationBell, ClientInput, FrotaInput, MunicipioInput, ToastContainer, useToasts } from '../components/UI'
 import { T, FONT, CARD_TYPES, CARD_SUBTYPES, URGENCY, IS, LS, BS } from '../lib/constants'
 import { fmt, todayStr, getSubtypeLabel } from '../lib/utils'
+import { db } from '../lib/firebase'
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
 
 const STATUS_CONFIG = {
   pendente:  { label:'⏳ Aguardando análise', color:T.amarelo, bg:T.amareloLight },
   aceito:    { label:'✅ Aceito',             color:T.verde,   bg:T.verdeLight   },
   recusado:  { label:'❌ Recusado',           color:T.perigo,  bg:T.perigoLight  },
+  cancelado: { label:'🚫 Cancelado',          color:T.textMuted, bg:T.surfaceLow },
 }
 
 const URGENCY_SLA = {
-  critico: 'até 8h',
+  critico: 'até 4h',
   alto:    'até 24h',
   medio:   'até 3 dias',
   baixo:   'até 7 dias',
@@ -77,6 +80,94 @@ function SubtypeSelect({ type, value, onChange, error }) {
         ))}
       </div>
       {error && <div style={{ color:T.perigo, fontSize:10, fontFamily:FONT, marginTop:4 }}>⚠ Selecione o motivo do serviço</div>}
+    </div>
+  )
+}
+
+function MessageThread({ requestId, profile, onClose }) {
+  const { messages, sendMessage } = useMessages(requestId)
+  const [text, setText] = useState('')
+  const [sending, setSending] = useState(false)
+
+  const handleSend = async () => {
+    if (!text.trim()) return
+    setSending(true)
+    await sendMessage({
+      requestId,
+      text: text.trim(),
+      authorId:   profile?.uid || profile?.id || '',
+      authorName: profile?.name || 'Solicitante',
+      authorRole: profile?.role || 'solicitante',
+      type: 'message',
+    })
+    // Notifica o time de Frotas
+    await addDoc(collection(db, 'notifications'), {
+      userId:    'frotas',
+      requestId,
+      type:      'new_message',
+      title:     '💬 Nova mensagem',
+      message:   `${profile?.name} enviou uma mensagem na solicitação.`,
+      read:      false,
+      createdAt: serverTimestamp(),
+    })
+    setText('')
+    setSending(false)
+  }
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.55)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)' }}
+      onClick={e => e.target===e.currentTarget && onClose()}>
+      <motion.div initial={{ scale:.95, opacity:0 }} animate={{ scale:1, opacity:1 }}
+        style={{ background:T.surface, borderRadius:T.rLg, width:520, maxHeight:'80vh', display:'flex', flexDirection:'column', boxShadow:T.shadowLg, border:`1px solid ${T.border}`, overflow:'hidden' }}>
+
+        <div style={{ background:T.verde, padding:'14px 18px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <div style={{ color:'white', fontFamily:FONT, fontWeight:700, fontSize:14 }}>💬 Histórico da Solicitação</div>
+          <button onClick={onClose} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.7)', fontSize:22, cursor:'pointer' }}>×</button>
+        </div>
+
+        <div style={{ flex:1, overflowY:'auto', padding:'14px 16px', display:'flex', flexDirection:'column', gap:10 }}>
+          {messages.length === 0 && (
+            <div style={{ textAlign:'center', color:T.textMuted, fontFamily:FONT, fontSize:12, padding:'20px 0' }}>
+              Nenhuma mensagem ainda.
+            </div>
+          )}
+          {messages.map(m => {
+            const isMe = m.authorRole === 'solicitante'
+            const isEvent = m.type === 'status_change'
+            if (isEvent) return (
+              <div key={m.id} style={{ textAlign:'center' }}>
+                <span style={{ background:T.surfaceLow, color:T.textMuted, borderRadius:20, padding:'3px 12px', fontSize:10, fontFamily:FONT }}>
+                  {m.text}
+                </span>
+              </div>
+            )
+            return (
+              <div key={m.id} style={{ display:'flex', flexDirection:'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
+                <div style={{ maxWidth:'75%', background: isMe ? T.laranja : T.surfaceAlt, borderRadius: isMe ? '12px 12px 2px 12px' : '12px 12px 12px 2px', padding:'9px 13px', boxShadow:T.shadow }}>
+                  <div style={{ color: isMe ? 'rgba(255,255,255,0.8)' : T.textMuted, fontSize:9, fontFamily:FONT, fontWeight:700, marginBottom:3, textTransform:'uppercase', letterSpacing:'0.06em' }}>
+                    {m.authorName}
+                  </div>
+                  <div style={{ color: isMe ? 'white' : T.text, fontSize:12, fontFamily:FONT, lineHeight:1.5 }}>{m.text}</div>
+                </div>
+                <div style={{ color:T.textMuted, fontSize:9, fontFamily:FONT, marginTop:2, paddingLeft:4, paddingRight:4 }}>
+                  {m.createdAt?.toDate?.()?.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }) || ''}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        <div style={{ padding:'12px 16px', borderTop:`1px solid ${T.border}`, display:'flex', gap:8 }}>
+          <input value={text} onChange={e=>setText(e.target.value)}
+            onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); handleSend() } }}
+            placeholder="Digite uma mensagem..."
+            style={{ ...IS, flex:1, margin:0 }}/>
+          <button onClick={handleSend} disabled={sending||!text.trim()}
+            style={{ ...BS, background:text.trim()?T.laranja:T.borderMid, color:'white', fontWeight:700, flexShrink:0 }}>
+            {sending ? '⏳' : 'Enviar'}
+          </button>
+        </div>
+      </motion.div>
     </div>
   )
 }
@@ -229,7 +320,7 @@ function RequestForm({ simClients, onSubmit, onClose, profile, initialData }) {
             values={form.nInternos}
             onChange={v=>set('nInternos',v)}
             hint={form.selectedClient?.nInternos?.length > 0
-              ? `${form.selectedClient.nInternos.length} frota(s) vinculada(s) — sugestões aparecem ao digitar`
+              ? `${form.selectedClient.nInternos.length} frota(s) vinculada(s) — sugestões aparecem abaixo`
               : 'Pressione Enter ou vírgula para adicionar cada N° interno'}
           />
           {form.clientName && form.selectedClient?.nInternos?.length > 0 && (
@@ -383,6 +474,7 @@ export function SolicitanteView({ simClients }) {
   const { toasts, add:addToast, dismiss } = useToasts()
   const [showForm,   setShowForm]   = useState(false)
   const [reopenData, setReopenData] = useState(null)
+  const [messaging,  setMessaging]  = useState(null)
 
   const handleSubmit = async form => {
     await submitRequest(form)
@@ -507,23 +599,39 @@ export function SolicitanteView({ simClients }) {
 
                 {r.responseNote && (
                   <div style={{ marginTop:8, padding:'8px 12px', background:r.status==='aceito'?T.verdeLight:T.perigoLight, borderRadius:T.rSm, color:r.status==='aceito'?T.verde:T.perigo, fontFamily:FONT, fontSize:11, fontWeight:700 }}>
-                    {r.status==='aceito' ? '✅' : '❌'} {r.responseNote}
+                    {r.status==='aceito' ? '✅' : r.status==='cancelado' ? '🚫' : '❌'} {r.responseNote}
                   </div>
                 )}
 
-                {r.status==='recusado' && (
-                  <div style={{ marginTop:10, display:'flex', justifyContent:'flex-end' }}>
+                {/* Ações */}
+                <div style={{ marginTop:10, display:'flex', gap:8, justifyContent:'flex-end' }}>
+                  {/* Histórico — sempre visível */}
+                  <button onClick={()=>setMessaging(r)}
+                    style={{ ...BS, background:T.infoLight, color:T.info, border:`1px solid ${T.info}30`, fontSize:11, fontWeight:700 }}>
+                    💬 Histórico
+                  </button>
+                  {/* Reabrir — só recusados */}
+                  {r.status==='recusado' && (
                     <button onClick={()=>setReopenData(r)}
                       style={{ ...BS, background:T.laranjaLight, color:T.laranja, border:`1px solid ${T.laranja}40`, fontSize:11, fontWeight:700 }}>
                       🔄 Reabrir e ajustar
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </motion.div>
             )
           })}
         </div>
       </div>
+
+      {/* Modais */}
+      {messaging && (
+        <MessageThread
+          requestId={messaging.id}
+          profile={profile}
+          onClose={()=>setMessaging(null)}
+        />
+      )}
 
       {(showForm || reopenData) && (
         <RequestForm
