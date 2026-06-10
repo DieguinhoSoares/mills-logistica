@@ -9,10 +9,12 @@ import { db } from '../lib/firebase'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
 
 const STATUS_CONFIG = {
-  pendente:  { label:'⏳ Aguardando análise', color:T.amarelo, bg:T.amareloLight },
-  aceito:    { label:'✅ Aceito',             color:T.verde,   bg:T.verdeLight   },
-  recusado:  { label:'❌ Recusado',           color:T.perigo,  bg:T.perigoLight  },
-  cancelado: { label:'🚫 Cancelado',          color:T.textMuted, bg:T.surfaceLow },
+  pendente_supervisor: { label:'⏳ Aguard. Supervisor',  color:'#B8860B',  bg:'#FFF8E1'      },
+  pendente_gerente:    { label:'📋 Aguard. Gerência',    color:T.info,     bg:T.infoLight    },
+  pendente:            { label:'⏳ Aguardando análise',  color:T.amarelo,  bg:T.amareloLight },
+  aceito:              { label:'✅ Aceito',               color:T.verde,    bg:T.verdeLight   },
+  recusado:            { label:'❌ Recusado',             color:T.perigo,   bg:T.perigoLight  },
+  cancelado:           { label:'🚫 Cancelado',            color:T.textMuted,bg:T.surfaceLow  },
 }
 
 const URGENCY_SLA = {
