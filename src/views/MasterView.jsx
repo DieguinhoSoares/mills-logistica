@@ -23,7 +23,7 @@ function CancelCardModal({ card, onConfirm, onClose }) {
       onClick={e => e.target===e.currentTarget && onClose()}>
       <motion.div initial={{ scale:.95, opacity:0 }} animate={{ scale:1, opacity:1 }}
         style={{ background:T.surface, borderRadius:T.rLg, padding:28, width:440, boxShadow:T.shadowLg, border:`2px solid ${T.perigo}` }}>
-        <h3 style={{ color:T.perigo, fontFamily:FONT, fontWeight:700, fontSize:18, margin:'0 0 6px' }}>\U0001f6ab Cancelar Serviço</h3>
+        <h3 style={{ color:T.perigo, fontFamily:FONT, fontWeight:700, fontSize:18, margin:'0 0 6px' }}>🚫 Cancelar Serviço</h3>
         <p style={{ color:T.textSec, fontFamily:FONT, fontSize:12, margin:'0 0 16px' }}>
           Cancelar <strong style={{ color:T.laranja }}>{card?.client}</strong> — {fmt(card?.startDate)}.
         </p>
@@ -177,9 +177,9 @@ export function MasterView({ simClients }) {
                     </div>
                     <div style={{ display:'flex', gap:8, flexWrap:'wrap', fontSize:10 }}>
                       <span style={{ background:ct?.bg, color:ct?.color, borderRadius:20, padding:'2px 8px', fontWeight:700, fontFamily:FONT }}>{ct?.icon} {ct?.short}</span>
-                      <span style={{ color:T.textMuted, fontFamily:FONT }}>\U0001f527 {r.machine||'—'}</span>
-                      <span style={{ color:T.textMuted, fontFamily:FONT }}>\U0001f4c5 {r.desiredDate}</span>
-                      <span style={{ color:T.textMuted, fontFamily:FONT }}>{r.originCityName||r.origin||'—'} \u2192 {r.destCityName||r.destination||'—'}</span>
+                      <span style={{ color:T.textMuted, fontFamily:FONT }}>🔧 {r.machine||'—'}</span>
+                      <span style={{ color:T.textMuted, fontFamily:FONT }}>📅 {r.desiredDate}</span>
+                      <span style={{ color:T.textMuted, fontFamily:FONT }}>{r.originCityName||r.origin||'—'} → {r.destCityName||r.destination||'—'}</span>
                     </div>
                   </motion.div>
                 )
@@ -222,7 +222,7 @@ export function MasterView({ simClients }) {
             <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
               {(filterAprov==='todos'?mgrReqs:mgrReqs.filter(r=>r.status===filterAprov)).map(r => {
                 const ct = CARD_TYPES[r.type]
-                const sc = { pendente_supervisor:{label:'\u23f3 Aguard. Supervisor',color:'#B8860B',bg:'#FFF8E1'}, pendente_gerente:{label:'\U0001f4cb Aguard. Gerência',color:T.info,bg:T.infoLight}, pendente:{label:'\U0001f69b No time de Frotas',color:T.verde,bg:T.verdeLight}, aceito:{label:'\u2705 Aceito',color:T.sucesso,bg:T.sucessoLight}, recusado:{label:'\u274c Recusado',color:T.perigo,bg:T.perigoLight} }[r.status] || {}
+                const sc = { pendente_supervisor:{label:'⏳ Aguard. Supervisor',color:'#B8860B',bg:'#FFF8E1'}, pendente_gerente:{label:'📋 Aguard. Gerência',color:T.info,bg:T.infoLight}, pendente:{label:'🚛 No time de Frotas',color:T.verde,bg:T.verdeLight}, aceito:{label:'✅ Aceito',color:T.sucesso,bg:T.sucessoLight}, recusado:{label:'❌ Recusado',color:T.perigo,bg:T.perigoLight} }[r.status] || {}
                 const canApprove = ['pendente_supervisor','pendente_gerente'].includes(r.status)
                 return (
                   <motion.div key={r.id} layout style={{ background:T.surface, border:`1.5px solid ${sc.color||T.border}25`, borderRadius:T.rLg, padding:'14px 16px', boxShadow:T.shadow }}>
@@ -234,7 +234,7 @@ export function MasterView({ simClients }) {
                       <span style={{ background:sc.bg, border:`1px solid ${sc.color}40`, borderRadius:20, padding:'3px 11px', color:sc.color, fontSize:10, fontWeight:800, fontFamily:FONT, whiteSpace:'nowrap' }}>{sc.label}</span>
                     </div>
                     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:10 }}>
-                      {[['Solicitante',r.requesterName||'—'],['Unidade',r.unit||'—'],['Equipamento',r.machine||'—'],['Rota',`${r.originCityName||r.origin||'—'} \u2192 ${r.destCityName||r.destination||'—'}`],['Data',fmt(r.desiredDate)],['Planta/Obra',r.clientName||'—']].map(([l,v])=>(
+                      {[['Solicitante',r.requesterName||'—'],['Unidade',r.unit||'—'],['Equipamento',r.machine||'—'],['Rota',`${r.originCityName||r.origin||'—'} → ${r.destCityName||r.destination||'—'}`],['Data',fmt(r.desiredDate)],['Planta/Obra',r.clientName||'—']].map(([l,v])=>(
                         <div key={l}>
                           <div style={{ color:T.textMuted, fontSize:9, textTransform:'uppercase', letterSpacing:'0.07em', fontFamily:FONT, marginBottom:2 }}>{l}</div>
                           <div style={{ color:T.text, fontWeight:700, fontSize:11, fontFamily:FONT }}>{v}</div>
@@ -245,7 +245,7 @@ export function MasterView({ simClients }) {
                       <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginBottom:8 }}>
                         {r.approvalLog.map((log,i)=>(
                           <span key={i} style={{ background:log.action==='approved'?T.verdeLight:T.perigoLight, color:log.action==='approved'?T.verde:T.perigo, borderRadius:20, padding:'2px 9px', fontSize:9, fontWeight:700, fontFamily:FONT }}>
-                            {log.action==='approved'?'\u2705':'\u274c'} {log.step}: {log.approver?.split(' ')[0]}
+                            {log.action==='approved'?'✅':'\u274c'} {log.step}: {log.approver?.split(' ')[0]}
                           </span>
                         ))}
                       </div>
@@ -253,14 +253,14 @@ export function MasterView({ simClients }) {
                     {canApprove && (
                       <div style={{ display:'flex', justifyContent:'flex-end' }}>
                         <button onClick={()=>setApprovalModal(r)} style={{ ...BS, background:T.laranja, color:'white', fontSize:11, fontWeight:700, padding:'5px 14px' }}>
-                          \u2b50 Aprovar/Recusar como Master
+                          ⭐ Aprovar/Recusar como Master
                         </button>
                       </div>
                     )}
                   </motion.div>
                 )
               })}
-              {mgrReqs.length===0 && <div style={{ textAlign:'center', padding:'40px 0', color:T.textMuted, fontFamily:FONT }}><div style={{ fontSize:36, marginBottom:8 }}>\U0001f4ed</div><p>Nenhuma solicitação gerencial ainda.</p></div>}
+              {mgrReqs.length===0 && <div style={{ textAlign:'center', padding:'40px 0', color:T.textMuted, fontFamily:FONT }}><div style={{ fontSize:36, marginBottom:8 }}>📭</div><p>Nenhuma solicitação gerencial ainda.</p></div>}
             </div>
           </div>
         )}
@@ -273,7 +273,7 @@ export function MasterView({ simClients }) {
                 {pendingUsers.length > 0 && <span style={{ marginLeft:10, background:T.perigo, color:'white', borderRadius:20, padding:'2px 10px', fontSize:11, fontWeight:700, fontFamily:FONT }}>{pendingUsers.length} pendente{pendingUsers.length>1?'s':''}</span>}
               </h3>
             </div>
-            {pendingUsers.length===0 && <div style={{ textAlign:'center', padding:'40px 0', color:T.textMuted, fontFamily:FONT }}><div style={{ fontSize:40, marginBottom:10 }}>\u2705</div><p>Nenhum cadastro pendente.</p></div>}
+            {pendingUsers.length===0 && <div style={{ textAlign:'center', padding:'40px 0', color:T.textMuted, fontFamily:FONT }}><div style={{ fontSize:40, marginBottom:10 }}>✅</div><p>Nenhum cadastro pendente.</p></div>}
             <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
               {pendingUsers.map(u => (
                 <motion.div key={u.id} layout style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.rLg, padding:'16px 18px', boxShadow:T.shadow }}>
@@ -285,7 +285,7 @@ export function MasterView({ simClients }) {
                         Perfil: <strong style={{ color:T.laranja }}>{u.role}</strong> · Cadastrado em: {u.createdAt ? new Date(u.createdAt).toLocaleDateString('pt-BR') : '—'}
                       </div>
                     </div>
-                    <span style={{ background:T.amareloLight, color:T.amarelo, borderRadius:20, padding:'3px 10px', fontSize:10, fontWeight:700, fontFamily:FONT }}>\u23f3 Pendente</span>
+                    <span style={{ background:T.amareloLight, color:T.amarelo, borderRadius:20, padding:'3px 10px', fontSize:10, fontWeight:700, fontFamily:FONT }}>⏳ Pendente</span>
                   </div>
                   <div style={{ marginBottom:12 }}>
                     <label style={LS}>Definir perfil de acesso</label>
@@ -300,16 +300,16 @@ export function MasterView({ simClients }) {
                   </div>
                   <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
                     <button onClick={() => { refuseUser(u.id); addToast('Cadastro recusado.','info') }}
-                      style={{ ...BS, background:T.perigoLight, color:T.perigo, border:`1px solid ${T.perigo}40`, fontSize:11, fontWeight:700 }}>\u274c Recusar</button>
+                      style={{ ...BS, background:T.perigoLight, color:T.perigo, border:`1px solid ${T.perigo}40`, fontSize:11, fontWeight:700 }}>❌ Recusar</button>
                     <button onClick={() => handleApproveUser(u.id)} disabled={!approvingRole[u.id]}
-                      style={{ ...BS, background:approvingRole[u.id]?T.verde:T.borderMid, color:'white', fontSize:11, fontWeight:700, opacity:approvingRole[u.id]?1:0.5 }}>\u2705 Aprovar acesso</button>
+                      style={{ ...BS, background:approvingRole[u.id]?T.verde:T.borderMid, color:'white', fontSize:11, fontWeight:700, opacity:approvingRole[u.id]?1:0.5 }}>✅ Aprovar acesso</button>
                   </div>
                 </motion.div>
               ))}
             </div>
             {acceptedCards.length > 0 && (
               <div style={{ marginTop:28 }}>
-                <h3 style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:T.text, margin:'0 0 12px' }}>\U0001f6ab Cancelar Serviço Aceito <span style={{ color:T.textMuted, fontWeight:500, fontSize:12 }}>exclusivo Master</span></h3>
+                <h3 style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:T.text, margin:'0 0 12px' }}>🚫 Cancelar Serviço Aceito <span style={{ color:T.textMuted, fontWeight:500, fontSize:12 }}>exclusivo Master</span></h3>
                 <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                   {acceptedCards.map(c => {
                     const ct = CARD_TYPES[c.type]
@@ -320,9 +320,9 @@ export function MasterView({ simClients }) {
                             <span style={{ background:ct?.bg, color:ct?.color, borderRadius:20, padding:'2px 8px', fontSize:9, fontWeight:700, fontFamily:FONT }}>{ct?.icon} {ct?.short}</span>
                             <span style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:T.text }}>{c.client||'—'}</span>
                           </div>
-                          <div style={{ fontFamily:FONT, fontSize:10, color:T.textMuted }}>\U0001f4c5 {fmt(c.startDate)} · \U0001f464 {c.driver||'—'} · {c.originCity||c.origin||'—'} \u2192 {c.destCity||c.destination||'—'}</div>
+                          <div style={{ fontFamily:FONT, fontSize:10, color:T.textMuted }}>📅 {fmt(c.startDate)} · 👤 {c.driver||'—'} · {c.originCity||c.origin||'—'} → {c.destCity||c.destination||'—'}</div>
                         </div>
-                        <button onClick={() => setCancelModal(c)} style={{ ...BS, background:T.perigoLight, color:T.perigo, border:`1px solid ${T.perigo}40`, fontSize:11, fontWeight:700, flexShrink:0 }}>\U0001f6ab Cancelar</button>
+                        <button onClick={() => setCancelModal(c)} style={{ ...BS, background:T.perigoLight, color:T.perigo, border:`1px solid ${T.perigo}40`, fontSize:11, fontWeight:700, flexShrink:0 }}>🚫 Cancelar</button>
                       </div>
                     )
                   })}
@@ -335,7 +335,7 @@ export function MasterView({ simClients }) {
 
       <div style={{ background:T.surface, borderTop:`1px solid ${T.border}`, padding:'5px 20px', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
         <span style={{ color:T.textMuted, fontSize:9, fontFamily:FONT, letterSpacing:'0.06em' }}>Mills Pesados, Locação Serviços e Logística S.A.</span>
-        <span style={{ color:T.sucesso, fontSize:9, fontFamily:FONT, fontWeight:700 }}>\U0001f512 Backup automático diário ativado</span>
+        <span style={{ color:T.sucesso, fontSize:9, fontFamily:FONT, fontWeight:700 }}>🔒 Backup automático diário ativado</span>
       </div>
     </div>
   )
@@ -354,7 +354,7 @@ function ApprovalModal({ req, profile, onApprove, onRefuse, onClose }) {
         style={{ background:T.surface, borderRadius:T.rLg, padding:28, width:500, maxHeight:'90vh', overflowY:'auto', boxShadow:T.shadowLg, border:`1px solid ${T.border}` }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
           <div>
-            <h2 style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:20, margin:0 }}>\U0001f4cb Aprovação Master</h2>
+            <h2 style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:20, margin:0 }}>📋 Aprovação Master</h2>
             <div style={{ color:T.textMuted, fontFamily:FONT, fontSize:11, marginTop:3 }}>Substituindo alçada: <strong style={{ color:T.laranja }}>{stepLabel}</strong></div>
           </div>
           <button onClick={onClose} style={{ background:'none', border:'none', color:T.textMuted, fontSize:24, cursor:'pointer' }}>×</button>
@@ -382,11 +382,11 @@ function ApprovalModal({ req, profile, onApprove, onRefuse, onClose }) {
           <button onClick={onClose} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>Cancelar</button>
           <button onClick={async()=>{ setSaving(true); await onRefuse(req, note); setSaving(false) }} disabled={saving||!note.trim()}
             style={{ ...BS, background:note.trim()?T.perigoLight:T.borderMid, color:note.trim()?T.perigo:T.textMuted, border:`1px solid ${note.trim()?T.perigo+'40':T.border}`, fontWeight:700, opacity:note.trim()?1:0.5 }}>
-            \u274c Recusar
+            ❌ Recusar
           </button>
           <button onClick={async()=>{ setSaving(true); await onApprove(req, note); setSaving(false) }} disabled={saving}
             style={{ ...BS, background:T.verde, color:'white', fontWeight:700 }}>
-            {saving?'\u23f3...':'\u2705 Aprovar'}
+            {saving?'⏳...':'✅ Aprovar'}
           </button>
         </div>
       </motion.div>
