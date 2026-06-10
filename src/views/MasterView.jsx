@@ -1,12 +1,12 @@
+import { useCards, useRequests, useNotifications, useConfig, usePendingUsers, useManagerialRequests, runDailyBackup } from '../hooks/useFirestore'
+import { T, FONT, CARD_TYPES, BS, IS, LS } from '../lib/constants'
+import { detectConflicts, fmt, getSubtypeLabel } from '../lib/utils'
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
-import { useCards, useRequests, useNotifications, useConfig, usePendingUsers, runDailyBackup } from '../hooks/useFirestore'
 import { MillsLogo, ToastContainer, useToasts, BrazilMap, NotificationBell } from '../components/UI'
 import { KPIView } from './KPIView'
 import { T, FONT, CARD_TYPES, BS, LS } from '../lib/constants'
-import { detectConflicts, fmt } from '../lib/utils'
-import { doc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 
 function CancelCardModal({ card, onConfirm, onClose }) {
@@ -48,7 +48,12 @@ export function MasterView({ simClients }) {
   const { config }                                   = useConfig()
   const { toasts, add:addToast, dismiss }            = useToasts()
   const { pendingUsers, approveUser, refuseUser }    = usePendingUsers()
-
+  const { requests: mgrReqs }                             = useManagerialRequests()
+  const { approveAsSupervisor, refuseAsSupervisor,
+        approveAsGerente,    refuseAsGerente }           = useRequests('master')
+  const [approvalModal, setApprovalModal]                  = useState(null)
+  const [filterAprov,   setFilterAprov]                    = useState('todos')
+  const pendingAprov = mgrReqs.filter(r=>['pendente_supervisor','pendente_gerente'].includes(r.status)).length
   const [tab,           setTab]           = useState('kpis')
   const [cancelModal,   setCancelModal]   = useState(null)
   const [approvingRole, setApprovingRole] = useState({})
@@ -62,12 +67,13 @@ export function MasterView({ simClients }) {
   const conflicts = detectConflicts(cards)
   const pending   = requests.filter(r => r.status==='pendente').length
 
-  const TABS = [
-    { id:'kpis',     label:'📊 Indicadores',  badge: null },
-    { id:'map',      label:'🗺 Mapa',          badge: null },
-    { id:'requests', label:'📥 Solicitações',  badge: pending || null },
-    { id:'usuarios', label:'👥 Usuários',      badge: pendingUsers.length || null },
-  ]
+ const TABS = [
+  { id:'kpis',      label:'📊 Indicadores',  badge: null },
+  { id:'map',       label:'🗺 Mapa',          badge: null },
+  { id:'requests',  label:'📥 Solicitações',  badge: pending || null },
+  { id:'aprovacao', label:'📋 Aprovações',    badge: pendingAprov || null },
+  { id:'usuarios',  label:'👥 Usuários',      badge: pendingUsers.length || null },
+]
 
   const handleCancelCard = async (card, reason) => {
     await updateDoc(doc(db, 'cards', card.id), {
@@ -184,7 +190,85 @@ export function MasterView({ simClients }) {
                   {pending} pendentes
                 </span>
               )}
+              {tab==='aprovacao' && (
+  <div style={{ flex:1, overflow:'auto', padding:'16px 20px' }}>
+    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+      <div>
+        <h3 style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:T.text, margin:0 }}>
+          Aprovações Gerenciais
+          {pendingAprov>0 && <span style={{ marginLeft:10, background:T.perigo, color:'white', borderRadius:20, padding:'2px 10px', fontSize:11, fontWeight:700, fontFamily:FONT }}>{pendingAprov} pendentes</span>}
+        </h3>
+        <p style={{ color:T.textMuted, fontFamily:FONT, fontSize:11, margin:'3px 0 0' }}>Troca Técnica · Garantia · Sinistro · Guindauto</p>
+      </div>
+    </div>
+    <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:16 }}>
+      {[
+        { l:'Total',             v:mgrReqs.length,                                                                     c:T.laranja, bg:T.laranjaLight },
+        { l:'Aguard. Aprovação', v:pendingAprov,                                                                       c:'#B8860B',  bg:'#FFF8E1'     },
+        { l:'No time de Frotas', v:mgrReqs.filter(r=>['pendente','aceito'].includes(r.status)).length,                 c:T.verde,   bg:T.verdeLight  },
+        { l:'Recusadas',         v:mgrReqs.filter(r=>r.status==='recusado').length,                                    c:T.perigo,  bg:T.perigoLight },
+      ].map(s=>(
+        <div key={s.l} style={{ background:s.bg, border:`1px solid ${s.c}30`, borderRadius:T.rLg, padding:'12px 14px', boxShadow:T.shadow }}>
+          <div style={{ color:s.c, fontFamily:FONT, fontWeight:900, fontSize:24, lineHeight:1 }}>{s.v}</div>
+          <div style={{ color:T.textSec, fontSize:9, fontFamily:FONT, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.07em', marginTop:3 }}>{s.l}</div>
+        </div>
+      ))}
+    </div>
+    <div style={{ display:'flex', gap:8, marginBottom:14, flexWrap:'wrap' }}>
+      {[['todos','Todos'],['pendente_supervisor','Aguard. Supervisor'],['pendente_gerente','Aguard. Gerência'],['pendente','No time de Frotas'],['aceito','Aceito'],['recusado','Recusado']].map(([v,l])=>(
+        <button key={v} onClick={()=>setFilterAprov(v)}
+          style={{ ...BS, background:filterAprov===v?T.laranja:T.surface, color:filterAprov===v?'white':T.textSec, border:`1px solid ${filterAprov===v?T.laranja:T.border}`, fontSize:10, padding:'4px 12px' }}>
+          {l}
+        </button>
+      ))}
+    </div>
+    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+      {(filterAprov==='todos'?mgrReqs:mgrReqs.filter(r=>r.status===filterAprov)).map(r => {
+        const ct = CARD_TYPES[r.type]
+        const sc = { pendente_supervisor:{label:'⏳ Aguard. Supervisor',color:'#B8860B',bg:'#FFF8E1'}, pendente_gerente:{label:'📋 Aguard. Gerência',color:T.info,bg:T.infoLight}, pendente:{label:'🚛 No time de Frotas',color:T.verde,bg:T.verdeLight}, aceito:{label:'✅ Aceito',color:T.sucesso,bg:T.sucessoLight}, recusado:{label:'❌ Recusado',color:T.perigo,bg:T.perigoLight} }[r.status] || {}
+        const canApprove = ['pendente_supervisor','pendente_gerente'].includes(r.status)
+        return (
+          <motion.div key={r.id} layout style={{ background:T.surface, border:`1.5px solid ${sc.color||T.border}25`, borderRadius:T.rLg, padding:'14px 16px', boxShadow:T.shadow }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                <span style={{ background:ct?.bg, border:`1px solid ${ct?.color}40`, borderRadius:20, padding:'2px 9px', color:ct?.color, fontSize:9, fontWeight:800, fontFamily:FONT }}>{ct?.icon} {ct?.short}</span>
+                {r.subtype && <span style={{ background:T.infoLight, borderRadius:20, padding:'2px 9px', color:T.info, fontSize:9, fontWeight:800, fontFamily:FONT }}>{getSubtypeLabel(r.type,r.subtype)}</span>}
+              </div>
+              <span style={{ background:sc.bg, border:`1px solid ${sc.color}40`, borderRadius:20, padding:'3px 11px', color:sc.color, fontSize:10, fontWeight:800, fontFamily:FONT, whiteSpace:'nowrap' }}>{sc.label}</span>
             </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:10 }}>
+              {[['Solicitante',r.requesterName||'—'],['Unidade',r.unit||'—'],['Equipamento',r.machine||'—'],['Rota',`${r.originCityName||r.origin||'—'} → ${r.destCityName||r.destination||'—'}`],['Data',fmt(r.desiredDate)],['Planta/Obra',r.clientName||'—']].map(([l,v])=>(
+                <div key={l}>
+                  <div style={{ color:T.textMuted, fontSize:9, textTransform:'uppercase', letterSpacing:'0.07em', fontFamily:FONT, marginBottom:2 }}>{l}</div>
+                  <div style={{ color:T.text, fontWeight:700, fontSize:11, fontFamily:FONT }}>{v}</div>
+                </div>
+              ))}
+            </div>
+            {r.approvalLog?.length>0 && (
+              <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginBottom:8 }}>
+                {r.approvalLog.map((log,i)=>(
+                  <span key={i} style={{ background:log.action==='approved'?T.verdeLight:T.perigoLight, color:log.action==='approved'?T.verde:T.perigo, borderRadius:20, padding:'2px 9px', fontSize:9, fontWeight:700, fontFamily:FONT }}>
+                    {log.action==='approved'?'✅':'❌'} {log.step}: {log.approver?.split(' ')[0]}
+                  </span>
+                ))}
+              </div>
+            )}
+            {canApprove && (
+              <div style={{ display:'flex', justifyContent:'flex-end' }}>
+                <button onClick={()=>setApprovalModal(r)}
+                  style={{ ...BS, background:T.laranja, color:'white', fontSize:11, fontWeight:700, padding:'5px 14px' }}>
+                  ⭐ Aprovar/Recusar como Master
+                </button>
+              </div>
+            )}
+          </motion.div>
+        )
+      })}
+      {mgrReqs.length===0 && <div style={{ textAlign:'center', padding:'40px 0', color:T.textMuted, fontFamily:FONT }}><div style={{ fontSize:36, marginBottom:8 }}>📭</div><p>Nenhuma solicitação gerencial ainda.</p></div>}
+    </div>
+  </div>
+)}          
+   </div>
             <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
               {requests.map(r => {
                 const ct  = CARD_TYPES[r.type]
