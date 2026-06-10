@@ -62,7 +62,7 @@ function MessageThread({ requestId, profile, onClose }) {
     </div>
   )
 }
-
+ 
 // ── RotogramaModal ────────────────────────────────────────────────────────────
 function RotogramaModal({ driver, cards, profile, rotogramaAtivo, onClose, addToast }) {
   const [paradas,    setParadas]    = useState(rotogramaAtivo?.paradas||[])
