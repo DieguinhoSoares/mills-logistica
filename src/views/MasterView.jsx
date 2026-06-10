@@ -6,7 +6,6 @@ import { motion } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
 import { MillsLogo, ToastContainer, useToasts, BrazilMap, NotificationBell } from '../components/UI'
 import { KPIView } from './KPIView'
-import { T, FONT, CARD_TYPES, BS, LS } from '../lib/constants'
 import { db } from '../lib/firebase'
 
 function CancelCardModal({ card, onConfirm, onClose }) {
