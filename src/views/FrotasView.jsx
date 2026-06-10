@@ -767,6 +767,93 @@ function CsvUploadModal({ onLoaded, onClose }) {
   )
 }
 
+// ── DriversModal ──────────────────────────────────────────────────────────────
+function DriversModal({ drivers, onSave, onDelete, onClose, onRotograma, addToast }) {
+  const blank={name:'',cnh:'',category:'',phone:'',unit:'',active:true}
+  const [form,  setForm] =useState(blank)
+  const [editing,setEdit]=useState(null)
+  const [saving,setSaving]=useState(false)
+  const set=(k,v)=>setForm(p=>({...p,[k]:v}))
+  const handleSave=async()=>{
+    if(!form.name.trim()) return
+    setSaving(true)
+    await onSave(editing?{...form,id:editing}:form)
+    setForm(blank);setEdit(null);setSaving(false)
+  }
+  const handleEdit=d=>{setEdit(d.id);setForm({name:d.name,cnh:d.cnh||'',category:d.category||'',phone:d.phone||'',unit:d.unit||'',active:d.active!==false})}
+  const handleCopiarLink=async d=>{
+    const token=await ensureDriverToken(d.id)
+    const link=`https://dieguinhosoares.github.io/mills-logistica/?motorista=${token}`
+    navigator.clipboard.writeText(link)
+    addToast('Link do motorista copiado!','success')
+  }
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.55)', zIndex:3500, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)' }}>
+      <motion.div initial={{ scale:.95, opacity:0 }} animate={{ scale:1, opacity:1 }} style={{ background:T.surface, borderRadius:T.rLg, padding:28, width:680, maxHeight:'88vh', display:'flex', gap:20, boxShadow:T.shadowLg, border:`1px solid ${T.border}` }}>
+        <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+          <h3 style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:16, margin:'0 0 12px' }}>👤 Motoristas Cadastrados</h3>
+          <div style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', gap:7 }}>
+            {drivers.length===0&&<div style={{ color:T.textMuted, fontFamily:FONT, fontSize:12, textAlign:'center', padding:'20px 0' }}>Nenhum motorista cadastrado.</div>}
+            {drivers.map(d=>(
+              <div key={d.id} style={{ background:T.surfaceAlt, border:`1px solid ${T.border}`, borderRadius:T.r, padding:'10px 13px' }}>
+                <div style={{ marginBottom:6 }}>
+                  <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:T.text, display:'flex', alignItems:'center', gap:6 }}>
+                    {d.name}
+                    <span style={{ background:d.active!==false?T.verdeLight:T.perigoLight, color:d.active!==false?T.verde:T.perigo, borderRadius:20, padding:'1px 7px', fontSize:9, fontWeight:700 }}>
+                      {d.active!==false?'Ativo':'Inativo'}
+                    </span>
+                  </div>
+                  <div style={{ fontFamily:FONT, fontSize:10, color:T.textMuted }}>{d.cnh&&`CNH: ${d.cnh} · `}{d.category&&`Cat. ${d.category} · `}{d.phone&&`📱 ${d.phone}`}</div>
+                  <div style={{ fontFamily:FONT, fontSize:10, color:T.textMuted }}>{d.unit||'—'}</div>
+                </div>
+                <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+                  <button onClick={()=>handleEdit(d)} style={{ ...BS, background:T.infoLight, color:T.info, border:`1px solid ${T.info}30`, fontSize:10, padding:'4px 9px' }}>✏️ Editar</button>
+                  <button onClick={()=>onDelete(d.id)} style={{ ...BS, background:T.perigoLight, color:T.perigo, border:`1px solid ${T.perigo}30`, fontSize:10, padding:'4px 9px' }}>🗑</button>
+                  <button onClick={()=>onRotograma(d)} style={{ ...BS, background:T.verdeLight, color:T.verde, border:`1px solid ${T.verde}30`, fontSize:10, padding:'4px 9px' }}>🗺 Rotograma</button>
+                  <button onClick={()=>handleCopiarLink(d)} style={{ ...BS, background:T.laranjaLight, color:T.laranja, border:`1px solid ${T.laranja}30`, fontSize:10, padding:'4px 9px' }}>📱 Link</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{ width:240, flexShrink:0 }}>
+          <h3 style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:16, margin:'0 0 12px' }}>{editing?'✏️ Editar':'➕ Novo'} Motorista</h3>
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            <div><label style={LS}>Nome completo *</label><input value={form.name} onChange={e=>set('name',e.target.value)} style={IS} placeholder="Nome do motorista"/></div>
+            <div><label style={LS}>CNH</label><input value={form.cnh} onChange={e=>set('cnh',e.target.value)} style={IS} placeholder="00000000000"/></div>
+            <div><label style={LS}>Categoria CNH</label>
+              <select value={form.category} onChange={e=>set('category',e.target.value)} style={IS}>
+                <option value="">—</option>
+                {['A','B','C','D','E','AB','AC','AD','AE'].map(c=><option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div><label style={LS}>Telefone</label><input value={form.phone} onChange={e=>set('phone',e.target.value)} style={IS} placeholder="(11) 99999-9999"/></div>
+            <div><label style={LS}>Filial</label>
+              <select value={form.unit} onChange={e=>set('unit',e.target.value)} style={IS}>
+                <option value="">— selecione —</option>
+                {FILIAIS.map(f=><option key={f} value={f}>{f}</option>)}
+              </select>
+            </div>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 10px', background:T.surfaceAlt, borderRadius:T.r, border:`1px solid ${T.border}` }}>
+              <label style={{ ...LS, margin:0 }}>Ativo</label>
+              <div onClick={()=>set('active',!form.active)} style={{ width:36, height:20, borderRadius:10, background:form.active?T.verde:T.borderMid, cursor:'pointer', position:'relative', transition:'all .2s' }}>
+                <div style={{ position:'absolute', top:2, left:form.active?18:2, width:16, height:16, borderRadius:'50%', background:'white', transition:'all .2s', boxShadow:'0 1px 3px rgba(0,0,0,0.2)' }}/>
+              </div>
+            </div>
+            <div style={{ display:'flex', gap:8, marginTop:4 }}>
+              {editing&&<button onClick={()=>{setEdit(null);setForm(blank)}} style={{ ...BS, flex:1, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}`, fontSize:11 }}>Cancelar</button>}
+              <button onClick={handleSave} disabled={saving||!form.name.trim()} style={{ ...BS, flex:1, background:form.name.trim()?T.laranja:T.borderMid, color:'white', fontWeight:700, fontSize:11 }}>{saving?'⏳...':editing?'💾 Salvar':'➕ Adicionar'}</button>
+            </div>
+          </div>
+          <div style={{ marginTop:16 }}>
+            <button onClick={onClose} style={{ ...BS, width:'100%', background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>Fechar</button>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
 
 // ── AssignDriverModal ─────────────────────────────────────────────────────────
 function AssignDriverModal({ req, drivers, onConfirm, onCancel }) {
