@@ -90,7 +90,7 @@ export function useRequests(roleFilter) {
   }, [user, roleFilter])
 
   const submitRequest = async data => {
-    const status = getInitialStatus(data.type, data.subtype)
+    const status   = getInitialStatus(data.type, data.subtype)
     const needsGer = needsGerenteApproval(data.type, data.subtype)
     await addDoc(collection(db,'requests'), {
       ...data,
@@ -103,6 +103,17 @@ export function useRequests(roleFilter) {
       createdAt:            serverTimestamp(),
       updatedAt:            serverTimestamp(),
     })
+    if (status === 'pendente_supervisor') {
+      const cfg = await getDoc(doc(db,'config','settings'))
+      const s   = cfg.exists() ? cfg.data() : {}
+      if (s.whatsappPhone && s.whatsappApikey) {
+        const tipo = { freteMillsInterno:'Frete Mills', freteCliente:'Frete Cliente', guindauto:'Guindauto' }[data.type] || data.type
+        const sub  = data.subtype ? ' · ' + data.subtype.replace(/_/g,' ') : ''
+        const urg  = { critico:'🔴 Crítico', alto:'🟠 Alto', medio:'🟡 Médio', baixo:'🟢 Baixo' }[data.urgency] || ''
+        const msg  = `📋 Nova solicitação aguardando aprovação\nTipo: ${tipo}${sub} · Cliente: ${data.clientName||'—'} · Solicitante: ${data.requesterName||profile?.name||'—'} · Rota: ${data.originCityName||data.origin||'—'} → ${data.destCityName||data.destination||'—'}\nUrgência: ${urg}\n👉 Abrir e aprovar: https://dieguinhosoares.github.io/mills-logistica/`
+        try { await fetch(`https://api.callmebot.com/whatsapp.php?phone=${s.whatsappPhone}&text=${encodeURIComponent(msg)}&apikey=${s.whatsappApikey}`) } catch(e) { console.warn('WhatsApp:', e) }
+      }
+    }
   }
 
   const respondRequest = async (id, status, note, teamsWebhookUrl) => {
@@ -151,18 +162,20 @@ export function useRequests(roleFilter) {
       createdAt: serverTimestamp(),
     })
     // Notifica gerente se necessário
-    if (req?.needsGerenteApproval) {
+   if (req?.needsGerenteApproval) {
       await addDoc(collection(db,'notifications'), {
-        userId:    'gerente',
-        requestId: id,
-        type:      'pending_gerente_approval',
-        title:     '📋 Solicitação aguarda sua aprovação',
-        message:   `${req?.requesterName} · ${req?.machine||''} · ${req?.originCityName||''} → ${req?.destCityName||''}`,
-        read:      false,
-        createdAt: serverTimestamp(),
+        userId:'gerente', requestId:id, type:'pending_gerente_approval',
+        title:'📋 Solicitação aguarda sua aprovação',
+        message:`${req?.requesterName} · ${req?.machine||''} · ${req?.originCityName||''} → ${req?.destCityName||''}`,
+        read:false, createdAt:serverTimestamp(),
       })
+      const cfg = await getDoc(doc(db,'config','settings'))
+      const s   = cfg.exists() ? cfg.data() : {}
+      if (s.whatsappPhone && s.whatsappApikey) {
+        const msg = `📋 Solicitação aprovada pelo Supervisor — aguarda sua aprovação\nSolicitante: ${req?.requesterName||'—'} · ${req?.machine||'—'}\nRota: ${req?.originCityName||req?.origin||'—'} → ${req?.destCityName||req?.destination||'—'}\n👉 Abrir e aprovar: https://dieguinhosoares.github.io/mills-logistica/`
+        try { await fetch(`https://api.callmebot.com/whatsapp.php?phone=${s.whatsappPhone}&text=${encodeURIComponent(msg)}&apikey=${s.whatsappApikey}`) } catch(e) { console.warn('WhatsApp:', e) }
+      }
     }
-  }
 
   const refuseAsSupervisor = async (id, note, approverName) => {
     const req = requests.find(r=>r.id===id) || (await getDoc(doc(db,'requests',id))).data()
