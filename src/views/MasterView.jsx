@@ -68,18 +68,18 @@ export function MasterView({ simClients }) {
   const acceptedCards = cards.filter(c => c.status==='confirmado' || c.status==='aceito')
 
   const TABS = [
-    { id:'kpis',      label:'\U0001f4ca Indicadores',  badge: null },
-    { id:'map',       label:'\U0001f5fa Mapa',          badge: null },
-    { id:'requests',  label:'\U0001f4e5 Solicitações',  badge: pending || null },
-    { id:'aprovacao', label:'\U0001f4cb Aprovações',    badge: pendingAprov || null },
-    { id:'usuarios',  label:'\U0001f465 Usuários',      badge: pendingUsers.length || null },
-  ]
+  { id:'kpis',      label:'📊 Indicadores',  badge: null },
+  { id:'map',       label:'🗺 Mapa',          badge: null },
+  { id:'requests',  label:'📥 Solicitações',  badge: pending || null },
+  { id:'aprovacao', label:'📋 Aprovações',    badge: pendingAprov || null },
+  { id:'usuarios',  label:'👥 Usuários',      badge: pendingUsers.length || null },
+]
 
   const handleCancelCard = async (card, reason) => {
     await updateDoc(doc(db,'cards',card.id), { status:'cancelado', cancelReason:reason, cancelledAt:serverTimestamp(), cancelledBy:profile?.name||'Master', updatedAt:serverTimestamp() })
     if (card.requestId) {
       const req = requests.find(r => r.id===card.requestId)
-      if (req?.requesterId) await addDoc(collection(db,'notifications'), { userId:req.requesterId, requestId:card.requestId, type:'service_cancelled', title:'\U0001f6ab Serviço cancelado', message:`O serviço de ${card.client} foi cancelado. Motivo: ${reason}`, read:false, createdAt:serverTimestamp() })
+      if (req?.requesterId) await addDoc(collection(db,'notifications'), { userId:req.requesterId, requestId:card.requestId, type:'service_cancelled', title:'🚫 Serviço cancelado', message:`O serviço de ${card.client} foi cancelado. Motivo: ${reason}`, read:false, createdAt:serverTimestamp() })
     }
     setCancelModal(null)
     addToast(`Serviço de ${card.client} cancelado.`, 'info')
@@ -122,7 +122,7 @@ export function MasterView({ simClients }) {
           <MillsLogo height={28}/>
           <div style={{ width:1, height:22, background:'rgba(255,255,255,0.2)' }}/>
           <div>
-            <div style={{ color:'white', fontFamily:FONT, fontWeight:700, fontSize:12, letterSpacing:'0.1em', textTransform:'uppercase' }}>\u2b50 MASTER</div>
+            <div style={{ color:'white', fontFamily:FONT, fontWeight:700, fontSize:12, letterSpacing:'0.1em', textTransform:'uppercase' }}>⭐ MASTER</div>
             <div style={{ color:'rgba(255,255,255,0.6)', fontSize:9, letterSpacing:'0.1em', textTransform:'uppercase' }}>Painel Executivo · {profile?.name}</div>
           </div>
         </div>
@@ -245,7 +245,7 @@ export function MasterView({ simClients }) {
                       <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginBottom:8 }}>
                         {r.approvalLog.map((log,i)=>(
                           <span key={i} style={{ background:log.action==='approved'?T.verdeLight:T.perigoLight, color:log.action==='approved'?T.verde:T.perigo, borderRadius:20, padding:'2px 9px', fontSize:9, fontWeight:700, fontFamily:FONT }}>
-                            {log.action==='approved'?'✅':'\u274c'} {log.step}: {log.approver?.split(' ')[0]}
+                            {log.action==='approved'?'✅':'❌'} {log.step}: {log.approver?.split(' ')[0]}
                           </span>
                         ))}
                       </div>
