@@ -188,7 +188,7 @@ export function MasterView({ simClients }) {
                 <span style={{ background:T.perigoLight, color:T.perigo, borderRadius:20, padding:'3px 12px', fontSize:11, fontWeight:700, fontFamily:FONT }}>
                   {pending} pendentes
                 </span>
-              }}
+              )}
         </div>
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
           {requests.map(r => {
