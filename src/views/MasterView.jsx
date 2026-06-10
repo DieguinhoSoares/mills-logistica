@@ -188,7 +188,34 @@ export function MasterView({ simClients }) {
                 <span style={{ background:T.perigoLight, color:T.perigo, borderRadius:20, padding:'3px 12px', fontSize:11, fontWeight:700, fontFamily:FONT }}>
                   {pending} pendentes
                 </span>
-              )}
+              }}
+        </div>
+        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          {requests.map(r => {
+            const ct = CARD_TYPES[r.type]
+            const sc = { pendente:{color:T.amarelo,bg:T.amareloLight}, aceito:{color:T.verde,bg:T.verdeLight}, recusado:{color:T.perigo,bg:T.perigoLight} }[r.status] || {}
+            return (
+              <motion.div key={r.id} layout style={{ background:T.surface, border:`1px solid ${sc.color||T.border}30`, borderRadius:T.rLg, padding:'14px 16px', boxShadow:T.shadow }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
+                  <div>
+                    <span style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:T.text }}>{r.requesterName||'—'}</span>
+                    <span style={{ color:T.textMuted, fontSize:11, fontFamily:FONT }}> · {r.unit}</span>
+                  </div>
+                  <span style={{ background:sc.bg, color:sc.color, borderRadius:20, padding:'2px 10px', fontSize:10, fontWeight:700, fontFamily:FONT }}>{r.status?.replace(/_/g,' ')}</span>
+                </div>
+                <div style={{ display:'flex', gap:8, flexWrap:'wrap', fontSize:10 }}>
+                  <span style={{ background:ct?.bg, color:ct?.color, borderRadius:20, padding:'2px 8px', fontWeight:700, fontFamily:FONT }}>{ct?.icon} {ct?.short}</span>
+                  <span style={{ color:T.textMuted, fontFamily:FONT }}>🔧 {r.machine||'—'}</span>
+                  <span style={{ color:T.textMuted, fontFamily:FONT }}>📅 {r.desiredDate}</span>
+                  <span style={{ color:T.textMuted, fontFamily:FONT }}>{r.originCityName||r.origin||'—'} → {r.destCityName||r.destination||'—'}</span>
+                </div>
+              </motion.div>
+            )
+          })}
+          {requests.length===0 && <div style={{ textAlign:'center', padding:'40px 0', color:T.textMuted, fontFamily:FONT }}>Nenhuma solicitação.</div>}
+        </div>
+      </div>
+    )}
               {tab==='aprovacao' && (
   <div style={{ flex:1, overflow:'auto', padding:'16px 20px' }}>
     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
