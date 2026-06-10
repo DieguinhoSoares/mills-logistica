@@ -258,7 +258,7 @@ export function MasterView({ simClients }) {
                   <div style={{ marginBottom:12 }}>
                     <label style={LS}>Definir perfil de acesso</label>
                     <div style={{ display:'flex', gap:8, marginTop:6 }}>
-                      {[['frotas','🚛 Gestão de Frotas'],['solicitante','📋 Solicitante']].map(([v,l]) => (
+                      {[['frotas','🚛 Gestão de Frotas'],['solicitante','📋 Solicitante'],['supervisor','👷 Supervisor'],['gerente','👔 Gerente']].map(([v,l]) => (
                         <div key={v} onClick={() => setApprovingRole(p=>({...p,[u.id]:v}))}
                           style={{ flex:1, border:`2px solid ${approvingRole[u.id]===v ? T.laranja : T.border}`, borderRadius:T.r,
                             padding:'8px 12px', cursor:'pointer', textAlign:'center',
