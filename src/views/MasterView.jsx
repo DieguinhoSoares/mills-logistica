@@ -10,10 +10,10 @@ import { doc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/fi
 import { db } from '../lib/firebase'
 
 const PERFIS = [
-  ['frotas',      '\U0001f69b Gestão de Frotas'],
-  ['solicitante', '\U0001f4cb Solicitante'],
-  ['supervisor',  '\U0001f477 Supervisor de Programação'],
-  ['gerente',     '\U0001f454 Gerente de Manutenção'],
+  ['frotas',      '🚛 Gestão de Frotas'],
+  ['solicitante', '📋 Solicitante'],
+  ['supervisor',  '👷 Supervisor de Programação'],
+  ['gerente',     '👔 Gerente de Manutenção'],
 ]
 
 function CancelCardModal({ card, onConfirm, onClose }) {
