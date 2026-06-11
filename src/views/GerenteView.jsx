@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useLayoutEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
 import { useRequests, useManagerialRequests, useNotifications, useConfig } from '../hooks/useFirestore'
@@ -18,11 +18,15 @@ const STATUS_CONFIG = {
 }
 
 function useIsMobile() {
-  const [mobile, setMobile] = useState(window.innerWidth < 768)
+  const [mobile, setMobile] = useState(() => 
+    window.matchMedia('(max-width: 767px)').matches
+  )
   useEffect(() => {
-    const fn = () => setMobile(window.innerWidth < 768)
-    window.addEventListener('resize', fn)
-    return () => window.removeEventListener('resize', fn)
+    const mq = window.matchMedia('(max-width: 767px)')
+    const fn = e => setMobile(e.matches)
+    mq.addEventListener('change', fn)
+    setMobile(mq.matches)
+    return () => mq.removeEventListener('change', fn)
   }, [])
   return mobile
 }
