@@ -18,7 +18,6 @@ function AppInner() {
   if (motorToken) return <MotoristaView token={motorToken} />
 
   if (!user || !profile)              return <LoginScreen />
-  if (profile.role === 'master') return <GerenteView />
   if (profile.status === 'pendente')  return <PendingScreen />
   if (profile.status === 'recusado')  return <PendingScreen recusado />
   if (profile.role === 'master') return <MasterView simClients={simClients} />
