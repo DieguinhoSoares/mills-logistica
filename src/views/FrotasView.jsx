@@ -976,6 +976,117 @@ function AssignDriverModal({ req, drivers, onConfirm, onCancel }) {
     </div>
   )
 }
+
+function ValidacoesTab({ cards, onValidar, onRejeitar }) {
+  const [modal, setModal] = useState(null)
+  const [note,  setNote]  = useState('')
+  const [saving,setSaving]= useState(false)
+
+  const handleAction = async (action) => {
+    if (action==='rejeitar' && !note.trim()) return
+    setSaving(true)
+    if (action==='validar') await onValidar(modal.card, note)
+    else await onRejeitar(modal.card, note)
+    setModal(null); setNote(''); setSaving(false)
+  }
+
+  return (
+    <div style={{ flex:1, overflow:'auto', padding:'16px 20px' }}>
+      {modal && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.55)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)' }}
+          onClick={e=>e.target===e.currentTarget&&setModal(null)}>
+          <motion.div initial={{ scale:.95, opacity:0 }} animate={{ scale:1, opacity:1 }}
+            style={{ background:T.surface, borderRadius:T.rLg, padding:28, width:480, boxShadow:T.shadowLg, border:`1px solid ${T.border}` }}>
+            <h2 style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:18, margin:'0 0 6px' }}>
+              {modal.action==='validar' ? '✅ Confirmar Conclusão' : '⚠️ Rejeitar Conclusão'}
+            </h2>
+            <p style={{ color:T.textMuted, fontFamily:FONT, fontSize:12, margin:'0 0 16px' }}>
+              Serviço: <strong style={{ color:T.laranja }}>{modal.card.client}</strong> · {modal.card.driver||modal.card.transportadoraNome||'—'}
+            </p>
+            <div style={{ marginBottom:16 }}>
+              <label style={LS}>
+                Observação {modal.action==='rejeitar'&&<span style={{ color:T.perigo }}>*</span>}
+              </label>
+              <textarea value={note} onChange={e=>setNote(e.target.value)}
+                placeholder={modal.action==='rejeitar'?'Motivo da rejeição (obrigatório)...':'Observação opcional...'}
+                style={{ ...IS, height:80, resize:'vertical', marginTop:5 }}/>
+            </div>
+            <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+              <button onClick={()=>{setModal(null);setNote('')}} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>Cancelar</button>
+              <button onClick={()=>handleAction(modal.action)}
+                disabled={saving||(modal.action==='rejeitar'&&!note.trim())}
+                style={{ ...BS, background:modal.action==='validar'?T.verde:T.perigo, color:'white', fontWeight:700,
+                  opacity:(modal.action==='rejeitar'&&!note.trim())?0.5:1 }}>
+                {saving?'⏳...' : modal.action==='validar'?'✅ Confirmar':'⚠️ Rejeitar'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      <div style={{ marginBottom:16 }}>
+        <h2 style={{ fontFamily:FONT, fontWeight:700, fontSize:20, color:T.text, margin:0 }}>Validação de Conclusões</h2>
+        <p style={{ color:T.textMuted, fontFamily:FONT, fontSize:12, margin:'3px 0 0' }}>
+          {cards.length===0 ? 'Nenhuma conclusão aguardando validação.' : `${cards.length} serviço(s) aguardando sua validação`}
+        </p>
+      </div>
+
+      {cards.length===0 && (
+        <div style={{ textAlign:'center', padding:'40px 0', color:T.textMuted, fontFamily:FONT }}>
+          <div style={{ fontSize:44, marginBottom:10 }}>✅</div>
+          <p style={{ fontWeight:700, fontSize:16 }}>Tudo validado!</p>
+        </div>
+      )}
+
+      <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+        {cards.map(c => {
+          const ct = CARD_TYPES[c.type]
+          return (
+            <motion.div key={c.id} layout style={{ background:T.surface, border:`1.5px solid ${T.verde}30`, borderRadius:T.rLg, padding:'14px 16px', boxShadow:T.shadow }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                  <span style={{ background:ct?.bg, border:`1px solid ${ct?.color}40`, borderRadius:20, padding:'2px 9px', color:ct?.color, fontSize:9, fontWeight:800, fontFamily:FONT }}>{ct?.icon} {ct?.short}</span>
+                  <span style={{ background:T.verdeLight, borderRadius:20, padding:'2px 9px', color:T.verde, fontSize:9, fontWeight:800, fontFamily:FONT }}>🏁 Aguard. Validação</span>
+                </div>
+                <span style={{ color:T.textMuted, fontSize:10, fontFamily:FONT }}>{fmt(c.startDate)}</span>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:12 }}>
+                {[
+                  ['Cliente', c.client||'—'],
+                  ['Motorista', c.driver||c.transportadoraNome||'—'],
+                  ['Equipamento', c.machine||'—'],
+                  ['Rota', `${c.originCity||c.origin||'—'} → ${c.destCity||c.destination||'—'}`],
+                  ['N° Interno', c.nInterno||'—'],
+                  ['Unidade', c.unit||'—'],
+                ].map(([l,v])=>(
+                  <div key={l}>
+                    <div style={{ color:T.textMuted, fontSize:9, textTransform:'uppercase', letterSpacing:'0.07em', fontFamily:FONT, marginBottom:2 }}>{l}</div>
+                    <div style={{ color:T.text, fontWeight:700, fontSize:11, fontFamily:FONT }}>{v}</div>
+                  </div>
+                ))}
+              </div>
+              {c.conclusaoNota && (
+                <div style={{ marginBottom:10, padding:'8px 10px', background:T.verdeLight, borderRadius:T.rSm, color:T.verde, fontSize:11, fontFamily:FONT }}>
+                  💬 Motorista: {c.conclusaoNota}
+                </div>
+              )}
+              <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+                <button onClick={()=>{setModal({card:c,action:'rejeitar'});setNote('')}}
+                  style={{ ...BS, background:T.perigoLight, color:T.perigo, border:`1px solid ${T.perigo}40`, fontSize:11, fontWeight:700 }}>
+                  ⚠️ Rejeitar
+                </button>
+                <button onClick={()=>{setModal({card:c,action:'validar'});setNote('')}}
+                  style={{ ...BS, background:T.verde, color:'white', fontSize:11, fontWeight:700 }}>
+                  ✅ Confirmar Conclusão
+                </button>
+              </div>
+            </motion.div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
 // ── FrotasView ────────────────────────────────────────────────────────────────
 export function FrotasView() {
   const { profile, logout }              = useAuth()
@@ -1008,6 +1119,7 @@ export function FrotasView() {
   const pending    = requests.filter(r=>r.status==='pendente').length
   const hoje       = todayStr()
   const atrasados  = cards.filter(c=>c.endDate&&c.endDate<hoje&&!['concluido','cancelado'].includes(c.status)).length
+  const pendingValidacao = cards.filter(c=>c.status==='aguardando_validacao').length
 
   const navWeek  = d=>{const x=new Date(baseDate);x.setDate(x.getDate()+d*7);setBaseDate(x.toISOString().split('T')[0])}
   const navMonth = d=>{let m=mo+d,y=yr;if(m<0){m=11;y--;}if(m>11){m=0;y++;}setMo(m);setYr(y)}
@@ -1038,6 +1150,25 @@ export function FrotasView() {
     addToast('Serviço cancelado — solicitante notificado.','info')
   }
 
+  const handleValidarConclusao = async (card, note) => {
+    await updateDoc(doc(db,'cards',card.id), { status:'concluido', validadoEm:serverTimestamp(), validadoPor:profile?.name||'Frotas', updatedAt:serverTimestamp() })
+    if (card.requestId) {
+      const req = requests.find(r=>r.id===card.requestId)
+      if (req?.requesterId) {
+        await addDoc(collection(db,'notifications'), { userId:req.requesterId, requestId:card.requestId, type:'service_concluded', title:'✅ Serviço concluído!', message:`O serviço de ${card.client} foi concluído e validado pelo time de Frotas.${note?' Obs: '+note:''}`, read:false, createdAt:serverTimestamp() })
+      }
+    }
+    addToast(`✅ Serviço de ${card.client} validado como concluído!`, 'success')
+  }
+
+  const handleRejeitarConclusao = async (card, note) => {
+    await updateDoc(doc(db,'cards',card.id), { status:'em_execucao', rejeitadoEm:serverTimestamp(), rejeitadoPor:profile?.name||'Frotas', motivoRejeicao:note, updatedAt:serverTimestamp() })
+    if (card.driverId) {
+      await addDoc(collection(db,'notifications'), { userId:card.driverId, cardId:card.id, type:'conclusao_rejeitada', title:'⚠️ Conclusão rejeitada', message:`A conclusão do serviço de ${card.client} foi rejeitada. Motivo: ${note}`, read:false, createdAt:serverTimestamp() })
+    }
+    addToast('Conclusão rejeitada — motorista notificado.', 'info')
+  }
+  
  const handleAssignConfirm=async({driverId,driverName,transportadoraNome,transportadoraCnpj,date,note})=>{
   const{req,id,webhook}=assignModal
   const execType = driverName ? 'motorista' : 'transportadora'
@@ -1082,11 +1213,12 @@ export function FrotasView() {
             <span style={{ color:T.verde, fontSize:9, fontWeight:700, letterSpacing:'0.06em' }}>LIVE</span>
           </div>
           <div style={{ background:T.surfaceAlt, border:`1px solid ${T.border}`, borderRadius:T.r, display:'flex', padding:3, gap:2 }}>
-            {[['agenda','📅 Agenda'],['requests','📥 Solicitações']].map(([v,l])=>(
+            {[['agenda','📅 Agenda'],['requests','📥 Solicitações'],['validacoes','✅ Validações']].map(([v,l])=>(
               <button key={v} onClick={()=>setActiveTab(v)}
                 style={{ padding:'4px 12px', borderRadius:T.rSm, border:'none', background:activeTab===v?T.laranja:'transparent', color:activeTab===v?'white':T.textSec, fontFamily:FONT, fontWeight:600, fontSize:11, cursor:'pointer', transition:'all .12s', display:'flex', alignItems:'center', gap:5 }}>
                 {l}
                 {v==='requests'&&pending>0&&<span style={{ background:activeTab==='requests'?'rgba(255,255,255,.3)':T.perigo, color:'white', borderRadius:10, padding:'0 5px', fontSize:9, fontWeight:800 }}>{pending}</span>}
+                {v==='validacoes'&&pendingValidacao>0&&<span style={{ background:activeTab==='validacoes'?'rgba(255,255,255,.3)':T.perigo, color:'white', borderRadius:10, padding:'0 5px', fontSize:9, fontWeight:800 }}>{pendingValidacao}</span>}
               </button>
             ))}
           </div>
@@ -1195,7 +1327,13 @@ export function FrotasView() {
           </div>
         </div>
       )}
-
+      {activeTab==='validacoes'&&(
+  <ValidacoesTab
+    cards={cards.filter(c=>c.status==='aguardando_validacao')}
+    onValidar={handleValidarConclusao}
+    onRejeitar={handleRejeitarConclusao}
+  />
+)}
       <AnimatePresence>
         {modal==='card'&&<CardModal card={editCard} defaultDate={defaultDate} simClients={simClients} drivers={drivers} onSave={handleSaveCard} onClose={()=>{setModal(null);setEditCard(null);}} onDelete={handleDeleteCard}/>}
         {exportModal&&<ExportModal cards={cards} onClose={()=>setExportModal(false)}/>}
