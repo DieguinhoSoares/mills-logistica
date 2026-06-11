@@ -21,7 +21,7 @@ const URGENCY_SLA = { critico:'até 4h', alto:'até 24h', medio:'até 3 dias', b
 const SUBTYPES_NF       = ['desmobilizacao','rollout','quebra_contrato','troca_tecnica','sinistro','garantia']
 const SUBTYPES_EMBARQUE = ['troca_tecnica','sinistro','garantia']
 const SUBTYPES_OFICINA  = ['garantia']
-const SUBTYPES_MAQUINA_RESERVA = ['troca_tecnica','sinistro','garantia']
+const SUBTYPES_MAQUINA_RESERVA = ['troca_tecnica','sinistro','garantia','rollout']
 
 function ChipInput({ label, placeholder, values, onChange, hint }) {
   const [input, setInput] = useState('')
@@ -282,7 +282,7 @@ function RequestForm({ simClients, onSubmit, onClose, profile, initialData }) {
           {needsMaquinaReserva && (
             <div>
               <label style={{ ...LS, color:errors.machine?T.perigo:T.textMuted }}>
-                Equipamento Reserva <span style={{ color:T.perigo }}>*</span>
+                {form.subtype==='rollout' ? 'Equipamento que retorna' : 'Equipamento Reserva'} <span style={{ color:T.perigo }}>*</span>
               </label>
               <input value={form.machine} onChange={e=>set('machine',e.target.value)}
                 style={{ ...IS, border:`1px solid ${errors.machine?T.perigo:T.border}` }}
