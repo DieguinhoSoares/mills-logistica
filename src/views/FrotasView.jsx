@@ -299,7 +299,7 @@ function CardModal({ card, defaultDate, simClients, onSave, onClose, onDelete })
   </div>
  {(form.execType||'motorista')==='motorista' && (
   <input value={form.driver||''} onChange={e=>set('driver',e.target.value)} placeholder="Nome do motorista" style={IS}/>
-          }}
+          )}
           </div>
 <div><label style={LS}>Unidade Mills</label>
             <select value={form.unit||''} onChange={e=>set('unit',e.target.value)} style={IS}>
