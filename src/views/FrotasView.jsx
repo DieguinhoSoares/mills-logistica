@@ -220,6 +220,7 @@ function CardModal({ card, defaultDate, simClients, onSave, onClose, onDelete })
     type:'freteMillsInterno', subtype:'', client:'', clientState:'', clientCity:'',
     urgency:'medio', machine:'', om:'', nInterno:'', plantaObra:'', calendarStatus:'em_dia',
     originCity:null, destCity:null,
+    execType:'', transportadoraNome:'', transportadoraCnpj:'',
     startDate:defaultDate||todayStr(), endDate:defaultDate||todayStr(), notes:'', driver:'', unit:''
   }
   const [form, setForm] = useState(card ? {
@@ -237,16 +238,17 @@ function CardModal({ card, defaultDate, simClients, onSave, onClose, onDelete })
       machine:c.families?.[0]||p.machine, nInterno:c.nInternos?.[0]||p.nInterno}))
   }
   const handleSave = async () => {
-    setSaving(true)
-    await onSave({
-      ...form,
-      origin:      form.originCity?.s || form.origin || '',
-      destination: form.destCity?.s   || form.destination || '',
-      originCity:  form.originCity?.m || '',
-      destCity:    form.destCity?.m   || '',
-    })
-    setSaving(false)
-  }
+  setSaving(true)
+  await onSave({
+    ...form,
+    origin:      form.originCity?.s || form.origin || '',
+    destination: form.destCity?.s   || form.destination || '',
+    originCity:  form.originCity?.m || '',
+    destCity:    form.destCity?.m   || '',
+    driver: form.execType==='transportadora' ? '' : form.driver,
+  })
+  setSaving(false)
+}
   const subtypes = CARD_SUBTYPES[form.type]||[]
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.5)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)' }}
@@ -284,7 +286,19 @@ function CardModal({ card, defaultDate, simClients, onSave, onClose, onDelete })
           <div style={{ gridColumn:'1/-1' }}><label style={LS}>Cliente (Empresa)</label><input value={form.client||''} onChange={e=>set('client',e.target.value)} style={IS}/></div>
           <div><label style={LS}>N° Interno (Frota)</label><input value={form.nInterno||''} onChange={e=>set('nInterno',e.target.value)} placeholder="Ex: XXX01234" style={IS}/></div>
           <div><label style={LS}>OM</label><input value={form.om||''} onChange={e=>set('om',e.target.value)} style={IS}/></div>
-          <div><label style={LS}>Motorista</label><input value={form.driver||''} onChange={e=>set('driver',e.target.value)} style={IS}/></div>
+          <div style={{ gridColumn:'1/-1' }}>
+  <label style={LS}>Tipo de execução</label>
+  <div style={{ display:'flex', gap:8, marginTop:6, marginBottom:8 }}>
+    {[['motorista','👤 Motorista Mills'],['transportadora','🚚 Transportadora Externa']].map(([v,l])=>(
+      <div key={v} onClick={()=>set('execType',v)}
+        style={{ flex:1, border:`2px solid ${(form.execType||'motorista')===v?T.laranja:T.border}`, borderRadius:T.r, padding:'8px 12px', cursor:'pointer', textAlign:'center',
+          background:(form.execType||'motorista')===v?T.laranjaLight:T.surfaceAlt, transition:'all .12s' }}>
+        <div style={{ color:T.text, fontFamily:FONT, fontSize:12, fontWeight:(form.execType||'motorista')===v?800:500 }}>{l}</div>
+      </div>
+    ))}
+  </div>
+  {(form.execType||'motorista')==='motorista' && (
+    <input value={form.driver||''} onChange={e=>set('driver',e.target.value)} placeholder="Nome do motorista
           <div><label style={LS}>Unidade Mills</label>
             <select value={form.unit||''} onChange={e=>set('unit',e.target.value)} style={IS}>
               <option value="">— selecione —</option>
