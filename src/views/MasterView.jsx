@@ -58,6 +58,9 @@ export function MasterView({ simClients }) {
   const [approvingRole, setApprovingRole] = useState({})
   const [approvalModal, setApprovalModal] = useState(null)
   const [filterAprov,   setFilterAprov]   = useState('todos')
+  const [waPhone,  setWaPhone]  = useState(config?.whatsappPhone||'')
+  const [waApikey, setWaApikey] = useState(config?.whatsappApikey||'')
+  const [savedWa,  setSavedWa]  = useState(false)
 
   useState(() => {
     if (cards.length > 0 || requests.length > 0) runDailyBackup(cards, requests).catch(console.warn)
@@ -69,6 +72,7 @@ export function MasterView({ simClients }) {
 
   const TABS = [
   { id:'kpis',      label:'📊 Indicadores',  badge: null },
+  { id:'config', label:'⚙️ Config', badge: null },
   { id:'map',       label:'🗺 Mapa',          badge: null },
   { id:'requests',  label:'📥 Solicitações',  badge: pending || null },
   { id:'aprovacao', label:'📋 Aprovações',    badge: pendingAprov || null },
@@ -107,6 +111,39 @@ export function MasterView({ simClients }) {
     addToast('Usuário aprovado!', 'success')
   }
 
+  const handleSaveWhatsapp = async () => {
+  await saveConfig({ whatsappPhone: waPhone, whatsappApikey: waApikey })
+  setSavedWa(true); setTimeout(()=>setSavedWa(false), 2000)
+  addToast('WhatsApp configurado!', 'success')
+}
+
+{tab==='config' && (
+  <div style={{ flex:1, overflow:'auto', padding:'16px 20px', maxWidth:600 }}>
+    <h2 style={{ fontFamily:FONT, fontWeight:700, fontSize:20, color:T.text, margin:'0 0 16px' }}>⚙️ Configurações</h2>
+    <div style={{ background:T.surface, borderRadius:T.rLg, border:`1px solid ${T.border}`, padding:20, boxShadow:T.shadow }}>
+      <div style={{ marginBottom:14 }}>
+        <label style={LS}>💬 Número WhatsApp (com DDI+DDD, ex: 5518999999999)</label>
+        <input value={waPhone} onChange={e=>setWaPhone(e.target.value)}
+          placeholder="5518999999999" style={{ ...IS, marginTop:6 }}/>
+      </div>
+      <div style={{ marginBottom:14 }}>
+        <label style={LS}>🔑 CallMeBot API Key</label>
+        <input value={waApikey} onChange={e=>setWaApikey(e.target.value)}
+          placeholder="Ex: 5517289" style={{ ...IS, marginTop:6 }}/>
+        <p style={{ color:T.textMuted, fontSize:11, fontFamily:FONT, margin:'6px 0 0', lineHeight:1.5 }}>
+          Para ativar: salve o número +34 644 52 74 88 na agenda e envie a mensagem<br/>
+          <strong>I allow callmebot to send me messages</strong><br/>
+          A API key chegará em resposta no WhatsApp.
+        </p>
+      </div>
+      <button onClick={handleSaveWhatsapp}
+        style={{ ...BS, background:savedWa?T.verde:T.laranja, color:'white', fontWeight:700 }}>
+        {savedWa?'✅ Salvo!':'💾 Salvar'}
+      </button>
+    </div>
+  </div>
+)}
+  
   return (
     <div style={{ background:T.bg, height:'100vh', display:'flex', flexDirection:'column', overflow:'hidden', fontFamily:FONT }}>
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
