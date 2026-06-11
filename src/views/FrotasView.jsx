@@ -215,13 +215,13 @@ function SubtypeSelect({ type, value, onChange }) {
 }
 
 // ── CardModal ─────────────────────────────────────────────────────────────────
-function CardModal({ card, defaultDate, simClients, onSave, onClose, onDelete }) {
+function CardModal({ card, defaultDate, simClients, drivers, onSave, onClose, onDelete }) {
   const blank = {
     type:'freteMillsInterno', subtype:'', client:'', clientState:'', clientCity:'',
     urgency:'medio', machine:'', om:'', nInterno:'', plantaObra:'', calendarStatus:'em_dia',
     originCity:null, destCity:null,
     execType:'', transportadoraNome:'', transportadoraCnpj:'',
-    startDate:defaultDate||todayStr(), endDate:defaultDate||todayStr(), notes:'', driver:'', unit:''
+    startDate:defaultDate||todayStr(), endDate:defaultDate||todayStr(), notes:'', driver:'', driverId:'', unit:''
   }
   const [form, setForm] = useState(card ? {
     ...card,
@@ -290,7 +290,7 @@ function CardModal({ card, defaultDate, simClients, onSave, onClose, onDelete })
   <label style={LS}>Tipo de execução</label>
   <div style={{ display:'flex', gap:8, marginTop:6, marginBottom:8 }}>
     {[['motorista','👤 Motorista Mills'],['transportadora','🚚 Transportadora Externa']].map(([v,l])=>(
-      <div key={v} onClick={()=>set('execType',v)}
+      <div key={v} onClick={()=>set('',v)}
         style={{ flex:1, border:`2px solid ${(form.execType||'motorista')===v?T.laranja:T.border}`, borderRadius:T.r, padding:'8px 12px', cursor:'pointer', textAlign:'center',
           background:(form.execType||'motorista')===v?T.laranjaLight:T.surfaceAlt, transition:'all .12s' }}>
         <div style={{ color:T.text, fontFamily:FONT, fontSize:12, fontWeight:(form.execType||'motorista')===v?800:500 }}>{l}</div>
@@ -298,8 +298,17 @@ function CardModal({ card, defaultDate, simClients, onSave, onClose, onDelete })
     ))}
   </div>
  {(form.execType||'motorista')==='motorista' && (
-  <input value={form.driver||''} onChange={e=>set('driver',e.target.value)} placeholder="Nome do motorista" style={IS}/>
-          )}
+  <select value={form.driverId||''} onChange={e=>{
+    const d=drivers.find(x=>x.id===e.target.value)
+    set('driverId',e.target.value)
+    set('driver',d?.name||'')
+  }} style={IS}>
+    <option value="">-- selecione o motorista --</option>
+    {(drivers||[]).filter(d=>d.active!==false).map(d=>(
+      <option key={d.id} value={d.id}>{d.name}{d.unit?` · ${d.unit.replace(/ \(.*\)/,'')}`:''}</option>
+    ))}
+  </select>
+)}
           </div>
 <div><label style={LS}>Unidade Mills</label>
             <select value={form.unit||''} onChange={e=>set('unit',e.target.value)} style={IS}>
@@ -1184,7 +1193,7 @@ export function FrotasView() {
       )}
 
       <AnimatePresence>
-        {modal==='card'&&<CardModal card={editCard} defaultDate={defaultDate} simClients={simClients} onSave={handleSaveCard} onClose={()=>{setModal(null);setEditCard(null);}} onDelete={handleDeleteCard}/>}
+        {modal==='card'&&<CardModal card={editCard} defaultDate={defaultDate} simClients={simClients} drivers={drivers} onSave={handleSaveCard} onClose={()=>{setModal(null);setEditCard(null);}} onDelete={handleDeleteCard}/>}
         {exportModal&&<ExportModal cards={cards} onClose={()=>setExportModal(false)}/>}
         {csvModal&&<CsvUploadModal onLoaded={async clients=>{await uploadClients(clients);setCsvModal(false);addToast(`${clients.length} registros sincronizados.`,'success');}} onClose={()=>setCsvModal(false)}/>}
         {settingsModal&&<SettingsModal config={config} onSave={saveConfig} onClose={()=>setSettingsModal(false)}/>}
