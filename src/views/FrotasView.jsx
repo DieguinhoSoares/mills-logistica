@@ -1038,25 +1038,29 @@ export function FrotasView() {
     addToast('Serviço cancelado — solicitante notificado.','info')
   }
 
-  const handleAssignConfirm=async({driverId,driverName,date,note})=>{
-    const{req,id,webhook}=assignModal
-    await respondRequest(id,'aceito',note||`Motorista: ${driverName} · Data: ${date}`,webhook)
-   await saveCard({
-  type:req.type, subtype:req.subtype||'', client:req.clientName||req.requesterName||'',
-  plantaObra:req.clientName||'', nInterno:req.nInterno||'', machine:req.machine||'',
-  urgency:req.urgency||'medio', origin:req.origin||'', destination:req.destination||'',
-  originCity:req.originCityName||'', destCity:req.destCityName||'',
-  startDate:date, endDate:date,
-  driver:driverName, driverId,
-  transportadoraNome:assignModal.transportadoraNome||'',
-  transportadoraCnpj:assignModal.transportadoraCnpj||'',
-  execType:driverName?'motorista':'transportadora',
-  unit:req.unit||profile?.unit||'', notes:req.description||'',
-  requestId:id, status:'confirmado'
-})
-    addToast(`✅ Serviço aceito e atribuído a ${driverName||'motorista'}!`,'accepted')
-  }
-
+ const handleAssignConfirm=async({driverId,driverName,transportadoraNome,transportadoraCnpj,date,note})=>{
+  const{req,id,webhook}=assignModal
+  const execType = driverName ? 'motorista' : 'transportadora'
+  const noteMsg = note || (execType==='transportadora'
+    ? `Transportadora: ${transportadoraNome} · Data: ${date}`
+    : `Motorista: ${driverName} · Data: ${date}`)
+  await respondRequest(id,'aceito',noteMsg,webhook)
+  await saveCard({
+    type:req.type, subtype:req.subtype||'', client:req.clientName||req.requesterName||'',
+    plantaObra:req.clientName||'', nInterno:req.nInterno||'', machine:req.machine||'',
+    urgency:req.urgency||'medio', origin:req.origin||'', destination:req.destination||'',
+    originCity:req.originCityName||'', destCity:req.destCityName||'',
+    startDate:date, endDate:date,
+    driver:driverName, driverId,
+    transportadoraNome:transportadoraNome||'',
+    transportadoraCnpj:transportadoraCnpj||'',
+    execType,
+    unit:req.unit||profile?.unit||'', notes:req.description||'',
+    requestId:id, status:'confirmado'
+  })
+  setAssignModal(null)
+  addToast(`✅ Serviço aceito${execType==='transportadora'?` via ${transportadoraNome}`:` e atribuído a ${driverName}`}!`,'success')
+}
   return (
     <div style={{ background:T.bg, height:'100vh', display:'flex', flexDirection:'column', overflow:'hidden', fontFamily:FONT }}>
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
