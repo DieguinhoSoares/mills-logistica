@@ -16,6 +16,7 @@ export function LoginScreen() {
   const [unit,     setUnit]     = useState('')
   const [error,    setError]    = useState('')
   const [loading,  setLoading]  = useState(false)
+  const [showPass, setShowPass] = useState(false)
 
   const handle = async () => {
     setError(''); setLoading(true)
@@ -105,10 +106,17 @@ export function LoginScreen() {
               placeholder="seu@mills.com.br" onKeyDown={e=>e.key==='Enter'&&handle()}/>
           </div>
           <div style={{ marginBottom:18 }}>
-            <label style={LS}>Senha</label>
-            <input type="password" value={password} onChange={e=>setPassword(e.target.value)} style={IS}
-              placeholder="••••••••" onKeyDown={e=>e.key==='Enter'&&handle()}/>
-          </div>
+  <label style={LS}>Senha</label>
+  <div style={{ position:'relative' }}>
+    <input type={showPass?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)}
+      style={{ ...IS, paddingRight:40 }}
+      placeholder="••••••••" onKeyDown={e=>e.key==='Enter'&&handle()}/>
+    <button type="button" onClick={()=>setShowPass(p=>!p)}
+      style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', fontSize:16, color:T.textMuted, padding:0 }}>
+      {showPass ? '🙈' : '👁'}
+    </button>
+  </div>
+</div>
 
           {error && <div style={{ background:T.perigoLight, color:T.perigo, borderRadius:T.rSm, padding:'9px 12px', fontSize:12, marginBottom:14, fontFamily:FONT, fontWeight:700 }}>⚠️ {error}</div>}
 
