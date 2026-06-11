@@ -20,7 +20,7 @@ function AppInner() {
   if (!user || !profile)              return <LoginScreen />
   if (profile.status === 'pendente')  return <PendingScreen />
   if (profile.status === 'recusado')  return <PendingScreen recusado />
-
+  if (profile.role === 'master') return <MasterView simClients={simClients} />
   if (profile.role === 'master')      return <MasterView simClients={simClients} />
   if (profile.role === 'frotas')      return <FrotasView simClients={simClients} />
   if (profile.role === 'solicitante') return <SolicitanteView simClients={simClients} />
