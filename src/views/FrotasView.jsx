@@ -297,9 +297,11 @@ function CardModal({ card, defaultDate, simClients, onSave, onClose, onDelete })
       </div>
     ))}
   </div>
-  {(form.execType||'motorista')==='motorista' && (
-    <input value={form.driver||''} onChange={e=>set('driver',e.target.value)} placeholder="Nome do motorista
-          <div><label style={LS}>Unidade Mills</label>
+ {(form.execType||'motorista')==='motorista' && (
+  <input value={form.driver||''} onChange={e=>set('driver',e.target.value)} placeholder="Nome do motorista" style={IS}/>
+          }}
+          </div>
+<div><label style={LS}>Unidade Mills</label>
             <select value={form.unit||''} onChange={e=>set('unit',e.target.value)} style={IS}>
               <option value="">-- selecione --</option>
               {FILIAIS.map(f=><option key={f} value={f}>{f}</option>)}
