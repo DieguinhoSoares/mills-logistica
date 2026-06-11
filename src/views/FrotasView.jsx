@@ -290,7 +290,7 @@ function CardModal({ card, defaultDate, simClients, drivers, onSave, onClose, on
   <label style={LS}>Tipo de execução</label>
   <div style={{ display:'flex', gap:8, marginTop:6, marginBottom:8 }}>
     {[['motorista','👤 Motorista Mills'],['transportadora','🚚 Transportadora Externa']].map(([v,l])=>(
-      <div key={v} onClick={()=>set('',v)}
+      onClick={()=>{ set('execType',v); set('driverId',''); set('driver','') }}
         style={{ flex:1, border:`2px solid ${(form.execType||'motorista')===v?T.laranja:T.border}`, borderRadius:T.r, padding:'8px 12px', cursor:'pointer', textAlign:'center',
           background:(form.execType||'motorista')===v?T.laranjaLight:T.surfaceAlt, transition:'all .12s' }}>
         <div style={{ color:T.text, fontFamily:FONT, fontSize:12, fontWeight:(form.execType||'motorista')===v?800:500 }}>{l}</div>
