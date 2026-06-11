@@ -112,6 +112,11 @@ export function MasterView({ simClients }) {
     addToast('Usuário aprovado!', 'success')
   }
 
+  const handleSaveWhatsapp = async () => {
+    await saveConfig({ whatsappPhone: waPhone, whatsappApikey: waApikey })
+    setSavedWa(true); setTimeout(()=>setSavedWa(false), 2000)
+    addToast('WhatsApp configurado!', 'success')
+  }
  
   return (
     <div style={{ background:T.bg, height:'100vh', display:'flex', flexDirection:'column', overflow:'hidden', fontFamily:FONT }}>
