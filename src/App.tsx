@@ -26,6 +26,7 @@ function AppInner() {
   if (profile.role === 'solicitante') return <SolicitanteView simClients={simClients} />
   if (profile.role === 'supervisor')  return <GerenteView />
   if (profile.role === 'gerente')     return <GerenteView />
+  if (profile?.status === 'bloqueado') return <div>Acesso bloqueado. Entre em contato com o administrador.</div>
   return <LoginScreen />
 }
 
