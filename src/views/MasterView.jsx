@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
-import { useCards, useRequests, useNotifications, useConfig, usePendingUsers, useManagerialRequests, runDailyBackup } from '../hooks/useFirestore'
 import { MillsLogo, ToastContainer, useToasts, BrazilMap, NotificationBell } from '../components/UI'
 import { KPIView } from './KPIView'
 import { T, FONT, CARD_TYPES, BS, IS, LS } from '../lib/constants'
