@@ -1084,7 +1084,7 @@ function ValidacoesTab({ cards, onValidar, onRejeitar }) {
              {c.conclusaoFoto && (
   <div style={{ marginBottom:10 }}>
     <div style={{ color:T.textMuted, fontSize:9, fontFamily:FONT, marginBottom:4, textTransform:'uppercase', letterSpacing:'0.07em' }}>📷 Foto de conclusão</div>
-    <img src={c.conclusaoFoto} alt="conclusao" style={{ width:'100%', borderRadius:T.r, maxHeight:280, objectFit:'contain', background:T.surfaceAlt }}
+   <img src={c.conclusaoFoto} alt="conclusao" style={{ width:'100%', borderRadius:T.r, maxHeight:280, objectFit:'contain', background:T.surfaceAlt }}/>
   </div>
 )}
 {c.interrupcaoDescricao && (
