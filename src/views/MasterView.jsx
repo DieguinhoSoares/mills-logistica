@@ -8,6 +8,7 @@ import { T, FONT, CARD_TYPES, BS, IS, LS } from '../lib/constants'
 import { detectConflicts, fmt, getSubtypeLabel } from '../lib/utils'
 import { doc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore'
 import { db } from '../lib/firebase'
+import { useCards, useRequests, useNotifications, useConfig, usePendingUsers, useManagerialRequests, runDailyBackup } from '../hooks/useFirestore'
 
 const PERFIS = [
   ['frotas',      '🚛 Gestão de Frotas'],
@@ -15,7 +16,7 @@ const PERFIS = [
   ['supervisor',  '👷 Supervisor de Programação'],
   ['gerente',     '👔 Gerente de Manutenção'],
 ]
-
+import { useCards, useRequests, useNotifications, useConfig, usePendingUsers, useManagerialRequests, runDailyBackup } from '../hooks/useFirestore'
 function CancelCardModal({ card, onConfirm, onClose }) {
   const [reason, setReason] = useState('')
   return (
@@ -58,6 +59,7 @@ export function MasterView({ simClients }) {
   const [cancelModal,   setCancelModal]   = useState(null)
   const [approvingRole, setApprovingRole] = useState({})
   const [approvalModal, setApprovalModal] = useState(null)
+  const [messaging, setMessaging] = useState(null)
   const [filterAprov,   setFilterAprov]   = useState('todos')
   const [waPhone,  setWaPhone]  = useState('')
   const [waApikey, setWaApikey] = useState('')
@@ -127,6 +129,7 @@ export function MasterView({ simClients }) {
       {approvalModal && (
         <ApprovalModal req={approvalModal} profile={profile} onApprove={handleMasterApprove} onRefuse={handleMasterRefuse} onClose={()=>setApprovalModal(null)}/>
       )}
+      {messaging && <MessageThread requestId={messaging} profile={profile} onClose={()=>setMessaging(null)}/>}
 
       <div style={{ background:T.verde, padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:56, flexShrink:0, boxShadow:T.shadowMd }}>
         <div style={{ display:'flex', alignItems:'center', gap:12 }}>
@@ -261,13 +264,16 @@ export function MasterView({ simClients }) {
                         ))}
                       </div>
                     )}
-                    {canApprove && (
-                      <div style={{ display:'flex', justifyContent:'flex-end' }}>
-                        <button onClick={()=>setApprovalModal(r)} style={{ ...BS, background:T.laranja, color:'white', fontSize:11, fontWeight:700, padding:'5px 14px' }}>
-                          ⭐ Aprovar/Recusar como Master
-                        </button>
-                      </div>
-                    )}
+                   {canApprove && (
+  <div style={{ display:'flex', justifyContent:'flex-end', gap:8 }}>
+    <button onClick={()=>setMessaging(r.id)} style={{ ...BS, background:T.infoLight, color:T.info, border:`1px solid ${T.info}30`, fontSize:11, fontWeight:700, padding:'5px 14px' }}>
+      💬 Histórico
+    </button>
+    <button onClick={()=>setApprovalModal(r)} style={{ ...BS, background:T.laranja, color:'white', fontSize:11, fontWeight:700, padding:'5px 14px' }}>
+      ⭐ Aprovar/Recusar como Master
+    </button>
+  </div>
+)}
                   </motion.div>
                 )
               })}
