@@ -1003,6 +1003,22 @@ function ValidacoesTab({ cards, onValidar, onRejeitar }) {
             <p style={{ color:T.textMuted, fontFamily:FONT, fontSize:12, margin:'0 0 16px' }}>
               Serviço: <strong style={{ color:T.laranja }}>{modal.card.client}</strong> · {modal.card.driver||modal.card.transportadoraNome||'—'}
             </p>
+            {modal.card.conclusaoFoto && (
+  <div style={{ marginBottom:12 }}>
+    <div style={{ color:T.textMuted, fontSize:9, fontFamily:FONT, marginBottom:4, textTransform:'uppercase', letterSpacing:'0.07em' }}>📷 Foto de conclusão</div>
+    <img src={modal.card.conclusaoFoto} alt="conclusao" style={{ width:'100%', borderRadius:T.r, maxHeight:180, objectFit:'cover' }}/>
+  </div>
+)}
+{modal.card.conclusaoNota && (
+  <div style={{ marginBottom:12, padding:'7px 10px', background:T.verdeLight, borderRadius:T.rSm, color:T.verde, fontSize:11, fontFamily:FONT }}>
+    💬 Motorista: {modal.card.conclusaoNota}
+  </div>
+)}
+{modal.card.interrupcaoDescricao && (
+  <div style={{ marginBottom:12, padding:'7px 10px', background:'#FFF8E1', borderRadius:T.rSm, color:'#B8860B', fontSize:11, fontFamily:FONT, fontWeight:700 }}>
+    ⏸ Interrupção: {modal.card.interrupcaoDescricao}
+  </div>
+)}
             <div style={{ marginBottom:16 }}>
               <label style={LS}>
                 Observação {modal.action==='rejeitar'&&<span style={{ color:T.perigo }}>*</span>}
@@ -1065,11 +1081,17 @@ function ValidacoesTab({ cards, onValidar, onRejeitar }) {
                   </div>
                 ))}
               </div>
-              {c.conclusaoNota && (
-                <div style={{ marginBottom:10, padding:'8px 10px', background:T.verdeLight, borderRadius:T.rSm, color:T.verde, fontSize:11, fontFamily:FONT }}>
-                  💬 Motorista: {c.conclusaoNota}
-                </div>
-              )}
+             {c.conclusaoFoto && (
+  <div style={{ marginBottom:10 }}>
+    <div style={{ color:T.textMuted, fontSize:9, fontFamily:FONT, marginBottom:4, textTransform:'uppercase', letterSpacing:'0.07em' }}>📷 Foto de conclusão</div>
+    <img src={c.conclusaoFoto} alt="conclusao" style={{ width:'100%', borderRadius:T.r, maxHeight:160, objectFit:'cover' }}/>
+  </div>
+)}
+{c.interrupcaoDescricao && (
+  <div style={{ marginBottom:10, padding:'7px 10px', background:'#FFF8E1', borderRadius:T.rSm, color:'#B8860B', fontSize:11, fontFamily:FONT, fontWeight:700 }}>
+    ⏸ Interrupção: {c.interrupcaoDescricao}
+  </div>
+)}
               <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
                 <button onClick={()=>{setModal({card:c,action:'rejeitar'});setNote('')}}
                   style={{ ...BS, background:T.perigoLight, color:T.perigo, border:`1px solid ${T.perigo}40`, fontSize:11, fontWeight:700 }}>
