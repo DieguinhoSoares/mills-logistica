@@ -263,16 +263,16 @@ export function MasterView({ simClients }) {
                         ))}
                       </div>
                     )}
-                   {canApprove && (
-  <div style={{ display:'flex', justifyContent:'flex-end', gap:8 }}>
-    <button onClick={()=>setMessaging(r.id)} style={{ ...BS, background:T.infoLight, color:T.info, border:`1px solid ${T.info}30`, fontSize:11, fontWeight:700, padding:'5px 14px' }}>
-      💬 Histórico
-    </button>
+                 <div style={{ display:'flex', justifyContent:'flex-end', gap:8 }}>
+  <button onClick={()=>setMessaging(r.id)} style={{ ...BS, background:T.infoLight, color:T.info, border:`1px solid ${T.info}30`, fontSize:11, fontWeight:700, padding:'5px 14px' }}>
+    💬 Histórico
+  </button>
+  {canApprove && (
     <button onClick={()=>setApprovalModal(r)} style={{ ...BS, background:T.laranja, color:'white', fontSize:11, fontWeight:700, padding:'5px 14px' }}>
       ⭐ Aprovar/Recusar como Master
     </button>
-  </div>
-)}
+  )}
+</div>
                   </motion.div>
                 )
               })}
