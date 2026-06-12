@@ -1006,7 +1006,7 @@ function ValidacoesTab({ cards, onValidar, onRejeitar }) {
             {modal.card.conclusaoFoto && (
   <div style={{ marginBottom:12 }}>
     <div style={{ color:T.textMuted, fontSize:9, fontFamily:FONT, marginBottom:4, textTransform:'uppercase', letterSpacing:'0.07em' }}>📷 Foto de conclusão</div>
-    <img src={modal.card.conclusaoFoto} alt="conclusao" style={{ width:'100%', borderRadius:T.r, maxHeight:300, objectFit:'contain', background:T.surfaceAlt }}
+   <img src={modal.card.conclusaoFoto} alt="conclusao" style={{ width:'100%', borderRadius:T.r, maxHeight:300, objectFit:'contain', background:T.surfaceAlt }}/>
   </div>
 )}
 {modal.card.conclusaoNota && (
