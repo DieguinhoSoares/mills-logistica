@@ -15,7 +15,7 @@ const PERFIS = [
   ['supervisor',  '👷 Supervisor de Programação'],
   ['gerente',     '👔 Gerente de Manutenção'],
 ]
-import { useCards, useRequests, useNotifications, useConfig, usePendingUsers, useManagerialRequests, runDailyBackup } from '../hooks/useFirestore'
+
 function CancelCardModal({ card, onConfirm, onClose }) {
   const [reason, setReason] = useState('')
   return (
