@@ -360,72 +360,121 @@ export function MasterView({ simClients }) {
           </div>
         )}
         {tab==='usuarios' && (
-          <div style={{ flex:1, overflow:'auto', padding:'16px 20px' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
-              <h3 style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:T.text, margin:0 }}>
-                Aprovação de Cadastros
-                {pendingUsers.length > 0 && <span style={{ marginLeft:10, background:T.perigo, color:'white', borderRadius:20, padding:'2px 10px', fontSize:11, fontWeight:700, fontFamily:FONT }}>{pendingUsers.length} pendente{pendingUsers.length>1?'s':''}</span>}
-              </h3>
-            </div>
-            {pendingUsers.length===0 && <div style={{ textAlign:'center', padding:'40px 0', color:T.textMuted, fontFamily:FONT }}><div style={{ fontSize:40, marginBottom:10 }}>✅</div><p>Nenhum cadastro pendente.</p></div>}
-            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-              {pendingUsers.map(u => (
-                <motion.div key={u.id} layout style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.rLg, padding:'16px 18px', boxShadow:T.shadow }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:12 }}>
-                    <div>
-                      <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:T.text }}>{u.name}</div>
-                      <div style={{ fontFamily:FONT, fontSize:11, color:T.textMuted }}>{u.email} · {u.unit}</div>
-                      <div style={{ fontFamily:FONT, fontSize:10, color:T.textMuted, marginTop:2 }}>
-                        Perfil: <strong style={{ color:T.laranja }}>{u.role}</strong> · Cadastrado em: {u.createdAt ? new Date(u.createdAt).toLocaleDateString('pt-BR') : '—'}
-                      </div>
+  <div style={{ flex:1, overflow:'auto', padding:'16px 20px' }}>
+    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+      <h3 style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:T.text, margin:0 }}>
+        Gestão de Usuários
+        {pendingUsers.length > 0 && <span style={{ marginLeft:10, background:T.perigo, color:'white', borderRadius:20, padding:'2px 10px', fontSize:11, fontWeight:700, fontFamily:FONT }}>{pendingUsers.length} pendente{pendingUsers.length>1?'s':''}</span>}
+      </h3>
+    </div>
+
+    {/* PENDENTES */}
+    {pendingUsers.length > 0 && (
+      <div style={{ marginBottom:24 }}>
+        <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:10 }}>⏳ Aguardando aprovação</div>
+        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          {pendingUsers.map(u => (
+            <motion.div key={u.id} layout style={{ background:T.surface, border:`1px solid ${T.amarelo}40`, borderRadius:T.rLg, padding:'16px 18px', boxShadow:T.shadow }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:12 }}>
+                <div>
+                  <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:T.text }}>{u.name}</div>
+                  <div style={{ fontFamily:FONT, fontSize:11, color:T.textMuted }}>{u.email} · {u.unit}</div>
+                  <div style={{ fontFamily:FONT, fontSize:10, color:T.textMuted, marginTop:2 }}>
+                    Perfil solicitado: <strong style={{ color:T.laranja }}>{u.role}</strong> · Cadastrado em: {u.createdAt ? new Date(u.createdAt).toLocaleDateString('pt-BR') : '—'}
+                  </div>
+                </div>
+                <span style={{ background:T.amareloLight, color:T.amarelo, borderRadius:20, padding:'3px 10px', fontSize:10, fontWeight:700, fontFamily:FONT }}>⏳ Pendente</span>
+              </div>
+              <div style={{ marginBottom:12 }}>
+                <label style={LS}>Definir perfil de acesso</label>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:6 }}>
+                  {PERFIS.map(([v,l]) => (
+                    <div key={v} onClick={() => setApprovingRole(p=>({...p,[u.id]:v}))}
+                      style={{ border:`2px solid ${approvingRole[u.id]===v?T.laranja:T.border}`, borderRadius:T.r, padding:'8px 12px', cursor:'pointer', textAlign:'center', background:approvingRole[u.id]===v?T.laranjaLight:T.surfaceAlt, transition:'all .12s' }}>
+                      <div style={{ color:T.text, fontFamily:FONT, fontSize:11, fontWeight:approvingRole[u.id]===v?800:500 }}>{l}</div>
                     </div>
-                    <span style={{ background:T.amareloLight, color:T.amarelo, borderRadius:20, padding:'3px 10px', fontSize:10, fontWeight:700, fontFamily:FONT }}>⏳ Pendente</span>
-                  </div>
-                  <div style={{ marginBottom:12 }}>
-                    <label style={LS}>Definir perfil de acesso</label>
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:6 }}>
-                      {PERFIS.map(([v,l]) => (
-                        <div key={v} onClick={() => setApprovingRole(p=>({...p,[u.id]:v}))}
-                          style={{ border:`2px solid ${approvingRole[u.id]===v?T.laranja:T.border}`, borderRadius:T.r, padding:'8px 12px', cursor:'pointer', textAlign:'center', background:approvingRole[u.id]===v?T.laranjaLight:T.surfaceAlt, transition:'all .12s' }}>
-                          <div style={{ color:T.text, fontFamily:FONT, fontSize:11, fontWeight:approvingRole[u.id]===v?800:500 }}>{l}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
-                    <button onClick={() => { refuseUser(u.id); addToast('Cadastro recusado.','info') }}
-                      style={{ ...BS, background:T.perigoLight, color:T.perigo, border:`1px solid ${T.perigo}40`, fontSize:11, fontWeight:700 }}>❌ Recusar</button>
-                    <button onClick={() => handleApproveUser(u.id)} disabled={!approvingRole[u.id]}
-                      style={{ ...BS, background:approvingRole[u.id]?T.verde:T.borderMid, color:'white', fontSize:11, fontWeight:700, opacity:approvingRole[u.id]?1:0.5 }}>✅ Aprovar acesso</button>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-            {acceptedCards.length > 0 && (
-              <div style={{ marginTop:28 }}>
-                <h3 style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:T.text, margin:'0 0 12px' }}>🚫 Cancelar Serviço Aceito <span style={{ color:T.textMuted, fontWeight:500, fontSize:12 }}>exclusivo Master</span></h3>
-                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                  {acceptedCards.map(c => {
-                    const ct = CARD_TYPES[c.type]
-                    return (
-                      <div key={c.id} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.rLg, padding:'12px 16px', boxShadow:T.shadow, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                        <div>
-                          <div style={{ display:'flex', gap:6, alignItems:'center', marginBottom:4 }}>
-                            <span style={{ background:ct?.bg, color:ct?.color, borderRadius:20, padding:'2px 8px', fontSize:9, fontWeight:700, fontFamily:FONT }}>{ct?.icon} {ct?.short}</span>
-                            <span style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:T.text }}>{c.client||'—'}</span>
-                          </div>
-                          <div style={{ fontFamily:FONT, fontSize:10, color:T.textMuted }}>📅 {fmt(c.startDate)} · 👤 {c.driver||'—'} · {c.originCity||c.origin||'—'} → {c.destCity||c.destination||'—'}</div>
-                        </div>
-                        <button onClick={() => setCancelModal(c)} style={{ ...BS, background:T.perigoLight, color:T.perigo, border:`1px solid ${T.perigo}40`, fontSize:11, fontWeight:700, flexShrink:0 }}>🚫 Cancelar</button>
-                      </div>
-                    )
-                  })}
+                  ))}
                 </div>
               </div>
-            )}
-          </div>
+              <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+                <button onClick={() => { refuseUser(u.id); addToast('Cadastro recusado.','info') }}
+                  style={{ ...BS, background:T.perigoLight, color:T.perigo, border:`1px solid ${T.perigo}40`, fontSize:11, fontWeight:700 }}>❌ Recusar</button>
+                <button onClick={() => handleApproveUser(u.id)} disabled={!approvingRole[u.id]}
+                  style={{ ...BS, background:approvingRole[u.id]?T.verde:T.borderMid, color:'white', fontSize:11, fontWeight:700, opacity:approvingRole[u.id]?1:0.5 }}>✅ Aprovar acesso</button>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    )}
+
+    {/* TODOS OS USUÁRIOS */}
+    <div>
+      <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:10 }}>👥 Usuários cadastrados</div>
+      <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+        {allUsers.filter(u=>u.status!=='pendente').map(u => {
+          const isAtivo = u.status === 'ativo'
+          const statusColor = isAtivo ? T.verde : u.status==='bloqueado' ? T.perigo : T.textMuted
+          const statusBg    = isAtivo ? T.verdeLight : u.status==='bloqueado' ? T.perigoLight : T.surfaceLow
+          const statusLabel = isAtivo ? '✅ Ativo' : u.status==='bloqueado' ? '🔒 Bloqueado' : u.status
+          return (
+            <motion.div key={u.id} layout style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.rLg, padding:'12px 16px', boxShadow:T.shadow }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:3 }}>
+                    <span style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:T.text }}>{u.name}</span>
+                    <span style={{ background:statusBg, color:statusColor, borderRadius:20, padding:'1px 8px', fontSize:9, fontWeight:700, fontFamily:FONT }}>{statusLabel}</span>
+                  </div>
+                  <div style={{ fontFamily:FONT, fontSize:11, color:T.textMuted }}>{u.email} · {u.unit}</div>
+                  <div style={{ display:'flex', gap:6, alignItems:'center', marginTop:4 }}>
+                    <span style={{ color:T.textMuted, fontSize:10, fontFamily:FONT }}>Perfil:</span>
+                    <select value={u.role||''} onChange={e=>updateUserRole(u.id, e.target.value)}
+                      style={{ ...IS, padding:'2px 6px', fontSize:10, height:'auto', width:'auto', minWidth:140 }}>
+                      {PERFIS.map(([v,l])=><option key={v} value={v}>{l}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div style={{ display:'flex', gap:8, alignItems:'center', flexShrink:0 }}>
+                  <button onClick={()=>toggleUserStatus(u.id, u.status)}
+                    style={{ ...BS, background:isAtivo?T.perigoLight:T.verdeLight, color:isAtivo?T.perigo:T.verde, border:`1px solid ${isAtivo?T.perigo:T.verde}40`, fontSize:11, fontWeight:700 }}>
+                    {isAtivo ? '🔒 Bloquear' : '🔓 Reativar'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )
+        })}
+        {allUsers.filter(u=>u.status!=='pendente').length === 0 && (
+          <div style={{ textAlign:'center', padding:'20px 0', color:T.textMuted, fontFamily:FONT, fontSize:12 }}>Nenhum usuário ativo ainda.</div>
         )}
       </div>
+    </div>
+
+    {/* CANCELAR SERVIÇO */}
+    {acceptedCards.length > 0 && (
+      <div style={{ marginTop:28 }}>
+        <h3 style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:T.text, margin:'0 0 12px' }}>🚫 Cancelar Serviço Aceito <span style={{ color:T.textMuted, fontWeight:500, fontSize:12 }}>exclusivo Master</span></h3>
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          {acceptedCards.map(c => {
+            const ct = CARD_TYPES[c.type]
+            return (
+              <div key={c.id} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.rLg, padding:'12px 16px', boxShadow:T.shadow, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <div>
+                  <div style={{ display:'flex', gap:6, alignItems:'center', marginBottom:4 }}>
+                    <span style={{ background:ct?.bg, color:ct?.color, borderRadius:20, padding:'2px 8px', fontSize:9, fontWeight:700, fontFamily:FONT }}>{ct?.icon} {ct?.short}</span>
+                    <span style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:T.text }}>{c.client||'—'}</span>
+                  </div>
+                  <div style={{ fontFamily:FONT, fontSize:10, color:T.textMuted }}>📅 {fmt(c.startDate)} · 👤 {c.driver||'—'} · {c.originCity||c.origin||'—'} → {c.destCity||c.destination||'—'}</div>
+                </div>
+                <button onClick={() => setCancelModal(c)} style={{ ...BS, background:T.perigoLight, color:T.perigo, border:`1px solid ${T.perigo}40`, fontSize:11, fontWeight:700, flexShrink:0 }}>🚫 Cancelar</button>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )}
+  </div>
+)}      </div>
 
       <div style={{ background:T.surface, borderTop:`1px solid ${T.border}`, padding:'5px 20px', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
         <span style={{ color:T.textMuted, fontSize:9, fontFamily:FONT, letterSpacing:'0.06em' }}>Mills Pesados, Locação Serviços e Logística S.A.</span>
