@@ -352,7 +352,25 @@ export function usePendingUsers() {
   }
   return { pendingUsers, approveUser, refuseUser }
 }
-
+export function useAllUsers() {
+  const [users, setUsers] = useState([])
+  useEffect(() => {
+    const q = query(collection(db,'users'), orderBy('createdAt','asc'))
+    const unsub = onSnapshot(q,
+      snap => setUsers(snap.docs.map(d=>({ id:d.id, ...d.data() }))),
+      () => {}
+    )
+    return unsub
+  }, [])
+  const toggleUserStatus = async (userId, currentStatus) => {
+    const newStatus = currentStatus === 'ativo' ? 'bloqueado' : 'ativo'
+    await updateDoc(doc(db,'users',userId), { status:newStatus, updatedAt:new Date().toISOString() })
+  }
+  const updateUserRole = async (userId, role) => {
+    await updateDoc(doc(db,'users',userId), { role, updatedAt:new Date().toISOString() })
+  }
+  return { users, toggleUserStatus, updateUserRole }
+}
 export function useCancelRequest() {
   const cancelCard = async (cardId, reason, authorName) => {
     await updateDoc(doc(db,'cards',cardId), {
