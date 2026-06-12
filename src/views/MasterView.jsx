@@ -7,8 +7,7 @@ import { T, FONT, CARD_TYPES, BS, IS, LS } from '../lib/constants'
 import { detectConflicts, fmt, getSubtypeLabel } from '../lib/utils'
 import { doc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore'
 import { db } from '../lib/firebase'
-import { useCards, useRequests, useNotifications, useConfig, usePendingUsers, useManagerialRequests, runDailyBackup, useMessages } from '../hooks/useFirestore'
-
+import { useCards, useRequests, useNotifications, useConfig, usePendingUsers, useManagerialRequests, runDailyBackup, useMessages, useAllUsers } from '../hooks/useFirestore'
 const PERFIS = [
   ['frotas',      '🚛 Gestão de Frotas'],
   ['solicitante', '📋 Solicitante'],
@@ -106,7 +105,7 @@ export function MasterView({ simClients }) {
   const { config, saveConfig }                      = useConfig()
   const { toasts, add:addToast, dismiss }           = useToasts()
   const { pendingUsers, approveUser, refuseUser }   = usePendingUsers()
-
+  const { users: allUsers, toggleUserStatus, updateUserRole } = useAllUsers()
   const [tab,           setTab]           = useState('kpis')
   const [cancelModal,   setCancelModal]   = useState(null)
   const [approvingRole, setApprovingRole] = useState({})
