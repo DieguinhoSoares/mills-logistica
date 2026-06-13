@@ -12,21 +12,21 @@ function AppInner() {
   const { user, profile } = useAuth()
   const { simClients }    = useSimClients()
 
-  // Acesso por token de motorista — sem login
   const params     = new URLSearchParams(window.location.search)
   const motorToken = params.get('motorista')
   if (motorToken) return <MotoristaView token={motorToken} />
 
-  if (!user || !profile)              return <LoginScreen />
-  if (profile.status === 'pendente')  return <PendingScreen />
-  if (profile.status === 'recusado')  return <PendingScreen recusado />
-  if (profile.role === 'master') return <MasterView simClients={simClients} />
+  if (!user || !profile)                return <LoginScreen />
+  if (profile.status === 'pendente')    return <PendingScreen />
+  if (profile.status === 'recusado')    return <PendingScreen recusado />
+  if (profile.status === 'bloqueado')   return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', fontFamily:'IBM Plex Sans, sans-serif', color:'#666' }}>🔒 Acesso bloqueado. Entre em contato com o administrador.</div>
+
   if (profile.role === 'master')      return <MasterView simClients={simClients} />
   if (profile.role === 'frotas')      return <FrotasView simClients={simClients} />
   if (profile.role === 'solicitante') return <SolicitanteView simClients={simClients} />
-  if (profile.role === 'supervisor')  return <GerenteView />
-  if (profile.role === 'gerente')     return <GerenteView />
-  if (profile?.status === 'bloqueado') return <div>Acesso bloqueado. Entre em contato com o administrador.</div>
+  if (profile.role === 'supervisor')  return <GerenteView simClients={simClients} />
+  if (profile.role === 'gerente')     return <GerenteView simClients={simClients} />
+
   return <LoginScreen />
 }
 
