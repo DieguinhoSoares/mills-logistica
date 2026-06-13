@@ -8,6 +8,7 @@ import { fmt, todayStr, getWeekDays, getMonthWeeks, cardsForDay, detectConflicts
 import { db } from '../lib/firebase'
 import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore'
 import Papa from 'papaparse'
+import { FreteEstimativa } from '../components/FreteEstimativa'
 
 // ── MessageThread ─────────────────────────────────────────────────────────────
 function MessageThread({ requestId, profile, onClose }) {
@@ -903,14 +904,16 @@ function AssignDriverModal({ req, drivers, onConfirm, onCancel }) {
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.55)', zIndex:2500, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)' }}>
       <motion.div initial={{ scale:.95, opacity:0 }} animate={{ scale:1, opacity:1 }}
-        style={{ background:T.surface, borderRadius:T.rLg, padding:28, width:500, boxShadow:T.shadowLg, border:`2px solid ${T.verde}` }}>
+        style={{ background:T.surface, borderRadius:T.rLg, padding:28, width:540, maxHeight:'92vh', overflowY:'auto', boxShadow:T.shadowLg, border:`2px solid ${T.verde}` }}>
         <h2 style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:20, margin:'0 0 6px' }}>✅ Aceitar Solicitação</h2>
-        <p style={{ color:T.textMuted, fontFamily:FONT, fontSize:12, margin:'0 0 18px' }}>
+        <p style={{ color:T.textMuted, fontFamily:FONT, fontSize:12, margin:'0 0 4px' }}>
           Defina a execução para <strong style={{ color:T.laranja }}>{req?.clientName||req?.requesterName}</strong>.
         </p>
 
+        <FreteEstimativa request={req}/>
+
         {/* Toggle Motorista / Transportadora */}
-        <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+        <div style={{ display:'flex', gap:8, marginBottom:16, marginTop:16 }}>
           {[['motorista','👤 Motorista Mills'],['transportadora','🚚 Transportadora Externa']].map(([v,l])=>(
             <div key={v} onClick={()=>setExecType(v)}
               style={{ flex:1, border:`2px solid ${execType===v?T.laranja:T.border}`, borderRadius:T.r, padding:'9px 12px', cursor:'pointer', textAlign:'center',
