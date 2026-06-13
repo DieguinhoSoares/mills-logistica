@@ -7,6 +7,7 @@ import { T, FONT, CARD_TYPES, URGENCY, BS, IS, LS } from '../lib/constants'
 import { fmt, getSubtypeLabel } from '../lib/utils'
 import { db } from '../lib/firebase'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
+import { FreteEstimativa } from '../components/FreteEstimativa'
 
 const STATUS_CONFIG = {
   pendente_supervisor: { label:'⏳ Aguard. Supervisor', color:'#B8860B', bg:'#FFF8E1' },
@@ -105,7 +106,7 @@ function ApprovalModal({ req, profile, onApprove, onRefuse, onClose, isMobile })
             ))}
           </div>
         </div>
-
+        <FreteEstimativa request={req}/>
         {req.approvalLog?.length > 0 && (
           <div style={{ marginBottom:14 }}>
             <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8 }}>Histórico</div>
