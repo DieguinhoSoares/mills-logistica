@@ -135,7 +135,7 @@ function ApprovalModal({ req, profile, onApprove, onRefuse, onClose, isMobile, s
           )}
         </div>
 
-        <FreteEstimativa request={req} simClients={simClients} readOnly={true} tollguruApikey={config?.tollguruApikey||""}/>
+       <FreteEstimativa request={req} simClients={simClients} readOnly={true} tollguruApikey={config?.tollguruApikey||""}/>
 
         {req.approvalLog?.length > 0 && (
           <div style={{ marginBottom:14 }}>
