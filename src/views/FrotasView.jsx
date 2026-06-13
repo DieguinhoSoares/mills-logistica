@@ -1364,7 +1364,7 @@ export function FrotasView() {
         {csvModal&&<CsvUploadModal onLoaded={async clients=>{await uploadClients(clients);setCsvModal(false);addToast(`${clients.length} registros sincronizados.`,'success');}} onClose={()=>setCsvModal(false)}/>}
         {settingsModal&&<SettingsModal config={config} onSave={saveConfig} onClose={()=>setSettingsModal(false)}/>}
         {driversModal&&<DriversModal drivers={drivers} onSave={saveDriver} onDelete={deleteDriver} onClose={()=>setDriversModal(false)} onRotograma={d=>{setDriversModal(false);setRotogramaModal(d)}} addToast={addToast}/>}
-        {assignModal&&<AssignDriverModal req={assignModal.req} drivers={drivers} onConfirm={handleAssignConfirm} onCancel={()=>setAssignModal(null)}/>}
+        {assignModal&&<AssignDriverModal req={assignModal.req} drivers={drivers} simClients={simClients} onConfirm={handleAssignConfirm} onCancel={()=>setAssignModal(null)}/>}
         {rotogramaModal&&<RotogramaModal driver={rotogramaModal} cards={cards} profile={profile} rotogramaAtivo={rotogramas.find(r=>r.driverId===rotogramaModal.id)||null} onClose={()=>setRotogramaModal(null)} addToast={addToast}/>}
       </AnimatePresence>
     </div>
