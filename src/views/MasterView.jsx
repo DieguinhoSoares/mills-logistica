@@ -8,6 +8,8 @@ import { detectConflicts, fmt, getSubtypeLabel } from '../lib/utils'
 import { doc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { useCards, useRequests, useNotifications, useConfig, usePendingUsers, useManagerialRequests, runDailyBackup, useMessages, useAllUsers } from '../hooks/useFirestore'
+import { FreteEstimativa } from '../components/FreteEstimativa'
+
 const PERFIS = [
   ['frotas',      '🚛 Gestão de Frotas'],
   ['solicitante', '📋 Solicitante'],
@@ -515,6 +517,8 @@ function ApprovalModal({ req, profile, onApprove, onRefuse, onClose }) {
             ))}
           </div>
         </div>
+        </div>
+        <FreteEstimativa request={req}/>
         <div style={{ marginBottom:14 }}>
           <label style={LS}>Observação <span style={{ color:T.textMuted, fontWeight:400, fontSize:10 }}>(obrigatório para recusa)</span></label>
           <textarea value={note} onChange={e=>setNote(e.target.value)} placeholder="Observação..."
