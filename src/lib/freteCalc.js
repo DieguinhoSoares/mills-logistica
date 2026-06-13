@@ -85,10 +85,21 @@ export function buscarGrupoModelo(nInternos, simClients) {
   if (!simClients?.length) return null
   const lista = Array.isArray(nInternos) ? nInternos : [nInternos]
   for (const n of lista) {
-    const found = simClients.find(c =>
-      String(c['Nº interno'] || c['N° interno'] || c['nInterno'] || '').trim() === String(n).trim()
-    )
-    if (found) return found['Grupo de modelo'] || found['grupoModelo'] || null
+    const nStr = String(n).trim()
+    const found = simClients.find(c => {
+      const chave = Object.keys(c).find(k =>
+        k.toLowerCase().replace(/[^a-z0-9]/g,'').includes('ninterno') ||
+        k.toLowerCase().replace(/[^a-z0-9]/g,'').includes('nointerno')
+      )
+      return chave && String(c[chave]).trim() === nStr
+    })
+    if (found) {
+      const grupoKey = Object.keys(found).find(k =>
+        k.toLowerCase().replace(/[^a-z0-9]/g,'').includes('grupodemodelo') ||
+        k.toLowerCase().replace(/[^a-z0-9]/g,'').includes('grupo')
+      )
+      return grupoKey ? found[grupoKey] : null
+    }
   }
   return null
 }
