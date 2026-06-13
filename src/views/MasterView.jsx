@@ -591,7 +591,7 @@ function ApprovalModal({ req, profile, simClients, onApprove, onRefuse, onClose 
             </div>
           )}
         </div>
-        <FreteEstimativa request={req} simClients={simClients} readOnly={true} tollguruApikey={config?.tollguruApikey||""}/>
+        <FreteEstimativa request={req} simClients={simClients} readOnly={true}/>
         <div style={{ marginBottom:14 }}>
           <label style={LS}>Observação <span style={{ color:T.textMuted, fontWeight:400, fontSize:10 }}>(obrigatório para recusa)</span></label>
           <textarea value={note} onChange={e=>setNote(e.target.value)} placeholder="Observação..."
