@@ -882,7 +882,7 @@ function DriversModal({ drivers, onSave, onDelete, onClose, onRotograma, addToas
 
 
 // ── AssignDriverModal ─────────────────────────────────────────────────────────
-function AssignDriverModal({ req, drivers, onConfirm, onCancel }) {
+function AssignDriverModal({ req, drivers, simClients, onConfirm, onCancel }) {
   const [execType,   setExecType]   = useState('motorista')
   const [driverId,   setDriverId]   = useState('')
   const [transpNome, setTranspNome] = useState('')
@@ -910,7 +910,7 @@ function AssignDriverModal({ req, drivers, onConfirm, onCancel }) {
           Defina a execução para <strong style={{ color:T.laranja }}>{req?.clientName||req?.requesterName}</strong>.
         </p>
 
-        <FreteEstimativa request={req}/>
+        <FreteEstimativa request={req} simClients={simClients}/>
 
         {/* Toggle Motorista / Transportadora */}
         <div style={{ display:'flex', gap:8, marginBottom:16, marginTop:16 }}>
@@ -979,7 +979,6 @@ function AssignDriverModal({ req, drivers, onConfirm, onCancel }) {
     </div>
   )
 }
-
 function ValidacoesTab({ cards, onValidar, onRejeitar }) {
   const [modal, setModal] = useState(null)
   const [note,  setNote]  = useState('')
