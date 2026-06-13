@@ -515,7 +515,6 @@ function ApprovalModal({ req, profile, onApprove, onRefuse, onClose }) {
                 <div style={{ color:T.text, fontWeight:600, fontSize:12, fontFamily:FONT }}>{v}</div>
               </div>
             ))}
-          </div>
         </div>
         </div>
         <FreteEstimativa request={req}/>
