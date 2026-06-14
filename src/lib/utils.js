@@ -3,7 +3,7 @@ import { WD_SHORT, CARD_TYPES, CARD_SUBTYPES, URGENCY } from './constants'
 export const todayStr  = () => new Date().toISOString().split('T')[0]
 export const fmt       = d  => { if (!d) return '—'; const [y,m,dd] = d.split('-'); return `${dd}/${m}/${y}` }
 export const uid       = () => `${Date.now()}_${Math.random().toString(36).slice(2,8)}`
-
+ 
 export const getWeekDays = base => {
   const [y, m, d] = base.split('-').map(Number)
   const date = new Date(y, m-1, d)
