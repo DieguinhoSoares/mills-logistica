@@ -9,7 +9,6 @@ import Papa from 'papaparse'
 import { FreteEstimativa } from '../components/FreteEstimativa'
 import { RequestForm }     from '../components/RequestForm'
 import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore'
-import { FreteEstimativa } from '../components/FreteEstimativa'
 import { RequestForm }     from '../components/RequestForm'
 
 /* ══ SUBTYPE SELECT ══════════════════════════════════════════════════════════ */
