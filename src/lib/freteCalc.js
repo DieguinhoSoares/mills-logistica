@@ -5,7 +5,7 @@
 // Diárias e Escolta: valores negociados 2026
 // Distância: Nominatim (coords) + OSRM (rota rodoviária real)
 // ============================================================
-
+ 
 // ── TABELA DE TARIFAS HENGEL — Reajustada 2026 ──────────────
 // Frete ida: valor fixo (≤100km) ou R$/km (>100km)
 // Fonte: Planilha Tabela Reajustada — coluna SP
