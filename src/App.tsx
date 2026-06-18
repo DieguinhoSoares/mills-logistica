@@ -1,0 +1,38 @@
+import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { LoginScreen }     from './views/LoginScreen'
+import { FrotasView }      from './views/FrotasView'
+import { MasterView }      from './views/MasterView'
+import { GerenteView }     from './views/GerenteView'
+import { SolicitanteView } from './views/SolicitanteView'
+import { MotoristaView }     from './views/MotoristaView'
+import { IndicadoresView }   from './views/IndicadoresView'
+import { useSimClients }   from './hooks/useFirestore'
+
+function AppInner() {
+  const { user, profile } = useAuth()
+  const { simClients }    = useSimClients()
+
+  // Link de motorista — acesso sem login via token na URL
+  const params         = new URLSearchParams(window.location.search)
+  const motoristaToken = params.get('motorista')
+  if (motoristaToken) return <MotoristaView token={motoristaToken} />
+
+  if (!user || !profile) return <LoginScreen />
+
+  if (profile.role === 'master')      return <MasterView      simClients={simClients} />
+  if (profile.role === 'frotas')      return <FrotasView      simClients={simClients} />
+  if (profile.role === 'supervisor')  return <GerenteView     simClients={simClients} />
+  if (profile.role === 'gerente')     return <GerenteView     simClients={simClients} />
+  if (profile.role === 'indicadores') return <IndicadoresView />
+  if (profile.role === 'solicitante') return <SolicitanteView simClients={simClients} />
+
+  return <LoginScreen />
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
+  )
+}
