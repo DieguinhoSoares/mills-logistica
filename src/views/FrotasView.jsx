@@ -2,9 +2,9 @@ import { useState, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth }        from '../contexts/AuthContext'
 import { useCards, useRequests, useNotifications, useSimClients, useConfig, useDrivers, useMessages, useAllRotogramas, ensureDriverToken } from '../hooks/useFirestore'
-import { MillsLogo, ToastContainer, useToasts, ServiceCard, CardSearch, BrazilMap, MoveModal, NotificationBell, ClientInput, MunicipioInput } from '../components/UI'
+import { MillsLogo, ToastContainer, useToasts, ServiceCard, BrazilMap, MoveModal, NotificationBell, ClientInput, MunicipioInput } from '../components/UI'
 import { T, FONT, CARD_TYPES, CARD_SUBTYPES, URGENCY, BR_STATES, FILIAIS, MONTH_NAMES, WD_SHORT, BS, IS, LS, NB, SUBTYPES_NF } from '../lib/constants'
-import { fmt, todayStr, getWeekDays, getMonthWeeks, cardsForDay, detectConflicts, parseSIMCsv, getSubtypeLabel } from '../lib/utils'
+import { fmt, todayStr, getWeekDays, getMonthWeeks, cardsForDay, detectConflicts, parseSIMCsv, getSubtypeLabel, findRelatedPendingRequest } from '../lib/utils'
 import Papa from 'papaparse'
 import { db } from '../lib/firebase'
 import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore'
@@ -649,19 +649,8 @@ function AssignDriverModal({ req, drivers, simClients, cards, onConfirm, onCance
   const [transpCnpj,setTranspCnpj]=useState('')
   const [date,setDate]=useState(req?.desiredDate||todayStr())
   const [note,setNote]=useState('')
-  const [cardOrigemId,setCardOrigemId]=useState('')
   const selectedDriver=drivers.find(d=>d.id===driverId)
   const dateEnd = req?.desiredDateEnd || date
-  const isRetorno = req?.movimento === 'retorno'
-  // Candidatos a card de origem: mesmo cliente+subtipo, ainda não encerrados, que não sejam o próprio retorno.
-  const candidatosOrigem = isRetorno ? (cards||[])
-    .filter(c => c.subtype===req.subtype && c.client===req.clientName && !['concluido','cancelado'].includes(c.status) && (c.movimento||'saida')==='saida')
-    .sort((a,b) => {
-      const refNum = (req.refOrigem||'').replace('#','').trim()
-      if (refNum && String(a.seqId)===refNum) return -1
-      if (refNum && String(b.seqId)===refNum) return 1
-      return (b.seqId||0)-(a.seqId||0)
-    }) : []
   // Verifica se o motorista selecionado já tem outro serviço ativo em data sobreposta
   const conflitos = (cards||[]).filter(c =>
     c.driverId === driverId &&
@@ -671,8 +660,8 @@ function AssignDriverModal({ req, drivers, simClients, cards, onConfirm, onCance
     date <= c.endDate && dateEnd >= c.startDate
   )
   const handleConfirm=()=>{
-    if(execType==='transportadora'){onConfirm({driverId:'',driverName:'',transportadoraNome:transpNome,transportadoraCnpj:transpCnpj,date,note,cardOrigemId})}
-    else{onConfirm({driverId,driverName:selectedDriver?.name||'',transportadoraNome:'',transportadoraCnpj:'',date,note,cardOrigemId})}
+    if(execType==='transportadora'){onConfirm({driverId:'',driverName:'',transportadoraNome:transpNome,transportadoraCnpj:transpCnpj,date,note})}
+    else{onConfirm({driverId,driverName:selectedDriver?.name||'',transportadoraNome:'',transportadoraCnpj:'',date,note})}
   }
   const canConfirm=execType==='transportadora'?transpNome.trim():driverId
   return (
@@ -682,21 +671,6 @@ function AssignDriverModal({ req, drivers, simClients, cards, onConfirm, onCance
         <h2 style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:20, margin:'0 0 6px' }}>✅ Aceitar Solicitação</h2>
         <p style={{ color:T.textMuted, fontFamily:FONT, fontSize:12, margin:'0 0 4px' }}>Defina a execução para <strong style={{ color:T.laranja }}>{req?.clientName||req?.requesterName}</strong>.</p>
         <FreteEstimativa request={req} simClients={simClients}/>
-        {isRetorno && (
-          <div style={{ marginTop:14, marginBottom:2, padding:'12px 14px', background:T.amareloLight, borderRadius:T.r, border:`1px solid ${T.amarelo}40` }}>
-            <label style={{ ...LS, color:'#B8860B' }}>🔗 Vincular ao atendimento de origem (saída)</label>
-            {req.refOrigem && <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT, margin:'2px 0 8px' }}>Referência informada pelo solicitante: <strong>{req.refOrigem}</strong></div>}
-            <select value={cardOrigemId} onChange={e=>setCardOrigemId(e.target.value)} style={IS}>
-              <option value="">— selecione o card de origem —</option>
-              {candidatosOrigem.map(c => (
-                <option key={c.id} value={c.id}>#{c.seqId||'—'} · {fmt(c.startDate)} · {c.nInterno||c.machine||'—'}</option>
-              ))}
-            </select>
-            {candidatosOrigem.length===0 && (
-              <div style={{ marginTop:6, color:T.textMuted, fontSize:11, fontFamily:FONT }}>Nenhum card de saída em aberto encontrado para {req.clientName||'esse cliente'}. Pode confirmar sem vínculo e ajustar depois editando o card.</div>
-            )}
-          </div>
-        )}
         <div style={{ display:'flex', gap:8, marginBottom:16, marginTop:16 }}>
           {[['motorista','👤 Motorista Mills'],['transportadora','🚚 Transportadora Externa']].map(([v,l])=>(
             <div key={v} onClick={()=>setExecType(v)} style={{ flex:1, border:`2px solid ${execType===v?T.laranja:T.border}`, borderRadius:T.r, padding:'9px 12px', cursor:'pointer', textAlign:'center', background:execType===v?T.laranjaLight:T.surfaceAlt }}>
@@ -1034,7 +1008,7 @@ export function FrotasView() {
       startDate:           newStart,
       endDate:             newEnd,
       status:              'confirmado',
-      notes:               note ? `${pendingCardForm.notes||''} ${note}`.trim() : pendingCardForm.notes || '',
+      notes:               [pendingCardForm.description, note].filter(Boolean).join(' — '),
     }
     try {
       await saveCard(finalCard)
@@ -1098,6 +1072,21 @@ export function FrotasView() {
     }
   }
 
+  // Card aberto direto pelo Frotas duplicava uma solicitação formal já pendente.
+  // Preserva a solicitação (tem o rastro de aprovação) — remove o card avulso
+  // e segue o fluxo normal de aceite, que já cuida de criar o card vinculado.
+  const handleUseOriginalRequest = async (relatedRequest, cardId) => {
+    try {
+      await deleteCard(cardId)
+      setModal(null); setEditCard(null)
+      setAssignModal({ req: relatedRequest, id: relatedRequest.id, note:'', webhook: config?.teamsWebhookUrl })
+      addToast('Card avulso removido — siga a aprovação pela solicitação original.', 'info')
+    } catch (err) {
+      console.error('Erro ao reconciliar com a solicitação original:', err)
+      addToast('Erro ao reconciliar. Tente novamente.', 'error')
+    }
+  }
+
   const validacoes   = cards.filter(c => c.status === 'aguardando_validacao')
   // Cards sem driverId (ex.: transportadora externa) nunca passam pelo app do motorista —
   // precisam de uma via manual de conclusão, senão ficam presos para sempre em 'confirmado'.
@@ -1111,6 +1100,8 @@ export function FrotasView() {
     c.status !== 'cancelado' &&
     !c.nfConfirmada
   )
+
+  const relatedRequest = editCard ? findRelatedPendingRequest(editCard, requests) : null
 
   const handleValidarCard = async (card) => {
     if (SUBTYPES_NF.includes(card.subtype) && !card.nfConfirmada) {
@@ -1169,24 +1160,21 @@ export function FrotasView() {
     }
   }
 
-  const handleAssignConfirm = async ({ driverId, driverName, transportadoraNome, transportadoraCnpj, date, note, cardOrigemId }) => {
+  const handleAssignConfirm = async ({ driverId, driverName, transportadoraNome, transportadoraCnpj, date, note }) => {
     const { req, id, webhook } = assignModal
     const motorista = driverName || transportadoraNome || ''
     try {
       await respondRequest(id,'aceito',note||`Motorista: ${motorista} · Data: ${date}`,webhook)
-      const { seqId } = await saveCard({
+      await saveCard({
         type:req.type, subtype:req.subtype||'', client:req.clientName||req.requesterName||'',
         plantaObra:req.clientName||'', nInterno:req.nInterno||'', machine:req.machine||'',
         urgency:req.urgency||'medio', origin:req.origin||'', destination:req.destination||'',
         originCity:req.originCityName||'', destCity:req.destCityName||'',
         startDate:date, endDate:req.desiredDateEnd||date, driver:motorista, driverId:driverId||'',
         transportadoraNome:transportadoraNome||'', transportadoraCnpj:transportadoraCnpj||'',
-        unit:req.unit||profile?.unit||'', notes:req.description||'',
+        unit:req.unit||profile?.unit||'', notes:req.description||'', description:req.description||'',
         requestId:id, requesterId:req.requesterId||'', status:'confirmado',
-        movimento:req.movimento||'saida', refOrigem:req.refOrigem||'',
-        cardOrigemId:cardOrigemId||'',
       })
-      if (seqId) await updateDoc(doc(db,'requests',id), { seqId, updatedAt:serverTimestamp() })
       setAssignModal(null)
       addToast(`✅ Serviço aceito e atribuído a ${motorista||'motorista'}!`,'accepted')
     } catch (err) {
@@ -1216,12 +1204,6 @@ export function FrotasView() {
             <div style={{ width:6, height:6, borderRadius:'50%', background:T.verde, animation:'pulse 2s infinite' }}/>
             <span style={{ color:T.verde, fontSize:9, fontWeight:700, letterSpacing:'0.06em' }}>LIVE</span>
           </div>
-          <CardSearch cards={cards} onSelect={c=>{
-            setEditCard(c)
-            setModal('card')
-            if (c.startDate) { setBaseDate(c.startDate); setView('semana') }
-            setActiveTab('agenda')
-          }}/>
           <div style={{ background:T.surfaceAlt, border:`1px solid ${T.border}`, borderRadius:T.r, display:'flex', padding:3, gap:2 }}>
             {[['agenda','📅 Agenda'],['requests','📥 Solicitações']].map(([v,l])=>(
               <button key={v} onClick={()=>setActiveTab(v)}
@@ -1422,6 +1404,8 @@ export function FrotasView() {
           drivers={drivers}
           profile={profile}
           initialData={editCard}
+          relatedRequest={relatedRequest}
+          onUseOriginalRequest={handleUseOriginalRequest}
           title={editCard ? '✏️ Editar Serviço' : '➕ Novo Serviço'}
           submitLabel={editCard ? '💾 Salvar' : '➕ Criar Serviço'}
           onSubmit={handleSaveCard}
