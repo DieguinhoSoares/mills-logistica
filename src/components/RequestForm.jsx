@@ -78,7 +78,7 @@ function SubtypeSelect({ type, value, onChange, error }) {
   )
 }
 
-export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, profile, initialData, title, submitLabel }) {
+export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, profile, initialData, title, submitLabel, relatedRequest, onUseOriginalRequest }) {
   const blank = {
     type:'freteCliente', subtype:'', machine:'',
     nInternos:[], nInternosReserva:[], originCity:null, destCity:null,
@@ -513,6 +513,36 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
                 <input value={form.transportadoraCnpj} onChange={e=>set('transportadoraCnpj',e.target.value)} placeholder="CNPJ" style={IS}/>
               </div>
             )}
+          </div>
+        )}
+
+        {relatedRequest && isCardEdit && !form._dismissRelated && (
+          <div style={{ marginBottom:18, padding:'12px 14px', background:T.amareloLight, borderRadius:T.r, border:`1px solid ${T.amarelo}60` }}>
+            <div style={{ color:T.textSec, fontFamily:FONT, fontWeight:800, fontSize:13, marginBottom:6 }}>
+              ⚠️ Existe uma solicitação pendente que parece ser este mesmo serviço
+            </div>
+            <div style={{ color:T.text, fontFamily:FONT, fontSize:12, marginBottom:3 }}>
+              <strong>Solicitante:</strong> {relatedRequest.requesterName || '—'}
+            </div>
+            <div style={{ color:T.text, fontFamily:FONT, fontSize:12, marginBottom:3 }}>
+              <strong>Pedido em:</strong> {relatedRequest.createdAt?.toDate ? relatedRequest.createdAt.toDate().toLocaleDateString('pt-BR') : '—'}
+              {' · '}<strong>Nº interno:</strong> {relatedRequest.nInterno || '—'}
+            </div>
+            {relatedRequest.description && (
+              <div style={{ marginTop:6, padding:'8px 10px', background:T.surface, borderRadius:T.rSm, color:T.textSec, fontFamily:FONT, fontSize:11, fontStyle:'italic' }}>
+                "{relatedRequest.description}"
+              </div>
+            )}
+            <div style={{ display:'flex', gap:8, marginTop:10 }}>
+              <button onClick={()=>onUseOriginalRequest?.(relatedRequest, initialData.id)}
+                style={{ ...BS, background:T.laranja, color:'white', fontWeight:700, fontSize:11 }}>
+                🔗 Usar a solicitação original
+              </button>
+              <button onClick={()=>set('_dismissRelated', true)}
+                style={{ ...BS, background:'none', color:T.textMuted, border:`1px solid ${T.border}`, fontWeight:700, fontSize:11 }}>
+                Não é a mesma coisa
+              </button>
+            </div>
           </div>
         )}
 
