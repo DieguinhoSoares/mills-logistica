@@ -297,6 +297,113 @@ const FORCA_PRANCHA = new Set([
 ])
 
 // ── BUSCA GRUPO DE MODELO NO CSV SIM ─────────────────────────
+// ── DIMENSÕES POR FABRICANTE + MODELO (exatas, pesquisadas modelo a modelo) ──
+// Usadas no lugar da faixa de peso genérica (GRUPO) sempre que o CSV do SIM
+// trouxer Fabricante+Modelo e o par existir aqui — mais preciso, porque dois
+// modelos na MESMA faixa de peso podem ter larguras bem diferentes (ex: John
+// Deere 850J-II 2,49m vs Komatsu D65 3,29m, ambos ~20-21t).
+// largura = COM lâmina/implemento montado (pior caso real); larguraSemLamina
+// só existe pra quem a lâmina é desmontável (tratores de esteiras grandes).
+function normalizaModelo(s) {
+  return String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'')
+}
+
+const DIMENSOES_MODELO = {
+  // ── Motoniveladora ──
+  'CATERPILLAR|140K':        { peso:18.4, largura:2.48, comprimento:10.01 },
+  'CATERPILLAR|120LVR':      { peso:15.7, largura:2.49, comprimento:9.80  },
+  // ── Pá Carregadeira / Carregadeira de Pneus ──
+  'VOLVO|L60F':              { peso:11.6, largura:2.50, comprimento:7.27  },
+  'JOHNDEERE|524KII':        { peso:12.6, largura:2.54, comprimento:7.34  },
+  'JOHNDEERE|544KII':        { peso:13.1, largura:2.54, comprimento:7.43  },
+  'CATERPILLAR|930K':        { peso:13.1, largura:2.55, comprimento:7.61  },
+  'CATERPILLAR|938KSC':      { peso:15.8, largura:3.06, comprimento:8.07  }, // ⚠️ largura=altura no cadastro Mills, confirmar
+  'CATERPILLAR|950H':        { peso:18.3, largura:null, comprimento:null },
+  'CATERPILLAR|966L':        { peso:23.22,largura:null, comprimento:null },
+  // ── Escavadeira de Esteiras ──
+  'CATERPILLAR|312DL':       { peso:13.7, largura:2.59, comprimento:7.62  },
+  'CATERPILLAR|313D2GC':     { peso:13.4, largura:2.76, comprimento:7.61  },
+  'CATERPILLAR|320GC':       { peso:20.5, largura:2.98, comprimento:9.53  },
+  'CATERPILLAR|320NG':       { peso:22.0, largura:2.98, comprimento:9.53  },
+  'CATERPILLAR|318D2L':      { peso:17.2, largura:2.76, comprimento:7.61  },
+  'CATERPILLAR|336D':        { peso:36.2, largura:3.19, comprimento:11.17 },
+  // ── Trator de Esteiras (largura COM lâmina; lâmina é desmontável) ──
+  'CATERPILLAR|D4':          { peso:14.4, largura:2.90, comprimento:6.45  },
+  'CATERPILLAR|D6TXL':       { peso:20.5, largura:2.64, comprimento:6.74, larguraSemLamina:2.40 },
+  'CATERPILLAR|D7':          { peso:29.8, largura:3.70, comprimento:null, larguraSemLamina:3.30 },
+  'JOHNDEERE|850JII':        { peso:20.7, largura:3.25, comprimento:5.38, larguraSemLamina:2.49 }, // largura=lâmina (manual JD, linha D); sem lâmina=esteira (linha M)
+  'KOMATSU|D65E':            { peso:19.75,largura:3.29, comprimento:5.43, larguraSemLamina:3.10 },
+  'KOMATSU|D65A':            { peso:19.75,largura:3.29, comprimento:5.43, larguraSemLamina:3.10 },
+  'KOMATSU|D61EX':           { peso:19.77,largura:3.86, comprimento:5.48, larguraSemLamina:3.10 },
+  // ── Retroescavadeira ──
+  'JCB|3CX':                 { peso:8.2,  largura:2.35, comprimento:7.19  },
+  'CATERPILLAR|416F':        { peso:7.2,  largura:2.26, comprimento:7.03  },
+  'JOHNDEERE|310P':          { peso:7.1,  largura:2.18, comprimento:7.09  },
+  // ── Minicarregadeira ──
+  'BOBCAT|S650':             { peso:3.8,  largura:1.83, comprimento:3.63  },
+  'BOBCAT|S450':             { peso:2.2,  largura:1.45, comprimento:3.17  },
+  'CATERPILLAR|226B':        { peso:2.6,  largura:1.53, comprimento:3.23  },
+  // ── Rolo Compactador ──
+  'CATERPILLAR|CS54':        { peso:10.6, largura:2.30, comprimento:5.85  },
+  'CATERPILLAR|CS10GC':      { peso:12.0, largura:2.30, comprimento:5.70  },
+  'CATERPILLAR|CS11GC':      { peso:12.9, largura:2.30, comprimento:5.70  },
+  'CATERPILLAR|CB10':        { peso:9.7,  largura:1.87, comprimento:4.57  },
+  'CATERPILLAR|CB13':        { peso:12.9, largura:2.33, comprimento:4.74  },
+  'CATERPILLAR|CB7':         { peso:7.0,  largura:1.98, comprimento:4.55  },
+  'CATERPILLAR|CW34':        { peso:9.7,  largura:2.16, comprimento:5.35  }, // peso varia até 27t c/ lastro — usar peso real do CSV
+  'DYNAPAC|CA30D':           { peso:12.8, largura:2.26, comprimento:5.56  },
+  'DYNAPAC|CA25D':           { peso:12.0, largura:null, comprimento:null },
+  'DYNAPAC|CA25PD':          { peso:11.0, largura:null, comprimento:null },
+  'DYNAPAC|CA610D':          { peso:21.0, largura:2.40, comprimento:6.00  },
+  'DYNAPAC|CC1200':          { peso:2.6,  largura:1.31, comprimento:2.40  },
+  // ── Caminhões (sempre força prancha — ver FORCA_PRANCHA) ──
+  'VOLVO|VM330':             { peso:13.6, largura:2.60, comprimento:8.00, forcaPrancha:true }, // Basculante
+  'MERCEDESBENZ|AXOR4144':   { peso:15.5, largura:2.60, comprimento:7.56, forcaPrancha:true }, // Basculante
+  'VOLVO|VM270':             { peso:13.5, largura:2.60, comprimento:9.95, forcaPrancha:true }, // Comboio (Pipa usa mesma faixa, ver peso real do CSV)
+  'VOLVO|VM290':             { peso:13.5, largura:2.60, comprimento:9.95, forcaPrancha:true }, // Comboio
+  'MERCEDESBENZ|ATEGO2730':  { peso:15.3, largura:2.60, comprimento:9.89, forcaPrancha:true }, // Pipa/Irrigadeira
+  // ── Trator Agrícola ──
+  'NEWHOLLAND|T7205':        { peso:10.5, largura:3.03, comprimento:5.02  }, // ⚠️ largura=altura no cadastro Mills, confirmar
+}
+
+/**
+ * Busca a dimensão exata por Fabricante+Modelo do CSV do SIM. Tenta match
+ * exato fabricante+modelo primeiro; se não achar, tenta só pelo modelo
+ * (códigos de modelo já são bem específicos, ex: "938K-SC", "D6T-XL").
+ * Retorna null se o par não estiver catalogado — quem chamar deve cair de
+ * volta no GRUPO (faixa de peso) nesse caso.
+ */
+export function buscarDimensaoModelo(nInternos, simClients) {
+  if (!simClients?.length) return null
+  const lista = Array.isArray(nInternos) ? nInternos : [nInternos]
+
+  for (const n of lista) {
+    const nStr = String(n).trim()
+    const nNum = nStr.replace(/\D/g, '').replace(/^0+/, '')
+
+    for (const c of simClients) {
+      if (!c.machineModelos) continue
+      let entry = c.machineModelos[nStr]
+      if (!entry) {
+        const found = Object.entries(c.machineModelos).find(([k]) =>
+          String(k).replace(/\D/g, '').replace(/^0+/, '') === nNum
+        )
+        if (found) entry = found[1]
+      }
+      if (entry && (entry.fabricante || entry.modelo)) {
+        const fab = normalizaModelo(entry.fabricante)
+        const mod = normalizaModelo(entry.modelo)
+        const exato = DIMENSOES_MODELO[`${fab}|${mod}`]
+        if (exato) return exato
+        // Fallback: tenta achar só pelo modelo, ignorando fabricante
+        const porModelo = Object.entries(DIMENSOES_MODELO).find(([k]) => k.endsWith(`|${mod}`))
+        if (porModelo) return porModelo[1]
+      }
+    }
+  }
+  return null
+}
+
 export function buscarGrupoModelo(nInternos, simClients) {
   if (!simClients?.length) return null
   const lista = Array.isArray(nInternos) ? nInternos : [nInternos]
@@ -416,12 +523,21 @@ export function resolverVeiculoTransporte(
   // mesmo quando a carga combina equipamentos de tipos diferentes.
   const calcDimensoes = (lista) =>
     lista.reduce((acc, n) => {
+      const exata = buscarDimensaoModelo([n], simClients)
+      if (exata) {
+        // Dimensão exata do fabricante+modelo — mais precisa que a faixa de peso
+        acc.peso        += exata.peso || 0
+        acc.comprimento += exata.comprimento || 0
+        acc.larguras.push({ grupo: null, largura: exata.largura || 0, larguraSemLamina: exata.larguraSemLamina, forcaPrancha: !!exata.forcaPrancha, fonte:'modelo' })
+        return acc
+      }
+      // Fallback: não achou Fabricante+Modelo catalogado — usa a faixa de peso (Grupo de Modelo)
       const grupo = buscarGrupoModelo([n], simClients)
       if (!grupo) return acc
       const largura = LARGURA_GRUPO[grupo] || 0
       acc.peso        += PESO_GRUPO[grupo] || 0
       acc.comprimento += COMPRIMENTO_GRUPO[grupo] || 0
-      acc.larguras.push({ grupo, largura })
+      acc.larguras.push({ grupo, largura, fonte:'grupo' })
       return acc
     }, { peso:0, comprimento:0, larguras:[] })
 
@@ -434,8 +550,13 @@ export function resolverVeiculoTransporte(
   const pesoMax   = Math.max(pesoIda, pesoVolta)
   const larguraMax     = Math.max(0, ...todasLarguras.map(x => x.largura))
   const comprimentoMax = Math.max(idaCalc.comprimento, voltaCalc.comprimento)
-  const gruposComLamina = [...new Set(todasLarguras.filter(x => REQUER_DESMONTAGEM_LAMINA.has(x.grupo)).map(x => x.grupo))]
-  const temBasculante = todasLarguras.some(x => FORCA_PRANCHA.has(x.grupo))
+  // "Tem lâmina desmontável" — vale tanto pro grupo (faixa de peso) quanto pro
+  // modelo exato (quando o fabricante+modelo tem larguraSemLamina cadastrada).
+  const itensComLamina = todasLarguras.filter(x =>
+    x.fonte === 'modelo' ? x.larguraSemLamina !== undefined : REQUER_DESMONTAGEM_LAMINA.has(x.grupo)
+  )
+  const gruposComLamina = itensComLamina.length > 0 ? ['tem'] : [] // só precisa saber se existe ao menos 1
+  const temBasculante = todasLarguras.some(x => x.fonte === 'modelo' ? x.forcaPrancha : FORCA_PRANCHA.has(x.grupo))
 
   // Caminhão basculante sempre embarca em prancha — não se aplica o cálculo
   // normal de peso/largura/comprimento (é um veículo completo, não cabe a
@@ -450,28 +571,36 @@ export function resolverVeiculoTransporte(
     veiculoId = ORDEM_VEICULOS.find(id => cabeNoVeiculo(id, pesoMax, larguraMax, comprimentoMax))
   }
 
+  // Nenhum veículo padrão comporta peso+largura+comprimento simultaneamente.
+  // Em vez de pular direto pra prancha4 (mais cara), escolhe o MAIS BARATO que
+  // atenda peso+comprimento — já que largura excede igualmente em prancha3 e
+  // prancha4 (ambas têm 3,20m), não há ganho nenhum em pagar mais caro só
+  // por causa da largura. Sinaliza largura/comprimento excedidos sobre o
+  // veículo realmente escolhido, não sobre a prancha4 fixa.
+  let larguraExcedida = false, comprimentoExcedido = false
+  if (!veiculoId) {
+    veiculoId = ORDEM_VEICULOS.find(id => {
+      const v = VEICULOS.find(x => x.id === id)
+      return pesoMax <= v.carga && comprimentoMax <= v.comp
+    }) || 'prancha4'
+    const vEscolhido = VEICULOS.find(v => v.id === veiculoId)
+    larguraExcedida     = larguraMax > vEscolhido.larg
+    comprimentoExcedido = comprimentoMax > vEscolhido.comp
+  }
+
   // Se desmontar a(s) lâmina(s) resolveria (cabe em veículo mais barato), sinaliza a
   // sugestão de economia — substitui, na largura máxima, apenas os grupos com lâmina
   // pelo valor sem lâmina, mantendo a largura normal das demais máquinas da carga.
   let sugestaoDesmontagem = null
   if (gruposComLamina.length > 0) {
-    const larguraMaxSemLamina = Math.max(0, ...todasLarguras.map(x =>
-      REQUER_DESMONTAGEM_LAMINA.has(x.grupo) ? (LARGURA_SEM_LAMINA_GRUPO[x.grupo] || x.largura) : x.largura
-    ))
+    const larguraMaxSemLamina = Math.max(0, ...todasLarguras.map(x => {
+      if (x.fonte === 'modelo') return x.larguraSemLamina !== undefined ? x.larguraSemLamina : x.largura
+      return REQUER_DESMONTAGEM_LAMINA.has(x.grupo) ? (LARGURA_SEM_LAMINA_GRUPO[x.grupo] || x.largura) : x.largura
+    }))
     const veiculoSemLamina = ORDEM_VEICULOS.find(id => cabeNoVeiculo(id, pesoMax, larguraMaxSemLamina, comprimentoMax))
-    if (veiculoSemLamina && ORDEM_VEICULOS.indexOf(veiculoSemLamina) < ORDEM_VEICULOS.indexOf(veiculoId || 'prancha4')) {
+    if (veiculoSemLamina && ORDEM_VEICULOS.indexOf(veiculoSemLamina) < ORDEM_VEICULOS.indexOf(veiculoId)) {
       sugestaoDesmontagem = { veiculoId: veiculoSemLamina, veiculo: VEICULOS.find(v=>v.id===veiculoSemLamina) }
     }
-  }
-
-  // Nenhum veículo padrão comporta peso+largura+comprimento simultaneamente —
-  // usa a maior prancha e sinaliza qual dimensão foi o problema.
-  let larguraExcedida = false, comprimentoExcedido = false
-  if (!veiculoId) {
-    veiculoId = 'prancha4'
-    const p4 = VEICULOS.find(v=>v.id==='prancha4')
-    larguraExcedida     = larguraMax > p4.larg
-    comprimentoExcedido = comprimentoMax > p4.comp
   }
 
   // Para exibição: o veículo teria sido suficiente só pelo peso? Ajuda a entender

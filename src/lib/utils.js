@@ -222,6 +222,10 @@ export function parseSIMCsv(text, Papa) {
     const state    = (r['Estado (Planta/Obra)']    || '').trim()
     const city     = (r['Município (Planta/Obra)'] || '').trim()
     const familia     = (r['Família'] || r['Familia'] || '').trim()
+    // Fabricante/Modelo — usados pra cruzar com a dimensão real (peso/largura/comprimento)
+    // do equipamento específico, mais preciso que a faixa de peso genérica (Grupo de Modelo).
+    const fabricante = (r['Fabricante'] || r['fabricante'] || '').trim()
+    const modelo     = (r['Modelo'] || r['modelo'] || '').trim()
     // Grupo de Modelo — coluna que determina o veículo necessário para transporte
     const grupoModelo = (
       r['Grupo de Modelo'] ||   // nome exato do SIM
@@ -241,6 +245,7 @@ export function parseSIMCsv(text, Papa) {
         machines:     0,
         nInternos:    new Set(),
         machineGroups: {},  // nInterno → grupoModelo (para cálculo de frete)
+        machineModelos: {}, // nInterno → {fabricante, modelo} (dimensão exata)
       }
     }
 
@@ -250,6 +255,7 @@ export function parseSIMCsv(text, Papa) {
       map[name].nInternos.add(nInterno)
       // Só sobrescreve se tiver grupoModelo real (não apaga dado existente)
       if (grupoModelo) map[name].machineGroups[nInterno] = grupoModelo
+      if (fabricante || modelo) map[name].machineModelos[nInterno] = { fabricante, modelo }
     }
     if (!map[name].state && state) map[name].state = state
     if (!map[name].city  && city)  map[name].city  = city
@@ -265,6 +271,7 @@ export function parseSIMCsv(text, Papa) {
       families:  Array.from(c.families).slice(0, 5),
       nInternos:     Array.from(c.nInternos),
       machineGroups: c.machineGroups || {},  // nInterno → grupoModelo
+      machineModelos: c.machineModelos || {}, // nInterno → {fabricante, modelo}
     }))
     .sort((a, b) => b.machines - a.machines)
 
