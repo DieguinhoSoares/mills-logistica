@@ -1262,13 +1262,14 @@ export function FrotasView() {
                     style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:T.textMuted, fontSize:13, lineHeight:1 }}>×</button>
                 )}
                 {busca.trim().length>=1 && (() => {
-                  const q = busca.trim().toLowerCase()
+                  const normQ = busca.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+                  const normS = s => String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
                   const resultados = cards.filter(c =>
-                    String(c.seqId||'').includes(q) ||
-                    (c.nInterno||'').toLowerCase().includes(q) ||
-                    (c.client||'').toLowerCase().includes(q) ||
-                    (c.clientName||'').toLowerCase().includes(q) ||
-                    (c.nInternos||[]).some(n=>n.toLowerCase().includes(q))
+                    String(c.seqId||'').includes(normQ) ||
+                    normS(c.nInterno).includes(normQ) ||
+                    normS(c.client).includes(normQ) ||
+                    normS(c.clientName).includes(normQ) ||
+                    (c.nInternos||[]).some(n=>normS(n).includes(normQ))
                   ).filter(c=>!['cancelado'].includes(c.status)).slice(0,8)
                   return (
                     <div style={{ position:'absolute', top:34, right:0, width:320, background:T.surface, borderRadius:T.r, boxShadow:T.shadowLg, border:`1px solid ${T.border}`, zIndex:999, maxHeight:360, overflowY:'auto' }}>

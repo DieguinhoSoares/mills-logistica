@@ -53,15 +53,17 @@ export function SolicitanteView({ simClients }) {
 
   const filtered = useMemo(() => {
     if (!search.trim()) return requests
-    const q = search.toLowerCase()
+    const normQ = search.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    const normS  = s => String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    const q = normQ // alias
     return requests.filter(r =>
-      (r.clientName||'').toLowerCase().includes(q) ||
-      (r.machine||'').toLowerCase().includes(q) ||
-      (r.originCityName||r.origin||'').toLowerCase().includes(q) ||
-      (r.destCityName||r.destination||'').toLowerCase().includes(q) ||
-      (r.nInterno||'').toLowerCase().includes(q) ||
-      (r.requesterName||'').toLowerCase().includes(q) ||
-      (r.status||'').toLowerCase().includes(q)
+      normS(r.clientName).includes(normQ) ||
+      normS(r.machine).includes(normQ) ||
+      normS(r.originCityName||r.origin).includes(normQ) ||
+      normS(r.destCityName||r.destination).includes(normQ) ||
+      normS(r.nInterno).includes(normQ) ||
+      normS(r.requesterName).includes(normQ) ||
+      normS(r.status).includes(normQ)
     )
   }, [requests, search])
 
