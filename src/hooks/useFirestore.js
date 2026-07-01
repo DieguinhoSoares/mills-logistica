@@ -494,12 +494,45 @@ export async function runDailyBackup(cards, requests) {
     const today = new Date().toISOString().split('T')[0]
     const ref = doc(db,'backups',today)
     const existing = await getDoc(ref)
-    if (existing.exists()) return
+    if (existing.exists()) {
+      await setDoc(doc(db,'system','backupStatus'), { lastCheckAt:serverTimestamp(), lastBackupDate:today }, { merge:true })
+      return
+    }
     await setDoc(ref, {
       date:today, createdAt:serverTimestamp(),
       cardsCount:cards.length, requestsCount:requests.length,
       cards:cards.map(c=>({...c})), requests:requests.map(r=>({...r})),
     })
+    await setDoc(doc(db,'system','backupStatus'), {
+      lastBackupAt:serverTimestamp(), lastBackupDate:today,
+      lastCheckAt:serverTimestamp(), cardsCount:cards.length, requestsCount:requests.length,
+    }, { merge:true })
     console.log('Backup OK:', today)
   } catch(e) { console.warn('Backup error:', e) }
+}
+
+// Monitoramento de backup — MasterView usa pra exibir alerta quando atrasado.
+export function useBackupStatus() {
+  const [status, setStatus] = useState(null)
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db,'system','backupStatus'), snap => {
+      setStatus(snap.exists() ? snap.data() : null)
+    }, () => {})
+    return unsub
+  }, [])
+  return status
+}
+
+// Utilitário de migração — preenche seqId sequencial em cards que não têm esse campo.
+// Chamado uma única vez pelo Master via botão "Executar migração" no MasterView.
+export async function backfillSeqIds() {
+  const { getDocs } = await import('firebase/firestore')
+  const snap = await getDocs(collection(db,'cards'))
+  const semSeq = snap.docs.filter(d => !d.data().seqId).map(d => ({ id:d.id, ...d.data() }))
+  semSeq.sort((a,b) => (a.createdAt?.seconds||0) - (b.createdAt?.seconds||0))
+  let seq = 1
+  for (const c of semSeq) {
+    await updateDoc(doc(db,'cards',c.id), { seqId: seq++ })
+  }
+  return semSeq.length
 }
