@@ -243,7 +243,8 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
         destination:          form.destCity?.s||'',
         originCityName:       form.originCity?.m||'',
         destCityName:         form.destCity?.m||'',
-        ...(initialData?{reaberturaDe:initialData.id}:{}),
+        // Passa o id da request original pra submitRequest saber que é um reenvio (updateDoc)
+        ...(initialData?.id ? { id: initialData.id, reaberturaDe: initialData.id } : {}),
       })
       onClose()
     } catch (err) {
@@ -443,7 +444,7 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
               style={{ marginBottom:14, padding:'12px 14px', background:T.surfaceAlt, borderRadius:T.r, border:`1px solid ${T.border}` }}>
               <label style={LS}>🔁 Esse serviço é a ida ou o retorno da máquina?</label>
               <div style={{ display:'flex', gap:10, marginTop:8 }}>
-                {[['saida','📤 Saída — máquina vai para o cliente'],['retorno','📥 Retorno — máquina volta para o contrato']].map(([v,l])=>(
+                {[['saida','📤 Saída — máquina titular sai do contrato?'],['retorno','📥 Retorno — máquina titular volta para o contrato?']].map(([v,l])=>(
                   <div key={v} onClick={()=>set('movimento',v)}
                     style={{ flex:1, border:`2px solid ${form.movimento===v?T.laranja:T.border}`, borderRadius:T.r, padding:'8px 12px', cursor:'pointer', textAlign:'center', background:form.movimento===v?T.laranjaLight:T.surface, transition:'all .12s' }}>
                     <div style={{ color:T.text, fontFamily:FONT, fontSize:11, fontWeight:form.movimento===v?800:500 }}>{l}</div>
