@@ -87,22 +87,26 @@ export function KPIView({ cards, requests }) {
 
     // Base pra todas as métricas agregadas — cancelado nunca deve inflar volume,
     // distribuição por motorista/filial/rota, nem comparativo mensal.
+    // cardsValidos: base histórica — inclui concluídos, exclui cancelados.
+    // Usado para métricas de volume, por tipo, por motorista, rotas (dados históricos completos).
     const cardsValidos = cards.filter(c => c.status !== 'cancelado')
+    // cardsAtivos: só o que está em execução — para métricas operacionais (atrasados, prazo).
+    const cardsAtivos  = cardsValidos.filter(c => c.status !== 'concluido')
 
     const monthCards = cardsValidos.filter(c=>c.startDate?.startsWith(thisMonth))
     const lastCards  = cardsValidos.filter(c=>c.startDate?.startsWith(lastMonth))
     const total      = cardsValidos.length
 
-    // Atrasado = endDate < hoje e não concluído/cancelado
-    const late = cardsValidos.filter(c =>
-      c.endDate && c.endDate < hoje &&
-      c.status !== 'concluido'
+    // Atrasado = card ativo com endDate < hoje (concluídos e cancelados não contam)
+    const late = cardsAtivos.filter(c =>
+      c.endDate && c.endDate < hoje
     ).length
 
-    const onTime     = total - late
-    const pctOnTime  = total ? Math.round((onTime/total)*100) : 0
-    const remanejados = cardsValidos.filter(c=>c.moveLog?.length>0).length
-    const pctAder    = total ? Math.round(((total-remanejados)/total)*100) : 0
+    const totalAtivos = cardsAtivos.length
+    const onTime      = totalAtivos - late
+    const pctOnTime   = totalAtivos ? Math.round((onTime/totalAtivos)*100) : 0
+    const remanejados = cardsAtivos.filter(c=>c.moveLog?.length>0).length
+    const pctAder     = totalAtivos ? Math.round(((totalAtivos-remanejados)/totalAtivos)*100) : 0
 
     const byType = Object.entries(CARD_TYPES).map(([k,v])=>({
       label:v.short, value:cardsValidos.filter(c=>c.type===k).length, color:v.color
@@ -153,9 +157,10 @@ export function KPIView({ cards, requests }) {
     const growthPct = lastCards.length ? Math.round(((monthCards.length-lastCards.length)/lastCards.length)*100) : null
     const pendReq   = (requests||[]).filter(r=>r.status==='pendente').length
     const aceitoReq = (requests||[]).filter(r=>r.status==='aceito').length
-    const taxaAceit = (requests||[]).length ? Math.round((aceitoReq/(requests||[]).length)*100) : 0
+    const reqValidas = (requests||[]).filter(r=>r.status!=='cancelado').length
+    const taxaAceit = reqValidas ? Math.round((aceitoReq/reqValidas)*100) : 0
 
-    return { total,late,onTime,pctOnTime,pctAder,remanejados,byType,byDriver,byState,byFilial,tempoMedio,topRoutes,monthCards,growthPct,pendReq,taxaAceit }
+    return { total,totalAtivos,late,onTime,pctOnTime,pctAder,remanejados,byType,byDriver,byState,byFilial,tempoMedio,topRoutes,monthCards,growthPct,pendReq,taxaAceit }
   }, [cards, requests])
 
   return (
@@ -167,7 +172,7 @@ export function KPIView({ cards, requests }) {
 
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:14 }}>
         <KPICard title="Total de Serviços"  value={stats.total}            icon="📋" color={T.laranja} bg={T.laranjaXLight} trend={stats.growthPct} sub="Todos os períodos"/>
-        <KPICard title="No Prazo"           value={`${stats.pctOnTime}%`}  icon="✅" color={T.sucesso} bg={T.sucessoLight}  sub={`${stats.onTime}/${stats.total} serviços`}/>
+        <KPICard title="No Prazo"           value={`${stats.pctOnTime}%`}  icon="✅" color={T.sucesso} bg={T.sucessoLight}  sub={`${stats.onTime}/${stats.totalAtivos} em aberto`}/>
         <KPICard title="Aderência"          value={`${stats.pctAder}%`}    icon="📅" color={T.verde}   bg={T.verdeLight}    sub={`${stats.remanejados} remanejamentos`}/>
         <KPICard title="Tempo Médio"        value={stats.tempoMedio}       icon="⏱" color={T.info}    bg={T.infoLight}     sub={stats.tempoMedio==='—'?'Serviços de 1 dia não contam':'Duração por serviço'}/>
       </div>

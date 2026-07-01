@@ -25,15 +25,14 @@ function RotogramaModal({ driver, cards, profile, rotogramaAtivo, onClose, addTo
   const moverParada=(i,dir)=>{const n=[...paradas];const t=i+dir;if(t<0||t>=n.length)return;[n[i],n[t]]=[n[t],n[i]];setParadas(n)}
   const gerarUrl=()=>{if(!paradas.length)return null;return `https://www.google.com/maps/dir/${paradas.map(p=>encodeURIComponent(`${p.destino} ${p.destinoUF}`)).join('/')}`}
   const handleSalvar=async()=>{
-    if(!paradas.length)return
     setSaving(true)
     try {
-      const url=gerarUrl()
-      const data={driverId:driver.id,driverName:driver.name,paradas,urlRota:url,status:'ativo',criadoPor:profile?.name||'Frotas',updatedAt:serverTimestamp()}
+      const url=paradas.length ? gerarUrl() : null
+      const data={driverId:driver.id,driverName:driver.name,paradas,urlRota:url,status:paradas.length?'ativo':'inativo',criadoPor:profile?.name||'Frotas',updatedAt:serverTimestamp()}
       if(rotogramaAtivo?.id) await updateDoc(doc(db,'rotogramas',rotogramaAtivo.id),data)
-      else { data.criadoEm=serverTimestamp(); await addDoc(collection(db,'rotogramas'),data) }
+      else if(paradas.length){ data.criadoEm=serverTimestamp(); await addDoc(collection(db,'rotogramas'),data) }
       setLinkGerado(url)
-      addToast(`Rotograma de ${driver.name} salvo!`,'success')
+      addToast(paradas.length?`Rotograma de ${driver.name} salvo!`:`Rotograma de ${driver.name} limpo!`,'success')
     } catch(err) {
       console.error('Erro ao salvar rotograma:', err)
       addToast(`Erro ao salvar rotograma: ${err.message}`,'error')
@@ -112,7 +111,7 @@ function RotogramaModal({ driver, cards, profile, rotogramaAtivo, onClose, addTo
           <button onClick={handleCopiarLink} style={{ ...BS, background:T.infoLight, color:T.info, border:`1px solid ${T.info}30`, fontSize:11, fontWeight:700 }}>📱 Copiar link do motorista</button>
           <div style={{ display:'flex', gap:8 }}>
             <button onClick={onClose} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>Fechar</button>
-            <button onClick={handleSalvar} disabled={saving||!paradas.length} style={{ ...BS, background:paradas.length?T.laranja:T.borderMid, color:'white', fontWeight:700 }}>{saving?'⏳ Salvando...':'💾 Salvar Rotograma'}</button>
+            <button onClick={handleSalvar} disabled={saving} style={{ ...BS, background:T.laranja, color:'white', fontWeight:700 }}>{saving?'⏳ Salvando...':paradas.length?'💾 Salvar Rotograma':'🗑 Limpar Rotograma'}</button>
           </div>
         </div>
       </motion.div>
@@ -726,7 +725,8 @@ function RequestsKanban({ requests, teamsWebhookUrl, onRespond, onCancel, profil
   const [saving,    setSaving]     = useState(false)
   const groups={
     pendente: requests.filter(r=>r.status==='pendente'),
-    aceito:   requests.filter(r=>r.status==='aceito'),
+    aceito:   requests.filter(r=>r.status==='aceito'),  // concluído é exibido como aceito concluído; filtrado aqui se quiser ocultar
+    concluido: requests.filter(r=>r.status==='concluido'),
     recusado: requests.filter(r=>r.status==='recusado'),
   }
   const cols=[
@@ -948,7 +948,7 @@ export function FrotasView() {
   const [pendingCardForm, setPendingCardForm] = useState(null)
 
   const hoje      = todayStr()
-  const atrasados = cards.filter(c=>c.endDate&&c.endDate<hoje&&!['concluido','cancelado'].includes(c.status)).length
+  const atrasados = cards.filter(c=>c.endDate&&c.endDate<hoje&&!['concluido','cancelado'].includes(c.status))
   const conflicts = useMemo(() => detectConflicts(cards), [cards])
   const weekDays  = getWeekDays(baseDate)
   const pending   = requests.filter(r=>r.status==='pendente').length
@@ -1093,8 +1093,10 @@ export function FrotasView() {
   // Cards sem driverId (ex.: transportadora externa) nunca passam pelo app do motorista —
   // precisam de uma via manual de conclusão, senão ficam presos para sempre em 'confirmado'.
   const semExecutorApp = cards.filter(c => !c.driverId && ['confirmado','em_execucao'].includes(c.status))
-  const antecipados  = cards.filter(c => c.startDate > hoje && !['concluido','cancelado'].includes(c.status))
-  const atribuidos   = cards.filter(c => c.driverId || c.driver)
+  // cardsAtivos: base pra todos os contadores — exclui cancelado e concluído
+  const cardsAtivos   = cards.filter(c => !['concluido','cancelado'].includes(c.status))
+  const antecipados   = cardsAtivos.filter(c => c.startDate > hoje)
+  const atribuidos   = cardsAtivos.filter(c => c.driverId || c.driver)
   // NF pendente de emissão — subtipos que envolvem movimentação física de ativo/peça.
   // Responsabilidade exclusiva do analista; fica visível até alguém confirmar.
   const nfPendentes  = cards.filter(c =>
@@ -1271,7 +1273,7 @@ export function FrotasView() {
         {/* ── Faixa de 6 KPIs ─────────────────────────────────────────────────── */}
     <div style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:8, padding:'0 20px 8px', flexShrink:0 }}>
       {[
-        {l:'Serviços',              v:cards.length,        c:T.laranja,  bg:T.laranjaLight},
+        {l:'Serviços',              v:cardsAtivos.length,  c:T.laranja,  bg:T.laranjaLight},
         {l:'Atrasados',             v:atrasados.length,    c:T.perigo,   bg:T.perigoLight},
         {l:'Antecipados',           v:antecipados.length,  c:T.verde,    bg:T.verdeLight},
         {l:'Otimizações',           v:conflicts.length,    c:'#B8860B',  bg:T.amareloLight},
@@ -1390,7 +1392,7 @@ export function FrotasView() {
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14, flexShrink:0 }}>
             <div>
               <h2 style={{ fontFamily:'Barlow Condensed,IBM Plex Sans,sans-serif', fontWeight:700, fontSize:22, color:T.text, margin:0 }}>Solicitações de Serviço</h2>
-              <p style={{ color:T.textMuted, fontFamily:'IBM Plex Sans,sans-serif', fontSize:12, margin:'2px 0 0' }}>Demandas recebidas em tempo real · {requests.length} total</p>
+              <p style={{ color:T.textMuted, fontFamily:'IBM Plex Sans,sans-serif', fontSize:12, margin:'2px 0 0' }}>Demandas recebidas em tempo real · {requests.filter(r=>!['cancelado','concluido'].includes(r.status)).length} em aberto · {requests.length} total</p>
             </div>
           </div>
           <div style={{ flex:1, overflow:'hidden' }}>

@@ -7,7 +7,7 @@ import { T, FONT, CARD_TYPES, BS, IS, LS } from '../lib/constants'
 import { detectConflicts, fmt, getSubtypeLabel } from '../lib/utils'
 import { doc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore'
 import { db } from '../lib/firebase'
-import { useCards, useRequests, useNotifications, useConfig, usePendingUsers, useManagerialRequests, runDailyBackup, useMessages, useAllUsers, useBackupStatus, backfillSeqIds } from '../hooks/useFirestore'
+import { useCards, useRequests, useNotifications, useConfig, usePendingUsers, useManagerialRequests, runDailyBackup, useMessages, useAllUsers, useBackupStatus } from '../hooks/useFirestore'
 import { FreteEstimativa } from '../components/FreteEstimativa'
 import { MessageThread }    from '../components/MessageThread'
 import { ExportModal }      from '../components/ExportModal'
@@ -69,25 +69,6 @@ export function MasterView({ simClients = [] }) {
   const [savedWa,       setSavedWa]       = useState(false)
   const [tollguruKey,   setTollguruKey]   = useState('')
   const [savedToll,     setSavedToll]     = useState(false)
-  const [migratingSeq,     setMigratingSeq]     = useState(false)
-  const [seqMigrationResult, setSeqMigrationResult] = useState(null)
-
-  const handleBackfillSeqIds = async () => {
-    const semId = cards.filter(c => !c.seqId).length
-    if (semId === 0) { addToast('Todos os cards já têm número sequencial.', 'info'); return }
-    if (!window.confirm(`${semId} card(s) sem número sequencial serão numerados em ordem de criação (mais antigo = menor número). Evite criar serviços novos enquanto isso roda. Continuar?`)) return
-    setMigratingSeq(true)
-    try {
-      const total = await backfillSeqIds(cards)
-      setSeqMigrationResult(total)
-      addToast(`✅ ${total} card(s) numerado(s) com sucesso.`, 'success')
-    } catch (err) {
-      console.error('Erro na migração de IDs:', err)
-      addToast(`❌ Erro na migração: ${err.message}`, 'error')
-    } finally {
-      setMigratingSeq(false)
-    }
-  }
 
   const backupStatus = useBackupStatus()
 
@@ -153,7 +134,10 @@ export function MasterView({ simClients = [] }) {
   }
   // ────────────────────────────────────────────────────────────────────────────
 
-  const acceptedCards = cards.filter(c => c.status==='confirmado' || c.status==='aceito')
+  // cardsAtivos: base pra todos os contadores do Master — exclui cancelado e concluído
+  const cardsAtivos    = cards.filter(c => !['concluido','cancelado'].includes(c.status))
+  // acceptedCards: cards aceitos/confirmados ativos — exibidos na seção "Cancelar Serviço Aceito"
+  const acceptedCards  = cardsAtivos.filter(c => c.status==='confirmado' || c.status==='aceito')
 
   const TABS = [
     { id:'kpis',      label:'📊 Indicadores', badge: null },
@@ -338,10 +322,10 @@ export function MasterView({ simClients = [] }) {
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:16 }}>
               {[
-                { l:'Total',             v:mgrReqs.length,                                                     c:T.laranja, bg:T.laranjaLight },
-                { l:'Aguard. Aprovação', v:pendingAprov,                                                       c:'#B8860B',  bg:'#FFF8E1'     },
-                { l:'No time de Frotas', v:mgrReqs.filter(r=>['pendente','aceito'].includes(r.status)).length, c:T.verde,   bg:T.verdeLight  },
-                { l:'Recusadas',         v:mgrReqs.filter(r=>r.status==='recusado').length,                    c:T.perigo,  bg:T.perigoLight },
+                { l:'Em aberto',         v:mgrReqs.filter(r=>!['concluido','cancelado','recusado'].includes(r.status)).length, c:T.laranja, bg:T.laranjaLight },
+                { l:'Aguard. Aprovação', v:pendingAprov,                                                                       c:'#B8860B', bg:'#FFF8E1'     },
+                { l:'No time de Frotas', v:mgrReqs.filter(r=>['pendente','aceito'].includes(r.status)).length,                 c:T.verde,   bg:T.verdeLight  },
+                { l:'Recusadas',         v:mgrReqs.filter(r=>r.status==='recusado').length,                                    c:T.perigo,  bg:T.perigoLight },
               ].map(s=>(
                 <div key={s.l} style={{ background:s.bg, border:`1px solid ${s.c}30`, borderRadius:T.rLg, padding:'12px 14px', boxShadow:T.shadow }}>
                   <div style={{ color:s.c, fontFamily:FONT, fontWeight:900, fontSize:24, lineHeight:1 }}>{s.v}</div>
@@ -350,7 +334,7 @@ export function MasterView({ simClients = [] }) {
               ))}
             </div>
             <div style={{ display:'flex', gap:8, marginBottom:14, flexWrap:'wrap' }}>
-              {[['todos','Todos'],['pendente_supervisor','Aguard. Supervisor'],['pendente_gerente','Aguard. Gerência'],['pendente','No time de Frotas'],['aceito','Aceito'],['recusado','Recusado']].map(([v,l])=>(
+              {[['todos','Todos'],['pendente_supervisor','Aguard. Supervisor'],['pendente_gerente','Aguard. Gerência'],['pendente','No time de Frotas'],['aceito','Aceito'],['recusado','Recusado'],['concluido','Concluído']].map(([v,l])=>(
                 <button key={v} onClick={()=>setFilterAprov(v)}
                   style={{ ...BS, background:filterAprov===v?T.laranja:T.surface, color:filterAprov===v?'white':T.textSec, border:`1px solid ${filterAprov===v?T.laranja:T.border}`, fontSize:10, padding:'4px 12px' }}>
                   {l}
@@ -459,27 +443,6 @@ export function MasterView({ simClients = [] }) {
               <button onClick={handleSaveTollguru} style={{ ...BS, background:savedToll?T.verde:T.laranja, color:'white', fontWeight:700 }}>
                 {savedToll?'✅ Salvo!':'💾 Salvar'}
               </button>
-            </div>
-
-            {/* Migração de IDs sequenciais */}
-            <div style={{ background:T.surface, borderRadius:T.rLg, border:`1px solid ${T.border}`, padding:20, boxShadow:T.shadow, marginTop:16 }}>
-              <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:T.text, marginBottom:4 }}>🔢 Numeração retroativa dos serviços</div>
-              <p style={{ color:T.textMuted, fontSize:11, fontFamily:FONT, margin:'0 0 14px', lineHeight:1.5 }}>
-                Cards criados antes do recurso de ID sequencial não têm número (#). Esse botão atribui #1, #2, #3...
-                aos cards antigos em ordem de criação, continuando a contagem de onde os cards novos já estão.
-                Execução única — evite criar serviços novos enquanto roda.
-              </p>
-              <div style={{ marginBottom:12, padding:'6px 10px', background:T.surfaceAlt, borderRadius:T.rSm, color:T.textSec, fontSize:11, fontFamily:FONT, fontWeight:600 }}>
-                {cards.filter(c=>!c.seqId).length} card(s) sem número · {cards.filter(c=>c.seqId).length} já numerado(s)
-              </div>
-              <button onClick={handleBackfillSeqIds} disabled={migratingSeq} style={{ ...BS, background:migratingSeq?T.borderMid:T.laranja, color:'white', fontWeight:700, opacity:migratingSeq?0.6:1 }}>
-                {migratingSeq ? '⏳ Numerando...' : '🔢 Atribuir números retroativos'}
-              </button>
-              {seqMigrationResult !== null && (
-                <div style={{ marginTop:10, padding:'6px 10px', background:T.verdeLight, borderRadius:T.rSm, color:T.verde, fontSize:11, fontFamily:FONT, fontWeight:700 }}>
-                  ✅ {seqMigrationResult} card(s) numerado(s) na última execução.
-                </div>
-              )}
             </div>
           </div>
         )}

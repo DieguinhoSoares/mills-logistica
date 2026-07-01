@@ -550,23 +550,49 @@ export function MotoristaView({ token }) {
                   const card=cards.find(c=>c.id===parada.cardId)
                   if(!card) return null
                   const ct=CARD_TYPES[card.type]
+                  // Expiração automática: parada concluída há mais de 48h some da visualização do motorista
+                  const concluido = card.status==='concluido'
+                  const concluidoEm = card.concluidoEm ? new Date(card.concluidoEm) : null
+                  const expirado = concluido && concluidoEm && (Date.now()-concluidoEm.getTime()) > 48*3600*1000
+                  if(expirado) return null
+
+                  const handleRemoverParada = async () => {
+                    if(!window.confirm(`Remover "${parada.cliente}" do rotograma?`)) return
+                    try {
+                      const novasParadas = rotograma.paradas.filter(p=>p.cardId!==parada.cardId)
+                      await updateDoc(doc(db,'rotogramas',rotograma.id), { paradas:novasParadas, updatedAt:serverTimestamp() })
+                      setRotograma(prev=>prev?{...prev,paradas:novasParadas}:null)
+                    } catch(e){ console.error('Erro ao remover parada:',e) }
+                  }
+
                   return (
-                    <div key={parada.cardId} style={{ display:'flex', gap:10, marginBottom:10 }}>
+                    <div key={parada.cardId} style={{ display:'flex', gap:10, marginBottom:10, opacity:concluido?0.6:1 }}>
                       <div style={{ display:'flex', flexDirection:'column', alignItems:'center' }}>
-                        <div style={{ width:28, height:28, borderRadius:'50%', background:T.laranja, color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:FONT, fontWeight:700, fontSize:13, flexShrink:0 }}>{i+1}</div>
+                        <div style={{ width:28, height:28, borderRadius:'50%', background:concluido?T.sucesso:T.laranja, color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:FONT, fontWeight:700, fontSize:13, flexShrink:0 }}>{concluido?'✓':i+1}</div>
                         {i<rotograma.paradas.length-1&&<div style={{ width:2, flex:1, background:T.border, minHeight:20, marginTop:4 }}/>}
                       </div>
-                      <div style={{ flex:1, background:T.surface, borderRadius:T.r, padding:'10px 12px', boxShadow:T.shadow, marginBottom:4, border:`1px solid ${T.border}` }}>
+                      <div style={{ flex:1, background:T.surface, borderRadius:T.r, padding:'10px 12px', boxShadow:T.shadow, marginBottom:4, border:`1px solid ${concluido?T.sucesso+'40':T.border}` }}>
                         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:4 }}>
                           <span style={{ background:ct?.bg, color:ct?.color, borderRadius:20, padding:'1px 7px', fontSize:9, fontWeight:700, fontFamily:FONT }}>{ct?.icon} {ct?.short}</span>
-                          <StatusBadge status={card.status}/>
+                          <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+                            <StatusBadge status={card.status}/>
+                            <button onClick={handleRemoverParada}
+                              style={{ background:T.perigoLight, border:`1px solid ${T.perigo}30`, borderRadius:T.rSm, padding:'1px 6px', cursor:'pointer', color:T.perigo, fontSize:10, fontFamily:FONT, fontWeight:700 }}>
+                              × Remover
+                            </button>
+                          </div>
                         </div>
                         <div style={{ color:T.text, fontWeight:700, fontSize:13, fontFamily:FONT, marginBottom:2 }}>{card.client}</div>
                         <div style={{ color:T.textMuted, fontSize:11, fontFamily:FONT }}>{parada.destino} · {fmt(card.startDate)}</div>
-                        <a href={`https://waze.com/ul?q=${encodeURIComponent(parada.destino+' '+parada.destinoUF)}&navigate=yes`} target="_blank" rel="noreferrer"
+                        {concluido && concluidoEm && (
+                          <div style={{ color:T.sucesso, fontSize:10, fontFamily:FONT, marginTop:3 }}>
+                            ✅ Concluído — expira do rotograma em {new Date(concluidoEm.getTime()+48*3600*1000).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}
+                          </div>
+                        )}
+                        {!concluido && <a href={`https://waze.com/ul?q=${encodeURIComponent(parada.destino+' '+parada.destinoUF)}&navigate=yes`} target="_blank" rel="noreferrer"
                           style={{ display:'inline-block', marginTop:6, background:'#33CCFF', color:'white', borderRadius:T.rSm, padding:'4px 10px', fontSize:10, fontWeight:700, fontFamily:FONT, textDecoration:'none' }}>
                           🔵 Abrir no Waze
-                        </a>
+                        </a>}
                       </div>
                     </div>
                   )
