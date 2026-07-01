@@ -197,8 +197,11 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
           {!pesoInfo.milsSuporta && (
             <span style={{ color:'#C62828', fontWeight:800 }}>⚠️ Peso &gt; 32t — somente Hengel</span>
           )}
-          {pesoInfo.larguraExcedida && (
-            <span style={{ color:'#C62828', fontWeight:800 }}>⚠️ Largura excede até a prancha — avaliar remoção de implemento</span>
+          {pesoInfo.pesoExcedido && (
+            <span style={{ color:'#C62828', fontWeight:800 }}>⚠️ Peso {pesoInfo.pesoMax}t excede a capacidade da maior prancha (40,5t) — necessário dividir em 2 viagens</span>
+          )}
+          {pesoInfo.larguraExcedida && !pesoInfo.pesoExcedido && (
+            <span style={{ color:'#C62828', fontWeight:800 }}>⚠️ Largura {pesoInfo.larguraMax}m excede até a prancha — avaliar remoção de implemento ou AET especial</span>
           )}
           {pesoInfo.comprimentoExcedido && (
             <span style={{ color:'#C62828', fontWeight:800 }}>⚠️ Comprimento excede até a prancha — considerar viagens separadas</span>
@@ -208,7 +211,10 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
       {isFrotas && pesoInfo?.sugestaoDesmontagem && (
         <div style={{ marginBottom:10, padding:'6px 10px', background:T.amareloLight, borderRadius:T.rSm,
           color:'#8A6D00', fontSize:10, fontFamily:FONT, fontWeight:600 }}>
-          💡 Desmontando a lâmina, cabe em <strong>{pesoInfo.sugestaoDesmontagem.veiculo?.label}</strong> — opção mais econômica.
+          {pesoInfo.sugestaoDesmontagem.resolveAET && !pesoInfo.sugestaoDesmontagem.maisBarato
+            ? <>💡 Desmontando a lâmina, a largura fica dentro do limite (sem necessidade de AET especial) — mesmo veículo <strong>{pesoInfo.sugestaoDesmontagem.veiculo?.label}</strong>, operação mais simples.</>
+            : <>💡 Desmontando a lâmina, cabe em <strong>{pesoInfo.sugestaoDesmontagem.veiculo?.label}</strong> — opção mais econômica.</>
+          }
         </div>
       )}
 
