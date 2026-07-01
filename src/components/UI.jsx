@@ -158,13 +158,10 @@ export function ClientInput({ value, onChange, simClients }) {
   const handleBlur = () => {
     setTimeout(() => {
       setOpen(false)
-      // Se o usuário digitou algo mas não selecionou nenhum item do SIM,
-      // aceita como texto livre (ex: cliente de venda, fornecedor externo).
-      // Cria um objeto sintético {name} sem dados de SIM — funcional mas sem
-      // autopreenchimento de estado/cidade/frota.
-      if (search.trim() && (!value || value.name !== search.trim())) {
-        onChange({ name: search.trim(), state:'', city:'', machines:0, nInternos:[], _livreLookup:true })
-      }
+      // Se o usuário digitou algo mas não selecionou nenhum item, NÃO aceita
+      // automaticamente como texto livre — exige clique explícito na opção
+      // "Usar como texto livre" no dropdown. Isso evita perda acidental do
+      // vínculo com o SIM quando o cliente realmente existe na base.
     }, 180)
   }
 
@@ -189,25 +186,30 @@ export function ClientInput({ value, onChange, simClients }) {
               </div>
             </div>
           ))}
-          {/* Opção de texto livre quando há texto mas nenhum match exato */}
-          {search.trim() && filtered.length===0 && (
+          {/* Opção de texto livre — só aparece quando não há nenhum match no SIM
+              É um último recurso: fornecedores externos, clientes novos antes
+              da base ser atualizada. Perde vínculo com SIM (sem estado/cidade/frotas). */}
+          {search.trim().length>=3 && filtered.length===0 && (
             <div onMouseDown={()=>{ const obj={name:search.trim(),state:'',city:'',machines:0,nInternos:[],_livreLookup:true}; onChange(obj); setOpen(false) }}
-              style={{ padding:'9px 13px', cursor:'pointer', borderBottom:`1px solid ${T.border}` }}
-              onMouseEnter={e=>e.currentTarget.style.background=T.laranjaXLight}
-              onMouseLeave={e=>e.currentTarget.style.background=T.surface}>
-              <div style={{ fontFamily:FONT, fontWeight:600, fontSize:12, color:T.textSec }}>
-                ✏️ Usar "{search.trim()}" como texto livre
+              style={{ padding:'9px 13px', cursor:'pointer', background:T.amareloLight, borderTop:`2px solid ${T.amarelo}40` }}
+              onMouseEnter={e=>e.currentTarget.style.opacity='0.8'}
+              onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
+              <div style={{ fontFamily:FONT, fontWeight:700, fontSize:11, color:'#8A6D00' }}>
+                ⚠️ Não encontrado no SIM
               </div>
-              <div style={{ fontFamily:FONT, fontSize:10, color:T.textMuted }}>
-                Cliente não encontrado no SIM — será salvo como digitado
+              <div style={{ fontFamily:FONT, fontSize:10, color:'#8A6D00', marginTop:2 }}>
+                Clique aqui para usar <strong>"{search.trim()}"</strong> como texto livre — sem vínculo com SIM.<br/>
+                <em>Só use se o cliente realmente não está na base.</em>
               </div>
             </div>
           )}
         </div>
       )}
       {value?._livreLookup && (
-        <div style={{ marginTop:3, color:T.amarelo, fontSize:10, fontFamily:FONT, fontWeight:600 }}>
-          ⚠️ Não encontrado no SIM — salvo como texto livre
+        <div style={{ marginTop:4, padding:'5px 9px', background:T.amareloLight, borderRadius:T.rSm,
+          border:`1px solid ${T.amarelo}60`, color:'#8A6D00', fontSize:10, fontFamily:FONT, fontWeight:700 }}>
+          ⚠️ Texto livre — sem vínculo com SIM (estado, cidade e frotas não serão preenchidos automaticamente).
+          Se o cliente está na base, atualize o CSV e busque novamente.
         </div>
       )}
     </div>
