@@ -166,19 +166,32 @@ export function parseSIMCsv(text, Papa) {
   const lines = clean.split(/\r?\n/)
   const dataText = lines.slice(1).join('\n')
 
-  // Auto-detecta o separador — o SIM pode exportar com ; ou , dependendo
-  // da configuração regional do Windows do usuário. Conta qual ocorre mais
-  // na primeira linha (cabeçalho) e usa esse como separador.
-  const firstLine = dataText.split('\n')[0] || ''
-  const countSemi  = (firstLine.match(/;/g)  || []).length
-  const countComma = (firstLine.match(/,/g)  || []).length
-  const countTab   = (firstLine.match(/\t/g) || []).length
+  // O SIM exporta com uma linha extra no topo com agrupamentos de colunas
+  // (ex: "Equipamento;Equipamento;...;Reserva atual;..."). Essa linha não é
+  // o header real — precisa ser pulada antes de parsear.
+  const rawLines = dataText.split('\n')
+  const firstLine = (rawLines[0] || '').trim()
+
+  // Detecta linha de grupos: todas as células são palavras genéricas sem nº interno/frota/etc.
+  const isGroupRow = firstLine.length > 0 && !firstLine.includes('interno') &&
+    !firstLine.includes('Interno') && !firstLine.includes('série') &&
+    (firstLine.split(';').every(c => c.trim() === firstLine.split(';')[0].trim() ||
+     ['Equipamento','Reserva atual','Última Movimentação','Ãltima MovimentaÃ§Ã£o'].some(g => c.trim().startsWith(g))))
+
+  const dataToparse = isGroupRow ? rawLines.slice(1).join('\n') : dataText
+  if (isGroupRow) console.log('[parseSIMCsv] linha de grupos detectada e ignorada — usando linha 2 como header')
+
+  // Auto-detecta o separador
+  const headerLine = (isGroupRow ? rawLines[1] : rawLines[0]) || ''
+  const countSemi  = (headerLine.match(/;/g)  || []).length
+  const countComma = (headerLine.match(/,/g)  || []).length
+  const countTab   = (headerLine.match(/\t/g) || []).length
   const delimiter  = countTab > countSemi && countTab > countComma ? '\t'
                    : countComma > countSemi ? ','
                    : ';'
-  console.log(`[parseSIMCsv] separador detectado: "${delimiter}" (;:${countSemi} ,:${countComma} tab:${countTab})`)
+  console.log(`[parseSIMCsv] sep="${delimiter}" | linhas=${rawLines.length} | grupoIgnorado=${isGroupRow}`)
 
-  const result = Papa.parse(dataText, {
+  const result = Papa.parse(dataToparse, {
     header: true,
     skipEmptyLines: true,
     delimiter,
@@ -201,13 +214,15 @@ export function parseSIMCsv(text, Papa) {
   // O SIM exporta "Nº interno" com U+00BA (ordinal masculino)
   const getNInterno = r => {
     const candidates = [
-      r['N\u00BA interno'],  // Nº interno — ordinal masculino U+00BA (real do SIM)
-      r['N\u00B0 interno'],  // N° interno — símbolo de grau U+00B0
-      r['Nº interno'],
+      r['N\u00BA interno'],   // Nº interno — ordinal masculino U+00BA (real do SIM confirmado)
+      r['N\u00B0 interno'],   // N° interno — símbolo de grau U+00B0
+      r['Nº interno'],         // alias direto
       r['N° interno'],
       r['N° Interno'],
       r['Nº Interno'],
       r['N interno'],
+      r['nInterno'],
+      r['N Interno'],
     ]
     return (candidates.find(v => v !== undefined && v !== null) || '').trim()
   }
@@ -240,8 +255,8 @@ export function parseSIMCsv(text, Papa) {
     const modelo     = (r['Modelo'] || r['modelo'] || '').trim()
     // Grupo de Modelo — coluna que determina o veículo necessário para transporte
     const grupoModelo = (
-      r['Grupo de Modelo'] ||   // nome exato do SIM
-      r['Grupo de modelo'] ||
+      r['Grupo de modelo'] ||   // nome real do SIM (minúsculo)
+      r['Grupo de Modelo'] ||   // variante maiúscula
       r['Grupo De Modelo'] ||
       r['Grupo de modelos'] ||
       r['GrupoModelo'] ||
