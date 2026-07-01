@@ -957,6 +957,8 @@ export function FrotasView() {
   const navMonth = d => { let m=mo+d,y=yr; if(m<0){m=11;y--;}if(m>11){m=0;y++;} setMo(m);setYr(y) }
 
   const handleSaveCard = async f => {
+    // Nota: a verificação de NF pendente existe APENAS no handleValidarCard (fechamento do serviço).
+    // Update de dados do card é sempre permitido independente do status da NF.
     const mapped = {
       ...f,
       id:          editCard?.id   || f.id,           // preserva ID para update

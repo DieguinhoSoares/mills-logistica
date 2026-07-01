@@ -38,16 +38,16 @@ export function SolicitanteView({ simClients }) {
   const [search,     setSearch]     = useState('')
 
   const handleSubmit = async form => {
-    // Busca grupo de modelo das frotas danificadas (nInternos) para calcular frete
     const grupo = buscarGrupoModelo(form.nInternos || (form.nInterno ? [form.nInterno] : []), simClients)
-    // machine: label dos equipamentos reserva (para exibição nos modais)
     const machineLabel = form.nInternosReserva.length > 0 ? form.nInternosReserva.join(', ') : form.machine||''
     try {
-      await submitRequest({ ...form, grupoModelo: grupo || '', machine: machineLabel })
-      addToast('Solicitação enviada! O time de Frotas foi notificado.', 'success')
+      // Se reopenData tem id é um reenvio — passa o id pra submitRequest fazer update (não addDoc)
+      const idReenvio = reopenData?.id || null
+      await submitRequest({ ...form, grupoModelo: grupo || '', machine: machineLabel, ...(idReenvio ? { id: idReenvio } : {}) })
+      addToast(idReenvio ? 'Solicitação ajustada e reenviada! O time de Frotas foi notificado.' : 'Solicitação enviada! O time de Frotas foi notificado.', 'success')
     } catch (err) {
       console.error('Erro ao enviar solicitação:', err)
-      throw err // RequestForm exibe o alerta e mantém o formulário aberto para nova tentativa
+      throw err
     }
   }
 
@@ -153,10 +153,7 @@ export function SolicitanteView({ simClients }) {
                     {r.subtype && <span style={{ background:T.infoLight, borderRadius:20, padding:'2px 9px', color:T.info, fontSize:9, fontWeight:800, fontFamily:FONT }}>{getSubtypeLabel(r.type,r.subtype)}</span>}
                     <span style={{ background:ug?.bg, borderRadius:20, padding:'2px 9px', color:ug?.color, fontSize:9, fontWeight:800, fontFamily:FONT }}>{ug?.icon} {ug?.label}</span>
                   </div>
-                  <span style={{ display:'flex', alignItems:'center', gap:6 }}>
-                    {r.seqId && <span title="Número do serviço — use esse número se precisar abrir o retorno deste atendimento depois" style={{ color:T.textMuted, fontSize:11, fontWeight:800, fontFamily:FONT }}>#{r.seqId}</span>}
-                    <span style={{ background:sc.bg, border:`1px solid ${sc.color}40`, borderRadius:20, padding:'3px 11px', color:sc.color, fontSize:11, fontWeight:800, fontFamily:FONT, whiteSpace:'nowrap' }}>{sc.label}</span>
-                  </span>
+                  <span style={{ background:sc.bg, border:`1px solid ${sc.color}40`, borderRadius:20, padding:'3px 11px', color:sc.color, fontSize:11, fontWeight:800, fontFamily:FONT, whiteSpace:'nowrap' }}>{sc.label}</span>
                 </div>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:8 }}>
                   {[
