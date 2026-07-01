@@ -313,6 +313,9 @@ const DIMENSOES_MODELO = {
   'CATERPILLAR|140K':        { peso:18.4, largura:2.48, comprimento:10.01 },
   'CATERPILLAR|120LVR':      { peso:15.7, largura:2.49, comprimento:9.80  },
   // ── Pá Carregadeira / Carregadeira de Pneus ──
+  'CATERPILLAR|924K':        { peso:11.5, largura:2.55, comprimento:7.61  }, // Cat 924K — cross-check Cat 930K (13,1t/2,55m/7,61m)
+  'CATERPILLAR|924H':        { peso:11.2, largura:2.55, comprimento:7.50  }, // Cat 924H — estimado a partir da 924K
+  'CATERPILLAR|924':         { peso:11.0, largura:2.55, comprimento:7.40  }, // Cat 924 genérico
   'VOLVO|L60F':              { peso:11.6, largura:2.50, comprimento:7.27  },
   'JOHNDEERE|524KII':        { peso:12.6, largura:2.54, comprimento:7.34  },
   'JOHNDEERE|544KII':        { peso:13.1, largura:2.54, comprimento:7.43  },
@@ -533,7 +536,17 @@ export function resolverVeiculoTransporte(
       }
       // Fallback: não achou Fabricante+Modelo catalogado — usa a faixa de peso (Grupo de Modelo)
       const grupo = buscarGrupoModelo([n], simClients)
-      if (!grupo) return acc
+      if (!grupo) {
+        // Máquina sem grupo identificado — usa peso/largura/comprimento conservadores
+        // pra nunca sugerir um veículo menor que o necessário por falta de dados.
+        // Padrão: equivalente a uma Carregadeira de Pneus 10-11t (truck), que é o
+        // menor veículo razoável pra qualquer equipamento pesado não identificado.
+        console.warn(`[freteCalc] nInterno ${n} sem grupo de modelo — usando fallback conservador (truck)`)
+        acc.peso        += 10.5
+        acc.comprimento += 7.0
+        acc.larguras.push({ grupo:'_fallback', largura:2.55, fonte:'fallback' })
+        return acc
+      }
       const largura = LARGURA_GRUPO[grupo] || 0
       acc.peso        += PESO_GRUPO[grupo] || 0
       acc.comprimento += COMPRIMENTO_GRUPO[grupo] || 0
@@ -591,6 +604,10 @@ export function resolverVeiculoTransporte(
   // Se desmontar a(s) lâmina(s) resolveria (cabe em veículo mais barato), sinaliza a
   // sugestão de economia — substitui, na largura máxima, apenas os grupos com lâmina
   // pelo valor sem lâmina, mantendo a largura normal das demais máquinas da carga.
+  // Peso excede a capacidade da maior prancha disponível — carga precisa ser dividida
+  const prancha4Cap = VEICULOS.find(v=>v.id==='prancha4')?.carga || 40.5
+  const pesoExcedido = pesoMax > prancha4Cap
+
   let sugestaoDesmontagem = null
   if (gruposComLamina.length > 0) {
     const larguraMaxSemLamina = Math.max(0, ...todasLarguras.map(x => {
@@ -598,8 +615,19 @@ export function resolverVeiculoTransporte(
       return REQUER_DESMONTAGEM_LAMINA.has(x.grupo) ? (LARGURA_SEM_LAMINA_GRUPO[x.grupo] || x.largura) : x.largura
     }))
     const veiculoSemLamina = ORDEM_VEICULOS.find(id => cabeNoVeiculo(id, pesoMax, larguraMaxSemLamina, comprimentoMax))
-    if (veiculoSemLamina && ORDEM_VEICULOS.indexOf(veiculoSemLamina) < ORDEM_VEICULOS.indexOf(veiculoId)) {
-      sugestaoDesmontagem = { veiculoId: veiculoSemLamina, veiculo: VEICULOS.find(v=>v.id===veiculoSemLamina) }
+    // Sugestão quando: (a) cabe em veículo mais barato, OU
+    // (b) mesmo veículo mas sem largura excedida (desmontar resolve o AET/largura)
+    const idxSemLamina = ORDEM_VEICULOS.indexOf(veiculoSemLamina)
+    const idxAtual     = ORDEM_VEICULOS.indexOf(veiculoId)
+    const maisBarato   = veiculoSemLamina && idxSemLamina < idxAtual
+    const resolveAET   = veiculoSemLamina && idxSemLamina === idxAtual && larguraExcedida && larguraMaxSemLamina <= (VEICULOS.find(v=>v.id===veiculoSemLamina)?.larg || 0)
+    if (maisBarato || resolveAET) {
+      sugestaoDesmontagem = {
+        veiculoId: veiculoSemLamina,
+        veiculo: VEICULOS.find(v=>v.id===veiculoSemLamina),
+        resolveAET,   // true = mesmo veículo, mas sem necessidade de AET de largura especial
+        maisBarato,   // true = veículo mais barato é possível
+      }
     }
   }
 
@@ -624,7 +652,9 @@ export function resolverVeiculoTransporte(
     motivoBasculante: temBasculante,  // true = é caminhão basculante — sempre vai de prancha, independente do cálculo
     larguraExcedida,       // true = nem a maior prancha cobre a largura
     comprimentoExcedido,   // true = nem a maior prancha cobre o comprimento — avaliar viagens separadas
-    sugestaoDesmontagem,   // {veiculoId, veiculo} se desmontar a lâmina permitir veículo mais barato
+    pesoExcedido,          // true = peso combinado excede a prancha4 (40,5t) — necessário dividir em 2 viagens
+    recomendaDuasViagens:  pesoExcedido, // alias semântico para exibição
+    sugestaoDesmontagem,   // {veiculoId, veiculo, resolveAET, maisBarato}
     sentidoPesado,
     milsSuporta,
     especial: false,
