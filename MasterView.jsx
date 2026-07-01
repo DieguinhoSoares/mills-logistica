@@ -322,10 +322,10 @@ export function MasterView({ simClients = [] }) {
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:16 }}>
               {[
-                { l:'Total',             v:mgrReqs.filter(r=>r.status!=='cancelado').length,                   c:T.laranja, bg:T.laranjaLight },
-                { l:'Aguard. Aprovação', v:pendingAprov,                                                       c:'#B8860B',  bg:'#FFF8E1'     },
-                { l:'No time de Frotas', v:mgrReqs.filter(r=>['pendente','aceito'].includes(r.status)).length, c:T.verde,   bg:T.verdeLight  },
-                { l:'Recusadas',         v:mgrReqs.filter(r=>r.status==='recusado').length,                    c:T.perigo,  bg:T.perigoLight },
+                { l:'Em aberto',         v:mgrReqs.filter(r=>!['concluido','cancelado','recusado'].includes(r.status)).length, c:T.laranja, bg:T.laranjaLight },
+                { l:'Aguard. Aprovação', v:pendingAprov,                                                                       c:'#B8860B', bg:'#FFF8E1'     },
+                { l:'No time de Frotas', v:mgrReqs.filter(r=>['pendente','aceito'].includes(r.status)).length,                 c:T.verde,   bg:T.verdeLight  },
+                { l:'Recusadas',         v:mgrReqs.filter(r=>r.status==='recusado').length,                                    c:T.perigo,  bg:T.perigoLight },
               ].map(s=>(
                 <div key={s.l} style={{ background:s.bg, border:`1px solid ${s.c}30`, borderRadius:T.rLg, padding:'12px 14px', boxShadow:T.shadow }}>
                   <div style={{ color:s.c, fontFamily:FONT, fontWeight:900, fontSize:24, lineHeight:1 }}>{s.v}</div>
@@ -334,7 +334,7 @@ export function MasterView({ simClients = [] }) {
               ))}
             </div>
             <div style={{ display:'flex', gap:8, marginBottom:14, flexWrap:'wrap' }}>
-              {[['todos','Todos'],['pendente_supervisor','Aguard. Supervisor'],['pendente_gerente','Aguard. Gerência'],['pendente','No time de Frotas'],['aceito','Aceito'],['recusado','Recusado']].map(([v,l])=>(
+              {[['todos','Todos'],['pendente_supervisor','Aguard. Supervisor'],['pendente_gerente','Aguard. Gerência'],['pendente','No time de Frotas'],['aceito','Aceito'],['recusado','Recusado'],['concluido','Concluído']].map(([v,l])=>(
                 <button key={v} onClick={()=>setFilterAprov(v)}
                   style={{ ...BS, background:filterAprov===v?T.laranja:T.surface, color:filterAprov===v?'white':T.textSec, border:`1px solid ${filterAprov===v?T.laranja:T.border}`, fontSize:10, padding:'4px 12px' }}>
                   {l}

@@ -726,7 +726,8 @@ function RequestsKanban({ requests, teamsWebhookUrl, onRespond, onCancel, profil
   const [saving,    setSaving]     = useState(false)
   const groups={
     pendente: requests.filter(r=>r.status==='pendente'),
-    aceito:   requests.filter(r=>r.status==='aceito'),
+    aceito:   requests.filter(r=>r.status==='aceito'),  // concluído é exibido como aceito concluído; filtrado aqui se quiser ocultar
+    concluido: requests.filter(r=>r.status==='concluido'),
     recusado: requests.filter(r=>r.status==='recusado'),
   }
   const cols=[
@@ -1392,7 +1393,7 @@ export function FrotasView() {
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14, flexShrink:0 }}>
             <div>
               <h2 style={{ fontFamily:'Barlow Condensed,IBM Plex Sans,sans-serif', fontWeight:700, fontSize:22, color:T.text, margin:0 }}>Solicitações de Serviço</h2>
-              <p style={{ color:T.textMuted, fontFamily:'IBM Plex Sans,sans-serif', fontSize:12, margin:'2px 0 0' }}>Demandas recebidas em tempo real · {requests.length} total</p>
+              <p style={{ color:T.textMuted, fontFamily:'IBM Plex Sans,sans-serif', fontSize:12, margin:'2px 0 0' }}>Demandas recebidas em tempo real · {requests.filter(r=>!['cancelado','concluido'].includes(r.status)).length} em aberto · {requests.length} total</p>
             </div>
           </div>
           <div style={{ flex:1, overflow:'hidden' }}>
