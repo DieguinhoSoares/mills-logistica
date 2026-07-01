@@ -75,7 +75,11 @@ export const CARD_SUBTYPES = {
     { value:'desmobilizacao',     label:'📥 Desmobilização' },
     { value:'rollout',            label:'🔁 Rollout' },
     { value:'quebra_contrato',    label:'❌ Quebra de Contrato' },
+    { value:'troca_tecnica',      label:'🔄 Troca Técnica' },
+    { value:'sinistro',           label:'⚠️ Sinistro' },
+    { value:'garantia',           label:'🛡️ Garantia' },
     { value:'venda_equipamentos', label:'💰 Venda de Equipamentos' },
+    { value:'outros',             label:'📋 Outros' },
   ],
 }
 
