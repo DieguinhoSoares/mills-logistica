@@ -1,52 +1,10 @@
 import { useState, useEffect } from 'react'
 import {
   collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc,
-  query, orderBy, where, serverTimestamp, setDoc, getDoc, runTransaction, writeBatch,
+  query, orderBy, where, serverTimestamp, setDoc, getDoc,
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { useAuth } from '../contexts/AuthContext'
-
-// Gera um número sequencial atômico (#1, #2, #3...) usado para identificar cards/serviços.
-// Usa um doc contador em counters/{name} e runTransaction pra evitar dois cards com o mesmo número
-// mesmo se dois usuários criarem serviços ao mesmo tempo.
-async function getNextSeq(name) {
-  const ref = doc(db, 'counters', name)
-  const seq = await runTransaction(db, async tx => {
-    const snap = await tx.get(ref)
-    const next = (snap.exists() ? snap.data().value : 0) + 1
-    tx.set(ref, { value: next }, { merge: true })
-    return next
-  })
-  return seq
-}
-
-// Migração única: atribui #1, #2, #3... aos cards que existiam antes do recurso de ID
-// sequencial existir (em ordem de criação). Roda do mais antigo pro mais novo, e continua
-// a partir do número em uso pelo contador (não recomeça do zero nem colide com cards novos).
-// Use com cautela: evite criar cards novos enquanto a migração estiver em execução.
-export async function backfillSeqIds(cards) {
-  const missing = cards
-    .filter(c => !c.seqId)
-    .sort((a,b) => {
-      const ta = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0
-      const tb = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0
-      return ta - tb
-    })
-  if (!missing.length) return 0
-
-  const counterRef = doc(db, 'counters', 'cards')
-  const counterSnap = await getDoc(counterRef)
-  let next = counterSnap.exists() ? counterSnap.data().value : 0
-
-  for (let i = 0; i < missing.length; i += 450) {
-    const chunk = missing.slice(i, i + 450)
-    const batch = writeBatch(db)
-    chunk.forEach(c => { next += 1; batch.update(doc(db, 'cards', c.id), { seqId: next }) })
-    await batch.commit()
-  }
-  await setDoc(counterRef, { value: next }, { merge: true })
-  return missing.length
-}
 
 export function useCards() {
   const [cards,   setCards]   = useState([])
@@ -62,15 +20,8 @@ export function useCards() {
   const saveCard = async card => {
     const { id, ...data } = card
     data.updatedAt = serverTimestamp()
-    if (id && id.length > 10) {
-      await updateDoc(doc(db,'cards',id), data)
-      return { id, seqId: card.seqId }
-    } else {
-      data.createdAt = serverTimestamp()
-      data.seqId = await getNextSeq('cards')
-      const ref = await addDoc(collection(db,'cards'), data)
-      return { id: ref.id, seqId: data.seqId }
-    }
+    if (id && id.length > 10) await updateDoc(doc(db,'cards',id), data)
+    else { data.createdAt = serverTimestamp(); await addDoc(collection(db,'cards'), data) }
   }
   const deleteCard = id => deleteDoc(doc(db,'cards',id))
   const moveCard   = async (id, startDate, endDate, reason) => {
@@ -90,12 +41,7 @@ export function needsApproval(type, subtype) {
   return isFreteGerencial || isGuindauto
 }
 
-export function getInitialStatus(type, subtype, creatorRole) {
-  // Se o próprio supervisor abriu o pedido, não faz sentido ele aprovar a própria etapa —
-  // pula direto pra gerência (se o subtipo exigir) ou pro time de Frotas.
-  if (creatorRole === 'supervisor') {
-    return needsGerenteApproval(type, subtype) ? 'pendente_gerente' : 'pendente'
-  }
+export function getInitialStatus(type, subtype) {
   if (needsApproval(type, subtype)) return 'pendente_supervisor'
   return 'pendente'
 }
@@ -144,14 +90,37 @@ export function useRequests(roleFilter) {
   }, [user, roleFilter])
 
   const submitRequest = async data => {
-    const status   = getInitialStatus(data.type, data.subtype, data.createdByRole || profile?.role)
+    const status   = getInitialStatus(data.type, data.subtype)
     const needsGer = needsGerenteApproval(data.type, data.subtype)
+
+    // Se vier com id é um REENVIO de solicitação recusada — atualiza o doc existente
+    // em vez de criar um novo, preservando o histórico de aprovações e o vínculo.
+    if (data.id) {
+      await updateDoc(doc(db,'requests',data.id), {
+        ...data,
+        id:                   undefined, // não gravar o id como campo
+        requesterName:        data.requesterName || profile?.name || '',
+        unit:                 data.unit || profile?.unit || '',
+        status,
+        needsGerenteApproval: needsGer,
+        respondedAt:          null,
+        responseNote:         null,
+        updatedAt:            serverTimestamp(),
+      })
+      await addDoc(collection(db,'requests',data.id,'messages'), {
+        text:`Solicitação ajustada e reenviada pelo solicitante.`,
+        authorId:profile?.uid||'', authorName:profile?.name||'Solicitante',
+        authorRole:profile?.role||'solicitante', type:'status_change',
+        statusEvent:'reenviada', createdAt:serverTimestamp(),
+      })
+      return
+    }
+
     await addDoc(collection(db,'requests'), {
       ...data,
       requesterId:          user.uid,
       requesterName:        data.requesterName || profile?.name || '',
       unit:                 data.unit || profile?.unit || '',
-      createdByRole:        data.createdByRole || profile?.role || 'solicitante',
       status,
       needsGerenteApproval: needsGer,
       approvalLog:          [],
@@ -525,34 +494,12 @@ export async function runDailyBackup(cards, requests) {
     const today = new Date().toISOString().split('T')[0]
     const ref = doc(db,'backups',today)
     const existing = await getDoc(ref)
-    if (existing.exists()) {
-      // Já existe backup de hoje — ainda assim atualiza o heartbeat,
-      // pra confirmar que o processo passou por aqui novamente.
-      await setDoc(doc(db,'system','backupStatus'), { lastCheckAt:serverTimestamp(), lastBackupDate:today }, { merge:true })
-      return
-    }
+    if (existing.exists()) return
     await setDoc(ref, {
       date:today, createdAt:serverTimestamp(),
       cardsCount:cards.length, requestsCount:requests.length,
       cards:cards.map(c=>({...c})), requests:requests.map(r=>({...r})),
     })
-    await setDoc(doc(db,'system','backupStatus'), {
-      lastBackupAt:serverTimestamp(), lastBackupDate:today,
-      lastCheckAt:serverTimestamp(), cardsCount:cards.length, requestsCount:requests.length,
-    }, { merge:true })
     console.log('Backup OK:', today)
   } catch(e) { console.warn('Backup error:', e) }
-}
-
-// Monitoramento — qualquer tela com Master logado pode exibir um aviso
-// se o último backup bem-sucedido estiver muito antigo (ver MasterView).
-export function useBackupStatus() {
-  const [status, setStatus] = useState(null)
-  useEffect(() => {
-    const unsub = onSnapshot(doc(db,'system','backupStatus'), snap => {
-      setStatus(snap.exists() ? snap.data() : null)
-    }, () => {})
-    return unsub
-  }, [])
-  return status
 }
