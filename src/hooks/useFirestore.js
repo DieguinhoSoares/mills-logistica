@@ -96,22 +96,52 @@ export function useRequests(roleFilter) {
     // Se vier com id é um REENVIO de solicitação recusada — atualiza o doc existente
     // em vez de criar um novo, preservando o histórico de aprovações e o vínculo.
     if (data.id) {
-      await updateDoc(doc(db,'requests',data.id), {
-        ...data,
-        id:                   undefined, // não gravar o id como campo
-        requesterName:        data.requesterName || profile?.name || '',
+      // Reenvio: monta o payload explicitamente — sem usar spread do form
+      // que contém objetos não-serializáveis (Sets, refs, _livreLookup, etc.)
+      const reqId = data.id
+      const payload = {
+        type:                 data.type || '',
+        subtype:              data.subtype || '',
+        clientName:           data.clientName || data.client || '',
+        client:               data.clientName || data.client || '',
+        plantaObra:           data.clientName || data.client || '',
+        nInterno:             Array.isArray(data.nInternos) ? data.nInternos.join(', ') : (data.nInterno || ''),
+        nInternos:            Array.isArray(data.nInternos) ? data.nInternos : [],
+        nInternosReserva:     Array.isArray(data.nInternosReserva) ? data.nInternosReserva : [],
+        machine:              data.machine || '',
+        grupoModelo:          data.grupoModelo || '',
+        originCity:           data.originCity?.m || data.originCity || '',
+        destCity:             data.destCity?.m || data.destCity || '',
+        origin:               data.originCity?.s || data.origin || '',
+        destination:          data.destCity?.s || data.destination || '',
+        desiredDate:          data.desiredDate || '',
+        desiredDateEnd:       data.desiredDateEnd || '',
+        urgency:              data.urgency || 'medio',
+        om:                   data.om || '',
+        description:          data.description || '',
+        channel:              data.channel || 'teams',
+        podeEmbarcar:         data.podeEmbarcar || null,
+        destinoOficina:       data.destinoOficina || '',
+        movimento:            data.movimento || '',
+        semCliente:           !!data.semCliente,
+        localLivre:           data.localLivre || '',
         unit:                 data.unit || profile?.unit || '',
+        requesterName:        data.requesterName || profile?.name || '',
         status,
         needsGerenteApproval: needsGer,
         respondedAt:          null,
         responseNote:         null,
         updatedAt:            serverTimestamp(),
-      })
-      await addDoc(collection(db,'requests',data.id,'messages'), {
-        text:`Solicitação ajustada e reenviada pelo solicitante.`,
-        authorId:profile?.uid||'', authorName:profile?.name||'Solicitante',
-        authorRole:profile?.role||'solicitante', type:'status_change',
-        statusEvent:'reenviada', createdAt:serverTimestamp(),
+      }
+      await updateDoc(doc(db,'requests',reqId), payload)
+      await addDoc(collection(db,'requests',reqId,'messages'), {
+        text:'Solicitação ajustada e reenviada pelo solicitante.',
+        authorId:   profile?.uid  || '',
+        authorName: profile?.name || 'Solicitante',
+        authorRole: profile?.role || 'solicitante',
+        type:       'status_change',
+        statusEvent:'reenviada',
+        createdAt:  serverTimestamp(),
       })
       return
     }
