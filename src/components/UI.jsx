@@ -143,12 +143,37 @@ export function NotificationBell({ notifications, unreadCount, onMarkAllRead, on
 export function ClientInput({ value, onChange, simClients }) {
   const [open, setOpen]     = useState(false)
   const [search, setSearch] = useState(value?.name||'')
-  const filtered = search.length>1 ? simClients.filter(c=>c.name.toLowerCase().includes(search.toLowerCase())).slice(0,8) : []
+
+  // Normalização tolerante a acentos e maiúsculas/minúsculas —
+  // converte "SÃO PAULO" e "SAO PAULO" pra a mesma string de busca.
+  const norm = s => s.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')  // remove diacríticos (acentos)
+    .replace(/[^a-z0-9\s]/g, '')                        // remove pontuação
+    .trim()
+
+  const filtered = search.length>1
+    ? simClients.filter(c => norm(c.name).includes(norm(search))).slice(0,8)
+    : []
+
+  const handleBlur = () => {
+    setTimeout(() => {
+      setOpen(false)
+      // Se o usuário digitou algo mas não selecionou nenhum item do SIM,
+      // aceita como texto livre (ex: cliente de venda, fornecedor externo).
+      // Cria um objeto sintético {name} sem dados de SIM — funcional mas sem
+      // autopreenchimento de estado/cidade/frota.
+      if (search.trim() && (!value || value.name !== search.trim())) {
+        onChange({ name: search.trim(), state:'', city:'', machines:0, nInternos:[], _livreLookup:true })
+      }
+    }, 180)
+  }
+
   return (
     <div style={{ position:'relative' }}>
       <input value={search}
         onChange={e=>{ setSearch(e.target.value); setOpen(true); if(!e.target.value) onChange(null) }}
-        onFocus={()=>setOpen(true)} onBlur={()=>setTimeout(()=>setOpen(false),180)}
+        onFocus={()=>setOpen(true)}
+        onBlur={handleBlur}
         placeholder="Digite a planta ou obra..." style={{ width:'100%', background:T.surfaceAlt, border:`1px solid ${T.border}`, borderRadius:8, padding:'9px 12px', color:T.text, fontSize:13, fontFamily:FONT, boxSizing:'border-box', outline:'none' }} autoComplete="off"/>
       {open && filtered.length>0 && (
         <div style={{ position:'absolute', top:'100%', left:0, right:0, background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.r, boxShadow:T.shadowLg, zIndex:500, maxHeight:220, overflowY:'auto' }}>
@@ -164,6 +189,25 @@ export function ClientInput({ value, onChange, simClients }) {
               </div>
             </div>
           ))}
+          {/* Opção de texto livre quando há texto mas nenhum match exato */}
+          {search.trim() && filtered.length===0 && (
+            <div onMouseDown={()=>{ const obj={name:search.trim(),state:'',city:'',machines:0,nInternos:[],_livreLookup:true}; onChange(obj); setOpen(false) }}
+              style={{ padding:'9px 13px', cursor:'pointer', borderBottom:`1px solid ${T.border}` }}
+              onMouseEnter={e=>e.currentTarget.style.background=T.laranjaXLight}
+              onMouseLeave={e=>e.currentTarget.style.background=T.surface}>
+              <div style={{ fontFamily:FONT, fontWeight:600, fontSize:12, color:T.textSec }}>
+                ✏️ Usar "{search.trim()}" como texto livre
+              </div>
+              <div style={{ fontFamily:FONT, fontSize:10, color:T.textMuted }}>
+                Cliente não encontrado no SIM — será salvo como digitado
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {value?._livreLookup && (
+        <div style={{ marginTop:3, color:T.amarelo, fontSize:10, fontFamily:FONT, fontWeight:600 }}>
+          ⚠️ Não encontrado no SIM — salvo como texto livre
         </div>
       )}
     </div>
@@ -219,7 +263,7 @@ export function MunicipioInput({ value, onChange, placeholder='Cidade...' }) {
     try {
       const res  = await fetch('https://servicodados.ibge.gov.br/api/v1/localidades/municipios?orderBy=nome')
       const data = await res.json()
-      setResults(data.filter(m=>m.nome.toLowerCase().includes(texto.toLowerCase())).slice(0,10).map(m=>({ m:m.nome, s:m.microrregiao.mesorregiao.UF.sigla })))
+      const normT=texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); setResults(data.filter(m=>m.nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes(normT)).slice(0,10).map(m=>({ m:m.nome, s:m.microrregiao.mesorregiao.UF.sigla })))
     } catch { setResults([]) }
     setLoading(false)
   }
@@ -267,7 +311,6 @@ export function ServiceCard({ card, conflicts, onEdit, onDragStart, compact=fals
       <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:compact?1:4 }}>
         <span style={{ fontSize:compact?10:12 }}>{ct?.icon}</span>
         <span style={{ color:ct?.color, fontSize:8, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', fontFamily:FONT }}>{ct?.short}</span>
-        {card.seqId && <span style={{ color:T.textMuted, fontSize:8, fontWeight:700, fontFamily:FONT }}>#{card.seqId}</span>}
         <span style={{ marginLeft:'auto', fontSize:compact?9:11 }}>{ug?.icon}</span>
       </div>
       <div style={{ color:T.text, fontWeight:700, fontSize:compact?10:12, fontFamily:FONT, marginBottom:compact?0:2, lineHeight:1.2, textDecoration:isCancelado?'line-through':'none' }}>{card.client}</div>
@@ -276,73 +319,8 @@ export function ServiceCard({ card, conflicts, onEdit, onDragStart, compact=fals
         <div style={{ color:T.textSec, fontSize:9, fontFamily:FONT }}>{card.originCity||card.origin||'—'} → {card.destCity||card.destination||'—'}</div>
         {card.nInterno && <div style={{ color:T.info, fontSize:9, fontFamily:FONT, fontWeight:600 }}>🔢 {card.nInterno}</div>}
         {card.driver   && <div style={{ color:T.verde, fontSize:9, fontFamily:FONT, fontWeight:600 }}>👤 {card.driver}</div>}
-        {card.movimento==='retorno' && card.cardOrigemId && <div style={{ color:T.textMuted, fontSize:8, fontFamily:FONT, fontWeight:600 }}>🔗 vinculado à saída</div>}
-        {card.movimento==='retorno' && !card.cardOrigemId && <div style={{ color:T.amarelo, fontSize:8, fontFamily:FONT, fontWeight:700 }}>🔗 sem vínculo{card.refOrigem?` (ref: ${card.refOrigem})`:''}</div>}
       </>}
     </motion.div>
-  )
-}
-
-export function CardSearch({ cards, onSelect, placeholder='Buscar por ID, cliente ou subtipo...' }) {
-  const [q, setQ]   = useState('')
-  const [open, setOpen] = useState(false)
-  const boxRef = useRef(null)
-
-  useEffect(() => {
-    const close = e => { if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false) }
-    document.addEventListener('mousedown', close)
-    return () => document.removeEventListener('mousedown', close)
-  }, [])
-
-  const term = q.trim().toLowerCase()
-  const results = term.length === 0 ? [] : cards
-    .filter(c => {
-      const idStr = String(c.seqId || '')
-      return idStr === term.replace('#','')
-        || idStr.includes(term.replace('#',''))
-        || (c.client||'').toLowerCase().includes(term)
-        || (c.subtype||'').replace(/_/g,' ').toLowerCase().includes(term)
-        || (c.nInterno||'').toLowerCase().includes(term)
-    })
-    .sort((a,b) => (b.seqId||0)-(a.seqId||0))
-    .slice(0, 8)
-
-  return (
-    <div ref={boxRef} style={{ position:'relative', width:240 }}>
-      <input value={q} onFocus={()=>setOpen(true)}
-        onChange={e=>{ setQ(e.target.value); setOpen(true) }}
-        placeholder={placeholder}
-        style={{ width:'100%', padding:'5px 10px', borderRadius:T.rSm, border:`1px solid ${T.border}`,
-          background:T.surfaceAlt, color:T.text, fontFamily:'IBM Plex Sans,sans-serif', fontSize:11, outline:'none' }}/>
-      {open && term.length>0 && (
-        <div style={{ position:'absolute', top:'calc(100% + 4px)', left:0, right:0, zIndex:50,
-          background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.rSm, boxShadow:T.shadowMd,
-          maxHeight:280, overflowY:'auto' }}>
-          {results.length===0 && (
-            <div style={{ padding:'10px 12px', color:T.textMuted, fontSize:11, fontFamily:'IBM Plex Sans,sans-serif' }}>
-              Nenhum serviço encontrado.
-            </div>
-          )}
-          {results.map(c => {
-            const ct = CARD_TYPES[c.type]
-            return (
-              <div key={c.id} onClick={()=>{ onSelect?.(c); setOpen(false); setQ('') }}
-                style={{ padding:'8px 12px', cursor:'pointer', borderBottom:`1px solid ${T.border}`,
-                  display:'flex', alignItems:'center', gap:8 }}
-                onMouseEnter={e=>e.currentTarget.style.background=T.surfaceAlt}
-                onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                <span style={{ color:T.textMuted, fontSize:10, fontWeight:700, fontFamily:FONT, minWidth:28 }}>#{c.seqId||'—'}</span>
-                <span style={{ fontSize:11 }}>{ct?.icon}</span>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ color:T.text, fontSize:11, fontWeight:600, fontFamily:'IBM Plex Sans,sans-serif', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{c.client||'—'}</div>
-                  <div style={{ color:T.textSec, fontSize:9, fontFamily:'IBM Plex Sans,sans-serif' }}>{c.subtype?.replace(/_/g,' ')||ct?.short} · {c.startDate||'—'}</div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </div>
   )
 }
 
