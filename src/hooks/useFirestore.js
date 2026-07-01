@@ -468,8 +468,6 @@ export function useManagerialRequests() {
   const [requests, setRequests] = useState([])
   const [loading,  setLoading]  = useState(true)
   useEffect(() => {
-    // Busca TODAS as solicitações que passam pelo fluxo de aprovação gerencial
-    // Inclui: needsGerenteApproval=true (TT/Garantia/Sinistro) E Guindauto (needsApproval=true mas needsGerenteApproval=false)
     const q = query(collection(db,'requests'), orderBy('createdAt','desc'))
     const unsub = onSnapshot(q,
       snap => {
