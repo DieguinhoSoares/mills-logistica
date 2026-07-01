@@ -725,7 +725,7 @@ function RequestsKanban({ requests, teamsWebhookUrl, onRespond, onCancel, profil
   const [saving,    setSaving]     = useState(false)
   const groups={
     pendente: requests.filter(r=>r.status==='pendente'),
-    aceito:   requests.filter(r=>r.status==='aceito'),  // concluído é exibido como aceito concluído; filtrado aqui se quiser ocultar
+    aceito:   requests.filter(r=>r.status==='aceito'),
     concluido: requests.filter(r=>r.status==='concluido'),
     recusado: requests.filter(r=>r.status==='recusado'),
   }
@@ -933,6 +933,7 @@ export function FrotasView() {
 
   const [activeTab,    setActiveTab]    = useState('agenda')
   const [view,         setView]         = useState('semana')
+  const [busca,        setBusca]        = useState('')
   const [baseDate,     setBaseDate]     = useState(todayStr())
   const [yr,           setYr]           = useState(new Date().getFullYear())
   const [mo,           setMo]           = useState(new Date().getMonth())
@@ -1250,6 +1251,55 @@ export function FrotasView() {
               {view==='semana'&&<button onClick={()=>setBaseDate(todayStr())} style={{ ...NB, fontSize:10, padding:'3px 8px', letterSpacing:'0.04em' }}>HOJE</button>}
             </div>
             <div style={{ display:'flex', gap:7, alignItems:'center' }}>
+              {/* Campo de busca */}
+              <div style={{ position:'relative' }}>
+                <input
+                  value={busca} onChange={e=>setBusca(e.target.value)}
+                  placeholder="🔍 Nº card, frota ou cliente..."
+                  style={{ ...IS, width:220, padding:'5px 28px 5px 10px', fontSize:11, borderRadius:20, height:28 }}/>
+                {busca && (
+                  <button onClick={()=>setBusca('')}
+                    style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:T.textMuted, fontSize:13, lineHeight:1 }}>×</button>
+                )}
+                {busca.trim().length>=1 && (() => {
+                  const q = busca.trim().toLowerCase()
+                  const resultados = cards.filter(c =>
+                    String(c.seqId||'').includes(q) ||
+                    (c.nInterno||'').toLowerCase().includes(q) ||
+                    (c.client||'').toLowerCase().includes(q) ||
+                    (c.clientName||'').toLowerCase().includes(q) ||
+                    (c.nInternos||[]).some(n=>n.toLowerCase().includes(q))
+                  ).filter(c=>!['cancelado'].includes(c.status)).slice(0,8)
+                  return (
+                    <div style={{ position:'absolute', top:34, right:0, width:320, background:T.surface, borderRadius:T.r, boxShadow:T.shadowLg, border:`1px solid ${T.border}`, zIndex:999, maxHeight:360, overflowY:'auto' }}>
+                      {resultados.length===0 ? (
+                        <div style={{ padding:'14px 16px', color:T.textMuted, fontSize:12, fontFamily:FONT }}>Nenhum resultado encontrado</div>
+                      ) : resultados.map(card=>{
+                        const ct=CARD_TYPES[card.type]
+                        return (
+                          <div key={card.id} onClick={()=>{setEditCard(card);setModal('card');setBusca('')}}
+                            style={{ padding:'10px 14px', borderBottom:`1px solid ${T.border}`, cursor:'pointer', display:'flex', gap:10, alignItems:'flex-start' }}
+                            onMouseEnter={e=>e.currentTarget.style.background=T.surfaceAlt}
+                            onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                            <div style={{ flexShrink:0, marginTop:1 }}>
+                              <span style={{ background:ct?.bg, color:ct?.color, borderRadius:20, padding:'1px 6px', fontSize:9, fontWeight:700, fontFamily:FONT }}>{ct?.icon} {ct?.short}</span>
+                            </div>
+                            <div style={{ flex:1, minWidth:0 }}>
+                              <div style={{ color:T.text, fontWeight:700, fontSize:12, fontFamily:FONT, marginBottom:2 }}>
+                                {card.seqId ? `#${card.seqId} · ` : ''}{card.client||card.clientName||'—'}
+                              </div>
+                              <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT }}>
+                                {[card.nInterno, ...(card.nInternos||[])].filter(Boolean).join(', ')}
+                                {card.startDate ? ` · ${fmt(card.startDate)}` : ''}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })()}
+              </div>
               {Object.entries(CARD_TYPES).map(([k,v])=>(
                 <div key={k} style={{ display:'flex', alignItems:'center', gap:4, background:v.bg, border:`1px solid ${v.color}40`, borderRadius:20, padding:'2px 9px' }}>
                   <div style={{ width:7, height:7, borderRadius:'50%', background:v.color }}/><span style={{ color:v.color, fontSize:8, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em' }}>{v.short}</span>
@@ -1392,7 +1442,7 @@ export function FrotasView() {
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14, flexShrink:0 }}>
             <div>
               <h2 style={{ fontFamily:'Barlow Condensed,IBM Plex Sans,sans-serif', fontWeight:700, fontSize:22, color:T.text, margin:0 }}>Solicitações de Serviço</h2>
-              <p style={{ color:T.textMuted, fontFamily:'IBM Plex Sans,sans-serif', fontSize:12, margin:'2px 0 0' }}>Demandas recebidas em tempo real · {requests.filter(r=>!['cancelado','concluido'].includes(r.status)).length} em aberto · {requests.length} total</p>
+              <p style={{ color:T.textMuted, fontFamily:'IBM Plex Sans,sans-serif', fontSize:12, margin:'2px 0 0' }}>Demandas recebidas em tempo real · {requests.filter(r=>['pendente','aceito'].includes(r.status)).length} em aberto · {requests.filter(r=>!['cancelado'].includes(r.status)).length} histórico</p>
             </div>
           </div>
           <div style={{ flex:1, overflow:'hidden' }}>
