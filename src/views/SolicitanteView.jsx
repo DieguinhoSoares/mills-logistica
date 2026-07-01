@@ -41,10 +41,10 @@ export function SolicitanteView({ simClients }) {
     const grupo = buscarGrupoModelo(form.nInternos || (form.nInterno ? [form.nInterno] : []), simClients)
     const machineLabel = form.nInternosReserva.length > 0 ? form.nInternosReserva.join(', ') : form.machine||''
     try {
-      // Se reopenData tem id é um reenvio — passa o id pra submitRequest fazer update (não addDoc)
-      const idReenvio = reopenData?.id || null
-      await submitRequest({ ...form, grupoModelo: grupo || '', machine: machineLabel, ...(idReenvio ? { id: idReenvio } : {}) })
-      addToast(idReenvio ? 'Solicitação ajustada e reenviada! O time de Frotas foi notificado.' : 'Solicitação enviada! O time de Frotas foi notificado.', 'success')
+      // O RequestForm já passa form.id quando é um reenvio (initialData.id).
+      // Não precisa mais de lógica extra aqui — submitRequest detecta pelo form.id.
+      await submitRequest({ ...form, grupoModelo: grupo || '', machine: machineLabel })
+      addToast(form.id ? 'Solicitação ajustada e reenviada! O time de Frotas foi notificado.' : 'Solicitação enviada! O time de Frotas foi notificado.', 'success')
     } catch (err) {
       console.error('Erro ao enviar solicitação:', err)
       throw err
