@@ -24,29 +24,82 @@ const SUBTYPES_MAQUINA_RESERVA = ['troca_tecnica','sinistro','garantia']
 // (apoio operacional, transporte de peças sobressalentes, ou casos não previstos)
 const SUBTYPES_SEM_FROTA      = ['apoio_operacional','frete_pecas','outros']
 
-function ChipInput({ label, placeholder, values, onChange, hint }) {
-  const [input, setInput] = useState('')
-  const add = () => {
-    const v = input.trim()
-    if (!v || values.includes(v)) return
-    onChange([...values, v]); setInput('')
+// Padrão esperado: 3 letras + 5 dígitos (ex: PCP01141, TES01693, EHS02621)
+const PADRAO_FROTA = /^[A-Za-z]{3}\d{5}$/
+
+function ChipInput({ label, placeholder, values, onChange, hint, validateFrota = false }) {
+  const [input, setInput]       = useState('')
+  const [alertVal, setAlertVal] = useState(null) // valor fora do padrão aguardando confirmação
+
+  const tryAdd = (raw) => {
+    const v = raw.trim().toUpperCase()
+    if (!v || values.includes(v)) { setInput(''); return }
+    if (validateFrota && !PADRAO_FROTA.test(v)) {
+      setAlertVal(v) // mostra o alerta — não adiciona ainda
+    } else {
+      onChange([...values, v]); setInput('')
+    }
   }
+
+  const confirmAdd = () => {
+    if (alertVal) { onChange([...values, alertVal]); setAlertVal(null); setInput('') }
+  }
+
   const remove = v => onChange(values.filter(x => x !== v))
+
   return (
     <div>
       <label style={LS}>{label}</label>
-      <div style={{ display:'flex', flexWrap:'wrap', gap:5, padding:'7px 10px', background:T.surfaceAlt, border:`1px solid ${T.border}`, borderRadius:T.r, minHeight:42 }}>
-        {values.map(v => (
-          <span key={v} style={{ display:'flex', alignItems:'center', gap:4, background:T.verde, color:'white', borderRadius:20, padding:'2px 10px', fontSize:11, fontFamily:FONT, fontWeight:700 }}>
-            {v}<span onClick={()=>remove(v)} style={{ cursor:'pointer', fontSize:14, lineHeight:1, opacity:0.8 }}>×</span>
-          </span>
-        ))}
+      <div style={{ display:'flex', flexWrap:'wrap', gap:5, padding:'7px 10px', background:T.surfaceAlt,
+        border:`1px solid ${T.border}`, borderRadius:T.r, minHeight:42 }}>
+        {values.map(v => {
+          const fora = validateFrota && !PADRAO_FROTA.test(v)
+          return (
+            <span key={v} style={{ display:'flex', alignItems:'center', gap:4,
+              background: fora ? T.amarelo : T.verde,
+              color: fora ? '#000' : 'white',
+              borderRadius:20, padding:'2px 10px', fontSize:11, fontFamily:FONT, fontWeight:700,
+              title: fora ? 'Padrão fora do esperado (XXX00000)' : '' }}>
+              {fora && <span title="Padrão fora do esperado">⚠️</span>}
+              {v}<span onClick={()=>remove(v)} style={{ cursor:'pointer', fontSize:14, lineHeight:1, opacity:0.8 }}>×</span>
+            </span>
+          )
+        })}
         <input value={input} onChange={e=>setInput(e.target.value)}
-          onKeyDown={e=>{if(e.key==='Enter'||e.key===','){e.preventDefault();add()}}}
-          placeholder={values.length===0?placeholder:'+ adicionar'}
+          onKeyDown={e=>{if(e.key==='Enter'||e.key===','){e.preventDefault();tryAdd(input)}}}
+          onBlur={()=>{ if(input.trim()) tryAdd(input) }}
+          placeholder={values.length===0 ? placeholder : '+ adicionar'}
           style={{ border:'none', background:'transparent', outline:'none', fontSize:12, fontFamily:FONT, color:T.text, minWidth:120, flex:1 }}/>
       </div>
       {hint && <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT, marginTop:3 }}>{hint}</div>}
+
+      {/* Alerta de confirmação quando o padrão não bate */}
+      {alertVal && (
+        <div style={{ marginTop:8, padding:'10px 12px', background:T.amareloLight,
+          borderRadius:T.rSm, border:`1px solid ${T.amarelo}80`,
+          display:'flex', flexDirection:'column', gap:8 }}>
+          <div style={{ color:T.textSec, fontFamily:FONT, fontSize:12, fontWeight:700 }}>
+            ⚠️ Padrão fora do esperado
+          </div>
+          <div style={{ color:T.textSec, fontFamily:FONT, fontSize:11 }}>
+            O padrão de frota Mills é <strong>XXX00000</strong> (3 letras + 5 números).
+            O valor informado <strong style={{ color:T.perigo }}>"{alertVal}"</strong> não segue esse formato.
+          </div>
+          <div style={{ color:T.textSec, fontFamily:FONT, fontSize:11 }}>
+            Tem certeza de que o número de frota <strong>"{alertVal}"</strong> está correto?
+          </div>
+          <div style={{ display:'flex', gap:7 }}>
+            <button onClick={confirmAdd}
+              style={{ ...BS, background:T.amarelo, color:'#000', fontWeight:800, fontSize:11, padding:'6px 14px' }}>
+              ✅ Sim, está correto
+            </button>
+            <button onClick={()=>{ setAlertVal(null); }}
+              style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}`, fontWeight:700, fontSize:11, padding:'6px 14px' }}>
+              ✏️ Corrigir
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -287,9 +340,10 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
         <div style={{ marginBottom:14 }}>
           <ChipInput
             label={<>{needsMaquinaReserva ? '🔧 N° Interno da Frota Danificada (que retorna)' : '📋 N° Interno (Frota)'} {frotaOpcional ? <span style={{ color:T.textMuted, fontWeight:600 }}>(opcional)</span> : <span style={{ color:T.perigo }}>*</span>}</>}
-            placeholder={needsMaquinaReserva ? 'N° da frota danificada + Enter...' : 'Digite o N° e pressione Enter...'}
+            placeholder={needsMaquinaReserva ? 'Ex: TES01234 — N° da frota danificada + Enter...' : 'Ex: PCP01234 — Digite e pressione Enter...'}
             values={form.nInternos} onChange={v=>set('nInternos',v)}
-            hint={form.selectedClient?.nInternos?.length>0?`${form.selectedClient.nInternos.length} frota(s) vinculada(s)`:'Pressione Enter ou vírgula para adicionar cada N° interno'}/>
+            validateFrota={true}
+            hint={form.selectedClient?.nInternos?.length>0?`${form.selectedClient.nInternos.length} frota(s) vinculada(s)`:'Pressione Enter ou vírgula para adicionar cada N° interno · Padrão: XXX00000'}/>
           {form.clientName && form.selectedClient?.nInternos?.length>0 && (
             <div style={{ display:'flex', flexWrap:'wrap', gap:5, marginTop:6 }}>
               {form.selectedClient.nInternos.filter(n=>!form.nInternos.includes(n)).slice(0,8).map(n=>(
@@ -324,10 +378,11 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
             <div style={{ gridColumn:'1/-1' }}>
               <ChipInput
                 label={<>🚜 N° Interno(s) do Equipamento Reserva <span style={{ color:T.perigo }}>*</span></>}
-                placeholder="N° interno da reserva + Enter..."
+                placeholder="Ex: TES01234 — N° interno da reserva + Enter..."
                 values={form.nInternosReserva}
                 onChange={v=>set('nInternosReserva',v)}
-                hint="Informe o(s) N° interno(s) da(s) máquina(s) que será(ão) enviada(s) ao cliente."/>
+                validateFrota={true}
+                hint="Informe o(s) N° interno(s) da(s) máquina(s) que será(ão) enviada(s) ao cliente · Padrão: XXX00000"/>
               {errors.machine && <div style={{ color:T.perigo, fontSize:10, fontFamily:FONT, marginTop:3 }}>⚠ Informe ao menos um equipamento reserva</div>}
             </div>
           )}
