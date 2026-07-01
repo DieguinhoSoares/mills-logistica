@@ -166,10 +166,22 @@ export function parseSIMCsv(text, Papa) {
   const lines = clean.split(/\r?\n/)
   const dataText = lines.slice(1).join('\n')
 
+  // Auto-detecta o separador — o SIM pode exportar com ; ou , dependendo
+  // da configuração regional do Windows do usuário. Conta qual ocorre mais
+  // na primeira linha (cabeçalho) e usa esse como separador.
+  const firstLine = dataText.split('\n')[0] || ''
+  const countSemi  = (firstLine.match(/;/g)  || []).length
+  const countComma = (firstLine.match(/,/g)  || []).length
+  const countTab   = (firstLine.match(/\t/g) || []).length
+  const delimiter  = countTab > countSemi && countTab > countComma ? '\t'
+                   : countComma > countSemi ? ','
+                   : ';'
+  console.log(`[parseSIMCsv] separador detectado: "${delimiter}" (;:${countSemi} ,:${countComma} tab:${countTab})`)
+
   const result = Papa.parse(dataText, {
     header: true,
     skipEmptyLines: true,
-    delimiter: ';',
+    delimiter,
   })
 
   // Normaliza nome para chave de agrupamento:
