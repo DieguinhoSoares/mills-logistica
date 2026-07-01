@@ -821,9 +821,11 @@ function RequestsKanban({ requests, teamsWebhookUrl, onRespond, onCancel, profil
 
 
 function CsvUploadModal({ onLoaded, onClose }) {
-  const [status, setStatus] = useState('idle')
-  const [count,  setCount]  = useState(0)
+  const [status,  setStatus]  = useState('idle')
+  const [count,   setCount]   = useState(0)
   const [preview, setPreview] = useState([])
+  const [clients, setClients] = useState([])
+  const [diagQ,   setDiagQ]   = useState('')
   const inputRef = useRef()
 
   const handleFile = e => {
@@ -836,6 +838,7 @@ function CsvUploadModal({ onLoaded, onClose }) {
         const clients = parseSIMCsv(ev.target.result, Papa)
         setCount(clients.length)
         setPreview(clients.slice(0,4))
+        setClients(clients)
         setStatus('done')
         onLoaded(clients)
       } catch(err) {
@@ -867,17 +870,7 @@ function CsvUploadModal({ onLoaded, onClose }) {
           </div>
         </div>
 
-        <div style={{ padding:'10px 13px', background:T.infoLight, borderRadius:T.rSm, border:`1px solid ${T.info}20`, marginBottom:16 }}>
-          <div style={{ color:T.info, fontSize:11, fontWeight:700, fontFamily:FONT, marginBottom:4 }}>📋 Colunas lidas do CSV:</div>
-          <div style={{ color:T.textSec, fontSize:10, fontFamily:FONT, lineHeight:1.6 }}>
-            <strong>Cliente:</strong> "Planta/Obra"<br/>
-            <strong>Frota:</strong> "N° Interno"<br/>
-            <strong>Veículo:</strong> "Grupo de Modelo" <span style={{ color:T.verde, fontWeight:700 }}>← usado para calcular frete</span><br/>
-            <strong>Estado:</strong> "Estado (Planta/Obra)"<br/>
-            <strong>Cidade:</strong> "Município (Planta/Obra)"<br/>
-            Separador: ponto-e-vírgula (;) · Encoding: UTF-8
-          </div>
-        </div>
+
         <div style={{ padding:20, background:T.surfaceAlt, borderRadius:T.r, border:`2px dashed ${T.borderMid}`, textAlign:'center', marginBottom:16 }}>
           <div style={{ fontSize:36, marginBottom:10 }}>📊</div>
           <p style={{ color:T.textSec, fontFamily:'IBM Plex Sans,sans-serif', fontSize:13, margin:'0 0 12px' }}>CSV exportado do SIM</p>
@@ -910,6 +903,26 @@ function CsvUploadModal({ onLoaded, onClose }) {
           <div style={{ color:T.perigo, fontWeight:700, fontSize:13, fontFamily:'IBM Plex Sans,sans-serif' }}>❌ Erro ao processar. Verifique o formato do arquivo.</div>
           <div style={{ color:T.textSec, fontSize:11, fontFamily:'IBM Plex Sans,sans-serif', marginTop:4 }}>Certifique-se que o arquivo usa ; como separador e encoding UTF-8.</div>
         </div>}
+
+        {/* Busca de diagnóstico — verificar se cliente específico foi importado */}
+        {status==='done' && clients.length>0 && (() => {
+          const [q,setQ] = [diagQ, setDiagQ]
+          const matches = q.length>=2 ? clients.filter(c=>c.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes(q.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''))) : []
+          return (
+            <div style={{ marginBottom:16 }}>
+              <input value={q} onChange={e=>setQ(e.target.value)} placeholder="🔍 Verificar se cliente foi importado..."
+                style={{ ...IS, fontSize:11 }}/>
+              {q.length>=2 && (
+                <div style={{ marginTop:6 }}>
+                  {matches.length===0
+                    ? <div style={{ color:T.perigo, fontSize:11, fontFamily:FONT }}>❌ "{q}" não encontrado na base importada</div>
+                    : matches.slice(0,5).map(m=><div key={m.name} style={{ color:T.sucesso, fontSize:11, fontFamily:FONT }}>✅ {m.name} · {m.nInternos?.length||0} frota(s)</div>)
+                  }
+                </div>
+              )}
+            </div>
+          )
+        })()}
 
         <div style={{ display:'flex', justifyContent:'flex-end' }}>
           <button onClick={onClose} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>Fechar</button>
@@ -1229,7 +1242,9 @@ export function FrotasView() {
             <button onClick={()=>{setEditCard(null);setDefaultDate(baseDate);setModal('card');}} style={{ ...BS, background:T.laranja, color:'white', fontWeight:700, fontSize:11 }}>+ Novo Serviço</button>
           </>}
           <NotificationBell notifications={notifications} unreadCount={unreadCount} onMarkAllRead={markAllRead} onMarkRead={markRead}/>
-          <button onClick={()=>setCsvModal(true)} title="Atualizar base SIM" style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}`, fontSize:11, padding:'5px 10px' }}>⬆ SIM</button>
+          <button onClick={()=>setCsvModal(true)} title={`Atualizar base SIM · ${simClients.length} clientes carregados`} style={{ ...BS, background:simClients.length>0?T.surfaceAlt:T.perigoLight, color:simClients.length>0?T.textSec:T.perigo, border:`1px solid ${simClients.length>0?T.border:T.perigo}`, fontSize:11, padding:'5px 10px' }}>
+            ⬆ SIM {simClients.length>0?<span style={{ color:T.verde, fontWeight:700 }}>({simClients.length})</span>:<span style={{ color:T.perigo, fontWeight:700 }}>(!)</span>}
+          </button>
           <button onClick={()=>setDriversModal(true)} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}`, fontSize:11, padding:'5px 10px' }}>👤 Motoristas</button>
           <button onClick={()=>setSettingsModal(true)} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}`, fontSize:11, padding:'5px 10px' }}>⚙️</button>
           <button onClick={logout} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}`, fontSize:11 }}>Sair</button>
