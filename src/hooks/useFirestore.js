@@ -299,15 +299,18 @@ export function useSimClients() {
     const unsub = onSnapshot(doc(db,'config','simClients'), async snap => {
       if (!snap.exists()) return
       const { batches, clients } = snap.data()
-      if (clients && clients.length > 0) { setSimClients(clients); return }
+      // Prioridade 1: batches (formato atual — sempre gerado pelo upload recente)
+      // Prioridade 2: clients inline (formato legado — só usado se não há batches)
       if (batches) {
         const all = []
         for (let i = 0; i < batches; i++) {
           const bSnap = await getDoc(doc(db,'config',`simClients_${i}`))
           if (bSnap.exists()) all.push(...(bSnap.data().clients||[]))
         }
-        setSimClients(all)
+        if (all.length > 0) { setSimClients(all); return }
       }
+      // Fallback legado — base inline antiga (antes da migração pra batches)
+      if (clients && clients.length > 0) setSimClients(clients)
     }, ()=>{})
     return unsub
   }, [])
