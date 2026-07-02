@@ -321,8 +321,8 @@ const DIMENSOES_MODELO = {
   'JOHNDEERE|544KII':        { peso:13.1, largura:2.54, comprimento:7.43  },
   'CATERPILLAR|930K':        { peso:13.1, largura:2.55, comprimento:7.61  },
   'CATERPILLAR|938KSC':      { peso:15.8, largura:3.06, comprimento:8.07  }, // ⚠️ largura=altura no cadastro Mills, confirmar
-  'CATERPILLAR|950H':        { peso:18.3, largura:null, comprimento:null },
-  'CATERPILLAR|966L':        { peso:23.22,largura:null, comprimento:null },
+  'CATERPILLAR|950H':        { peso:18.5, largura:2.86, comprimento:8.02 },  // Fonte: LECTURA Specs (Cat 950H 2006-2011) — 18,5t/8,02m/2,86m
+  'CATERPILLAR|966L':        { peso:23.22,largura:2.99, comprimento:8.75 },  // Fonte: LECTURA Specs (Cat 966L 2019+) — 23,22t/8,75m/2,99m
   // ── Escavadeira de Esteiras ──
   'CATERPILLAR|312DL':       { peso:13.7, largura:2.59, comprimento:7.62  },
   'CATERPILLAR|313D2GC':     { peso:13.4, largura:2.76, comprimento:7.61  },
@@ -333,7 +333,7 @@ const DIMENSOES_MODELO = {
   // ── Trator de Esteiras (largura COM lâmina; lâmina é desmontável) ──
   'CATERPILLAR|D4':          { peso:14.4, largura:2.90, comprimento:6.45  },
   'CATERPILLAR|D6TXL':       { peso:20.5, largura:2.64, comprimento:6.74, larguraSemLamina:2.40 },
-  'CATERPILLAR|D7':          { peso:29.8, largura:3.70, comprimento:null, larguraSemLamina:3.30 },
+  'CATERPILLAR|D7':          { peso:29.8, largura:3.70, comprimento:4.74, larguraSemLamina:3.30 },  // Fonte: LECTURA (D7 XL 2020+) — comp 4,74m; Cat oficial: largura 3,7m c/ lâmina
   'JOHNDEERE|850JII':        { peso:20.7, largura:3.25, comprimento:5.38, larguraSemLamina:2.49 }, // largura=lâmina (manual JD, linha D); sem lâmina=esteira (linha M)
   'KOMATSU|D65E':            { peso:19.75,largura:3.29, comprimento:5.43, larguraSemLamina:3.10 },
   'KOMATSU|D65A':            { peso:19.75,largura:3.29, comprimento:5.43, larguraSemLamina:3.10 },
@@ -355,8 +355,8 @@ const DIMENSOES_MODELO = {
   'CATERPILLAR|CB7':         { peso:7.0,  largura:1.98, comprimento:4.55  },
   'CATERPILLAR|CW34':        { peso:9.7,  largura:2.16, comprimento:5.35  }, // peso varia até 27t c/ lastro — usar peso real do CSV
   'DYNAPAC|CA30D':           { peso:12.8, largura:2.26, comprimento:5.56  },
-  'DYNAPAC|CA25D':           { peso:12.0, largura:null, comprimento:null },
-  'DYNAPAC|CA25PD':          { peso:11.0, largura:null, comprimento:null },
+  'DYNAPAC|CA25D':           { peso:12.0, largura:2.13, comprimento:5.55 },  // Fonte: RitchieSpecs + heavy-spec (CA250D Brazil — família CA25x)
+  'DYNAPAC|CA25PD':          { peso:11.0, largura:2.13, comprimento:5.55 },  // Fonte: RitchieSpecs (CA250PD — variante padfoot)
   'DYNAPAC|CA610D':          { peso:21.0, largura:2.40, comprimento:6.00  },
   'DYNAPAC|CC1200':          { peso:2.6,  largura:1.31, comprimento:2.40  },
   // ── Caminhões (sempre força prancha — ver FORCA_PRANCHA) ──
@@ -571,12 +571,16 @@ export function resolverVeiculoTransporte(
   const gruposComLamina = itensComLamina.length > 0 ? ['tem'] : [] // só precisa saber se existe ao menos 1
   const temBasculante = todasLarguras.some(x => x.fonte === 'modelo' ? x.forcaPrancha : FORCA_PRANCHA.has(x.grupo))
 
-  // Caminhão basculante sempre embarca em prancha — não se aplica o cálculo
-  // normal de peso/largura/comprimento (é um veículo completo, não cabe a
-  // lógica de "amarrar sobre outro caminhão" usada para equipamentos).
+  // Caminhão/caminhonete sempre embarca em prancha. Mas quando há mais de 1
+  // caminhão na mesma viagem, o comprimento total pode exceder a prancha3 (15m)
+  // — nesse caso deve usar prancha4. Peso e comprimento são verificados; largura
+  // não é critério pois caminhões têm 2,60m (dentro do limite de qualquer prancha).
   let veiculoId
   if (temBasculante) {
-    veiculoId = pesoMax <= 32 ? 'prancha3' : 'prancha4'
+    const prancha3 = VEICULOS.find(v=>v.id==='prancha3')
+    const prancha4 = VEICULOS.find(v=>v.id==='prancha4')
+    const cabePrancha3 = pesoMax <= prancha3.carga && comprimentoMax <= prancha3.comp
+    veiculoId = cabePrancha3 ? 'prancha3' : 'prancha4'
   } else {
     // Escolhe o veículo mais econômico que comporta peso + largura + comprimento juntos.
     // AET é sempre solicitada pela Mills, então largura acima de 2,60m nunca bloqueia —
