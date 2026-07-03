@@ -380,6 +380,12 @@ export function GerenteView({ simClients = [] }) {
 
   const roleLabel = { supervisor:'👷 SUPERVISOR', gerente:'👔 GERENTE', master:'⭐ MASTER' }[role] || ''
   const totalPendentes = myPending.length
+  const now = Date.now()
+  const urgentesGer = myPending.filter(r => {
+    const sla = URGENCY_SLA_MS[r.urgency]
+    if (!sla || !['critico','alto'].includes(r.urgency)) return false
+    return new Date(r.desiredDate).getTime() + sla - now < 2 * 3600000
+  })
   const totalAprovados = mgrReqs.filter(r=>['pendente','aceito'].includes(r.status)).length
   const totalRecusados = mgrReqs.filter(r=>r.status==='recusado').length
   const historico = mgrReqs.filter(r=>!['pendente_supervisor','pendente_gerente'].includes(r.status))
