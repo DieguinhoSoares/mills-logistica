@@ -1303,45 +1303,38 @@ export function FrotasView() {
             <button onClick={()=>{setEditCard(null);setDefaultDate(baseDate);setModal('card');}} style={{ ...BS, background:T.laranja, color:'white', fontWeight:700, fontSize:11 }}>+ Novo Serviço</button>
           </>}
           <NotificationBell notifications={notifications} unreadCount={unreadCount} onMarkAllRead={markAllRead} onMarkRead={markRead}/>
-          {/* Menu "Mais" — agrupa SIM, Motoristas, Config e Sair */}
-          {(() => {
-            const [maisOpen, setMaisOpen] = useState(false)
-            return (
-              <div style={{ position:'relative' }}>
-                <button onClick={()=>setMaisOpen(v=>!v)}
-                  style={{ ...BS, background:maisOpen?T.laranja:T.surfaceAlt, color:maisOpen?'white':T.textSec, border:`1px solid ${maisOpen?T.laranja:T.border}`, fontSize:11, padding:'5px 10px', fontWeight:700 }}>
-                  ⋯ Mais
-                  {simClients.length===0&&<span style={{ marginLeft:4, color:maisOpen?'white':T.perigo }}>⚠️</span>}
+          {/* Menu "Mais" */}
+          <div style={{ position:'relative' }}>
+            <button onClick={()=>setMaisOpen(v=>!v)}
+              style={{ ...BS, background:maisOpen?T.laranja:T.surfaceAlt, color:maisOpen?'white':T.textSec, border:`1px solid ${maisOpen?T.laranja:T.border}`, fontSize:11, padding:'5px 10px', fontWeight:700 }}>
+              ⋯ Mais
+              {simClients.length===0&&<span style={{ marginLeft:4, color:maisOpen?'white':T.perigo }}>⚠️</span>}
+            </button>
+            {maisOpen&&(
+              <div onClick={e=>e.stopPropagation()} style={{ position:'absolute', top:36, right:0, background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.rLg, boxShadow:T.shadowLg, zIndex:999, minWidth:200, padding:8 }}>
+                <button onClick={()=>{setCsvModal(true);setMaisOpen(false)}}
+                  style={{ width:'100%', textAlign:'left', padding:'8px 12px', borderRadius:T.rSm, border:'none', background:'transparent', cursor:'pointer', fontFamily:FONT, fontSize:12, color:T.text, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <span>⬆️ Atualizar base SIM</span>
+                  {simClients.length>0
+                    ? <span style={{ color:T.verde, fontSize:10, fontWeight:700 }}>({simClients.length})</span>
+                    : <span style={{ color:T.perigo, fontSize:10, fontWeight:700 }}>vazia</span>}
                 </button>
-                {maisOpen&&(
-                  <div onClick={e=>e.stopPropagation()} style={{ position:'absolute', top:36, right:0, background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.rLg, boxShadow:T.shadowLg, zIndex:999, minWidth:200, padding:8 }}>
-                    <button onClick={()=>{setCsvModal(true);setMaisOpen(false)}}
-                      style={{ width:'100%', textAlign:'left', padding:'8px 12px', borderRadius:T.rSm, border:'none', background:'transparent', cursor:'pointer', fontFamily:FONT, fontSize:12, color:T.text, display:'flex', justifyContent:'space-between', alignItems:'center' }}
-                      onMouseEnter={e=>e.currentTarget.style.opacity='.85'} onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
-                      <span>⬆️ Atualizar base SIM</span>
-                      {simClients.length>0
-                        ? <span style={{ color:T.verde, fontSize:10, fontWeight:700 }}>({simClients.length})</span>
-                        : <span style={{ color:T.perigo, fontSize:10, fontWeight:700 }}>vazia</span>}
-                    </button>
-                    <button onClick={()=>{setDriversModal(true);setMaisOpen(false)}}
-                      style={{ width:'100%', textAlign:'left', padding:'8px 12px', borderRadius:T.rSm, border:'none', background:'transparent', cursor:'pointer', fontFamily:FONT, fontSize:12, color:T.text }}
-                      onMouseEnter={e=>e.currentTarget.style.opacity='.85'} onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
-                      👤 Motoristas
-                    </button>
-                    <button onClick={()=>{setSettingsModal(true);setMaisOpen(false)}}
-                      style={{ width:'100%', textAlign:'left', padding:'8px 12px', borderRadius:T.rSm, border:'none', background:'transparent', cursor:'pointer', fontFamily:FONT, fontSize:12, color:T.text }}
-                      onMouseEnter={e=>e.currentTarget.style.opacity='.85'} onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
-                      ⚙️ Configurações
-                    </button>
-                    <div style={{ height:1, background:T.border, margin:'4px 8px' }}/>
-                    <button onClick={()=>{logout();setMaisOpen(false)}}
-                      style={{ width:'100%', textAlign:'left', padding:'8px 12px', borderRadius:T.rSm, border:'none', background:'transparent', cursor:'pointer', fontFamily:FONT, fontSize:12, color:T.perigo }}
-                      onMouseEnter={e=>e.currentTarget.style.opacity='.85'} onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
-                      Sair
-                    </button>
-                  </div>
-                )}
-                {maisOpen&&<div onClick={()=>setMaisOpen(false)} style={{ position:'fixed', inset:0, zIndex:998 }}/>}
+                <button onClick={()=>{setDriversModal(true);setMaisOpen(false)}}
+                  style={{ width:'100%', textAlign:'left', padding:'8px 12px', borderRadius:T.rSm, border:'none', background:'transparent', cursor:'pointer', fontFamily:FONT, fontSize:12, color:T.text }}>
+                  👤 Motoristas
+                </button>
+                <button onClick={()=>{setSettingsModal(true);setMaisOpen(false)}}
+                  style={{ width:'100%', textAlign:'left', padding:'8px 12px', borderRadius:T.rSm, border:'none', background:'transparent', cursor:'pointer', fontFamily:FONT, fontSize:12, color:T.text }}>
+                  ⚙️ Configurações
+                </button>
+                <div style={{ height:1, background:T.border, margin:'4px 8px' }}/>
+                <button onClick={()=>{logout();setMaisOpen(false)}}
+                  style={{ width:'100%', textAlign:'left', padding:'8px 12px', borderRadius:T.rSm, border:'none', background:'transparent', cursor:'pointer', fontFamily:FONT, fontSize:12, color:T.perigo }}>
+                  Sair
+                </button>
+              </div>
+            )}
+            {maisOpen&&<div onClick={()=>setMaisOpen(false)} style={{ position:'fixed', inset:0, zIndex:998 }}/>}
           </div>
         </div>
       </div>
