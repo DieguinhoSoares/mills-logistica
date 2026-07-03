@@ -1470,7 +1470,7 @@ export function FrotasView() {
                     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
                       {[
                         ['Serviços', cardsAtivos.length, T.laranja, T.laranjaLight],
-                        ['Atrasados', atrasados, T.perigo, T.perigoLight],
+                        ['Atrasados', atrasados.length, T.perigo, T.perigoLight],
                         ['Atribuídos', atribuidos.length, T.verde, T.verdeLight],
                         ['Antecipados', antecipados.length, T.info, T.infoLight],
                       ].map(([l,v,color,bg])=>(
