@@ -83,6 +83,20 @@ export const CARD_SUBTYPES = {
   ],
 }
 
+// Ordenação de urgência para filas de aprovação (crítico primeiro)
+export const URGENCY_ORDER = { critico: 0, alto: 1, medio: 2, baixo: 3 }
+// SLA em milissegundos — usado para calcular "vence em Xh" na faixa de atenção
+export const URGENCY_SLA_MS = { critico: 4*3600000, alto: 24*3600000, medio: 3*86400000, baixo: 7*86400000 }
+
+// Função centralizada de ordenação por urgência + prazo mais próximo
+export function sortByUrgency(items, dateField='desiredDate') {
+  return [...items].sort((a, b) => {
+    const byUrgency = (URGENCY_ORDER[a.urgency]??99) - (URGENCY_ORDER[b.urgency]??99)
+    if (byUrgency !== 0) return byUrgency
+    return new Date(a[dateField]||'9999') - new Date(b[dateField]||'9999')
+  })
+}
+
 export const URGENCY = {
   critico: { label:'Crítico', color:'#D32F2F', bg:'#FFEBEE', icon:'🔴' },
   alto:    { label:'Alto',    color:'#E65100', bg:'#FFF3E0', icon:'🟠' },
