@@ -206,15 +206,16 @@ export function MasterView({ simClients = [] }) {
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
       <ToastContainer toasts={toasts} onDismiss={dismiss}/>
       {/* Botão de migração única — corrige origin/destination vazios */}
-      {migrateLog === null && (
-        <div style={{ margin:'16px 20px 0', padding:'12px 16px', background:'#FFF8E1', borderRadius:8, border:'1px solid #F59E0B', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <div>
-            <div style={{ fontFamily:'IBM Plex Sans,sans-serif', fontWeight:700, fontSize:13, color:'#92400E' }}>🔧 Migração de dados</div>
-            <div style={{ fontFamily:'IBM Plex Sans,sans-serif', fontSize:11, color:'#78350F', marginTop:2 }}>Corrigir cards sem estado de origem/destino (rodar uma única vez)</div>
-          </div>
-          <button onClick={handleMigrateCards} disabled={migrating}
-            style={{ background:migrating?'#D1D5DB':'#F59E0B', color:'white', border:'none', borderRadius:6, padding:'8px 16px', fontFamily:'IBM Plex Sans,sans-serif', fontWeight:700, fontSize:12, cursor:migrating?'wait':'pointer', whiteSpace:'nowrap' }}>
+      {migrateLog === null && !sessionStorage.getItem('migration_dismissed') && (
+        <div style={{ background:T.amareloLight, borderBottom:`1px solid ${T.amarelo}40`, padding:'0 20px', height:44, display:'flex', alignItems:'center', gap:12, flexShrink:0 }}>
+          <span style={{ color:'#8A6D00', fontFamily:FONT, fontWeight:700, fontSize:12 }}>🔧 Migração de dados — corrigir cards sem estado de origem/destino (uma única vez)</span>
+          <button onClick={handleMigration} disabled={migrating}
+            style={{ ...BS, background:T.amarelo, color:'#8A6D00', fontWeight:700, fontSize:11, padding:'4px 12px', whiteSpace:'nowrap' }}>
             {migrating ? '⏳ Corrigindo...' : '▶ Executar migração'}
+          </button>
+          <button onClick={()=>{ sessionStorage.setItem('migration_dismissed','1'); window.location.reload() }}
+            style={{ marginLeft:'auto', background:'none', border:'none', cursor:'pointer', color:'#8A6D00', fontFamily:FONT, fontSize:11, fontWeight:600 }}>
+            Depois
           </button>
         </div>
       )}

@@ -1301,14 +1301,58 @@ export function FrotasView() {
             <button onClick={()=>{setEditCard(null);setDefaultDate(baseDate);setModal('card');}} style={{ ...BS, background:T.laranja, color:'white', fontWeight:700, fontSize:11 }}>+ Novo Serviço</button>
           </>}
           <NotificationBell notifications={notifications} unreadCount={unreadCount} onMarkAllRead={markAllRead} onMarkRead={markRead}/>
-          <button onClick={()=>setCsvModal(true)} title={`Atualizar base SIM · ${simClients.length} clientes carregados`} style={{ ...BS, background:simClients.length>0?T.surfaceAlt:T.perigoLight, color:simClients.length>0?T.textSec:T.perigo, border:`1px solid ${simClients.length>0?T.border:T.perigo}`, fontSize:11, padding:'5px 10px' }}>
-            ⬆ SIM {simClients.length>0?<span style={{ color:T.verde, fontWeight:700 }}>({simClients.length})</span>:<span style={{ color:T.perigo, fontWeight:700 }}>(!)</span>}
-          </button>
-          <button onClick={()=>setDriversModal(true)} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}`, fontSize:11, padding:'5px 10px' }}>👤 Motoristas</button>
-          <button onClick={()=>setSettingsModal(true)} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}`, fontSize:11, padding:'5px 10px' }}>⚙️</button>
-          <button onClick={logout} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}`, fontSize:11 }}>Sair</button>
+          {/* Menu "Mais" — agrupa SIM, Motoristas, Config e Sair */}
+          {(() => {
+            const [maisOpen, setMaisOpen] = useState(false)
+            return (
+              <div style={{ position:'relative' }}>
+                <button onClick={()=>setMaisOpen(v=>!v)}
+                  style={{ ...BS, background:maisOpen?T.laranja:T.surfaceAlt, color:maisOpen?'white':T.textSec, border:`1px solid ${maisOpen?T.laranja:T.border}`, fontSize:11, padding:'5px 10px', fontWeight:700 }}>
+                  ⋯ Mais
+                  {simClients.length===0&&<span style={{ marginLeft:4, color:maisOpen?'white':T.perigo }}>⚠️</span>}
+                </button>
+                {maisOpen&&(
+                  <div onClick={e=>e.stopPropagation()} style={{ position:'absolute', top:36, right:0, background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.rLg, boxShadow:T.shadowLg, zIndex:999, minWidth:200, padding:8 }}>
+                    <button onClick={()=>{setCsvModal(true);setMaisOpen(false)}}
+                      style={{ width:'100%', textAlign:'left', padding:'8px 12px', borderRadius:T.rSm, border:'none', background:'transparent', cursor:'pointer', fontFamily:FONT, fontSize:12, color:T.text, display:'flex', justifyContent:'space-between', alignItems:'center' }}
+                      onMouseEnter={e=>e.currentTarget.style.background=T.surfaceAlt} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                      <span>⬆️ Atualizar base SIM</span>
+                      {simClients.length>0
+                        ? <span style={{ color:T.verde, fontSize:10, fontWeight:700 }}>({simClients.length})</span>
+                        : <span style={{ color:T.perigo, fontSize:10, fontWeight:700 }}>vazia</span>}
+                    </button>
+                    <button onClick={()=>{setDriversModal(true);setMaisOpen(false)}}
+                      style={{ width:'100%', textAlign:'left', padding:'8px 12px', borderRadius:T.rSm, border:'none', background:'transparent', cursor:'pointer', fontFamily:FONT, fontSize:12, color:T.text }}
+                      onMouseEnter={e=>e.currentTarget.style.background=T.surfaceAlt} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                      👤 Motoristas
+                    </button>
+                    <button onClick={()=>{setSettingsModal(true);setMaisOpen(false)}}
+                      style={{ width:'100%', textAlign:'left', padding:'8px 12px', borderRadius:T.rSm, border:'none', background:'transparent', cursor:'pointer', fontFamily:FONT, fontSize:12, color:T.text }}
+                      onMouseEnter={e=>e.currentTarget.style.background=T.surfaceAlt} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                      ⚙️ Configurações
+                    </button>
+                    <div style={{ height:1, background:T.border, margin:'4px 8px' }}/>
+                    <button onClick={()=>{logout();setMaisOpen(false)}}
+                      style={{ width:'100%', textAlign:'left', padding:'8px 12px', borderRadius:T.rSm, border:'none', background:'transparent', cursor:'pointer', fontFamily:FONT, fontSize:12, color:T.perigo }}
+                      onMouseEnter={e=>e.currentTarget.style.background=T.perigoLight} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                      Sair
+                    </button>
+                  </div>
+                )}
+                {maisOpen&&<div onClick={()=>setMaisOpen(false)} style={{ position:'fixed', inset:0, zIndex:998 }}/>}
+              </div>
+            )
+          })()}
         </div>
       </div>
+
+      {/* Banner SIM vazio — visível em qualquer aba */}
+      {simClients.length===0&&(
+        <div style={{ background:T.perigoLight, borderBottom:`2px solid ${T.perigo}`, padding:'0 20px', height:44, display:'flex', alignItems:'center', gap:10, flexShrink:0 }}>
+          <span style={{ color:T.perigo, fontFamily:FONT, fontWeight:700, fontSize:12 }}>⚠️ Base do SIM não carregada — campos de cliente e frota não funcionarão</span>
+          <button onClick={()=>setCsvModal(true)} style={{ ...BS, background:T.perigo, color:'white', fontSize:11, fontWeight:700, padding:'4px 12px', marginLeft:'auto' }}>Carregar SIM agora</button>
+        </div>
+      )}
 
       {/* AGENDA TAB */}
       {activeTab==='agenda'&&<>
@@ -1412,102 +1456,131 @@ export function FrotasView() {
       ))}
     </div>
 
-    <div style={{ flex:'0 0 35%', display:'grid', gridTemplateColumns:'1fr 220px 220px', gap:10, padding:'0 20px 14px', minHeight:0, overflow:'hidden' }}>
-          {/* MAPA */}
+    <div style={{ flex:'0 0 36%', display:'grid', gridTemplateColumns:'1fr 310px', gap:10, padding:'0 20px 14px', minHeight:0, overflow:'hidden' }}>
+          {/* MAPA — ganha mais espaço */}
           <BrazilMap cards={cards}/>
 
-          {/* SOLICITAÇÕES */}
-          <div style={{ display:'flex', flexDirection:'column', gap:8, overflow:'hidden' }}>
-            <div style={{ background:T.surface, borderRadius:T.rLg, border:`1px solid ${T.border}`, padding:13, flex:1, display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:T.shadow }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10, flexShrink:0 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:7 }}>
-                  <span style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:11, textTransform:'uppercase', letterSpacing:'0.08em' }}>📥 Solicitações</span>
-                  {pending>0&&<div style={{ background:T.perigo, color:'white', borderRadius:20, padding:'0 7px', fontSize:9, fontWeight:800 }}>{pending}</div>}
-                </div>
-                <button onClick={()=>setActiveTab('requests')} style={{ color:T.laranja, background:'none', border:'none', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Ver todas →</button>
-              </div>
-              <div style={{ overflowY:'auto', flex:1 }}>
-                {requests.length===0&&<p style={{ color:T.textMuted, fontSize:11, fontFamily:FONT, margin:0 }}>Nenhuma solicitação.</p>}
-                {[...requests].sort((a,b)=>a.status==='pendente'?-1:1).slice(0,5).map(r=>{
-                  const sc={pendente:T.amarelo,aceito:T.verde,recusado:T.perigo}
-                  const sl={pendente:'⏳',aceito:'✅',recusado:'❌'}
-                  return (
-                    <div key={r.id} style={{ border:`1px solid ${T.border}`, borderRadius:T.rSm, padding:'9px 11px', marginBottom:7, cursor:'pointer', background:T.surfaceAlt, transition:'all .1s' }}
-                      onMouseEnter={e=>e.currentTarget.style.borderColor=T.laranja} onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}
-                      onClick={()=>setActiveTab('requests')}>
-                      <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
-                        <span style={{ color:T.text, fontWeight:700, fontSize:11, fontFamily:FONT }}>{r.requesterName||'—'}</span>
-                        <span style={{ color:sc[r.status], fontSize:11 }}>{sl[r.status]}</span>
-                      </div>
-                      <div style={{ color:T.textSec, fontSize:10, fontFamily:FONT }}>{r.unit} · {fmt(r.desiredDate)}</div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* AGUARDANDO VALIDAÇÃO */}
-          <div style={{ display:'flex', flexDirection:'column', gap:8, overflow:'hidden' }}>
-            <div style={{ background:validacoes.length>0?T.infoLight:T.surface, borderRadius:T.rLg, border:`1px solid ${validacoes.length>0?T.info+'50':T.border}`, padding:13, flex:1, display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:T.shadow }}>
-              <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:10, flexShrink:0 }}>
-                <span style={{ color:validacoes.length>0?T.info:T.textMuted, fontFamily:FONT, fontWeight:700, fontSize:11, textTransform:'uppercase', letterSpacing:'0.08em' }}>⏳ Validação</span>
-                {validacoes.length>0&&<div style={{ background:T.info, color:'white', borderRadius:20, padding:'0 7px', fontSize:9, fontWeight:800 }}>{validacoes.length}</div>}
-              </div>
-              <div style={{ overflowY:'auto', flex:1 }}>
-                {validacoes.length===0&&<p style={{ color:T.textMuted, fontSize:11, fontFamily:FONT, margin:0 }}>Nenhum serviço aguardando.</p>}
-                {validacoes.map(c=>(
-                  <div key={c.id} style={{ border:`1px solid ${T.info}30`, borderRadius:T.rSm, padding:'9px 11px', marginBottom:7, background:T.surface }}>
-                    <div style={{ color:T.text, fontWeight:700, fontSize:11, fontFamily:FONT, marginBottom:2 }}>{c.client||'—'}</div>
-                    <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT, marginBottom:2 }}>👤 {c.driver||'—'}</div>
-                    <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT, marginBottom:6 }}>📅 {fmt(c.startDate)}</div>
-                    {c.conclusaoNota&&<div style={{ color:T.textSec, fontSize:10, fontFamily:FONT, fontStyle:'italic', marginBottom:6, padding:'4px 7px', background:T.infoLight, borderRadius:T.rSm }}>"{c.conclusaoNota.slice(0,60)}{c.conclusaoNota.length>60?'...':''}"</div>}
-                    <button onClick={()=>handleValidarCard(c)}
-                      style={{ ...BS, background:T.verde, color:'white', fontWeight:700, fontSize:10, width:'100%' }}>
-                      ✅ Validar e encerrar
+          {/* PAINEL ÚNICO com abas: Resumo / Solicitações / Validação */}
+          {(()=>{
+            const [painelTab,setPainelTab]=useState('resumo')
+            const totalValidacao=validacoes.length+semExecutorApp.length
+            const totalNF=nfPendentes.length
+            return (
+              <div style={{ background:T.surface, borderRadius:T.rLg, border:`1px solid ${T.border}`, display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:T.shadow }}>
+                {/* Abas */}
+                <div style={{ display:'flex', borderBottom:`1px solid ${T.border}`, flexShrink:0 }}>
+                  {[
+                    ['resumo',  'Resumo',      null],
+                    ['sol',     'Solicitações', pending||null],
+                    ['val',     'Validação',    (totalValidacao+totalNF)||null],
+                  ].map(([k,l,badge])=>(
+                    <button key={k} onClick={()=>setPainelTab(k)}
+                      style={{ flex:1, padding:'8px 4px', border:'none', borderBottom:`2px solid ${painelTab===k?T.laranja:'transparent'}`, background:'transparent', cursor:'pointer', fontFamily:FONT, fontWeight:painelTab===k?700:500, fontSize:10, color:painelTab===k?T.laranja:T.textMuted, display:'flex', alignItems:'center', justifyContent:'center', gap:4, transition:'all .1s' }}>
+                      {l}
+                      {badge&&<span style={{ background:k==='val'&&totalNF>0?T.perigo:T.laranja, color:'white', borderRadius:10, padding:'0 5px', fontSize:9, fontWeight:800 }}>{badge}</span>}
                     </button>
-                  </div>
-                ))}
+                  ))}
+                </div>
 
-                {/* Cards sem app de execução (ex.: transportadora externa) — nunca chegam a 'aguardando_validacao' sozinhos */}
-                {semExecutorApp.length>0&&(
-                  <div style={{ marginTop:14, paddingTop:10, borderTop:`1px dashed ${T.border}` }}>
-                    <div style={{ color:T.textMuted, fontSize:9, fontFamily:FONT, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8 }}>
-                      🚚 Sem app de execução — conclusão manual
+                <div style={{ flex:1, overflowY:'auto', padding:13 }}>
+                  {/* Resumo */}
+                  {painelTab==='resumo'&&(
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                      {[
+                        ['Serviços', cardsAtivos.length, T.laranja, T.laranjaLight],
+                        ['Atrasados', atrasados, T.perigo, T.perigoLight],
+                        ['Atribuídos', atribuidos.length, T.verde, T.verdeLight],
+                        ['Antecipados', antecipados.length, T.info, T.infoLight],
+                      ].map(([l,v,color,bg])=>(
+                        <div key={l} style={{ background:bg, border:`1px solid ${color}20`, borderRadius:T.r, padding:'10px 12px' }}>
+                          <div style={{ color, fontFamily:FONT, fontWeight:900, fontSize:22, lineHeight:1 }}>{v}</div>
+                          <div style={{ color:T.textSec, fontSize:9, fontFamily:FONT, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', marginTop:3 }}>{l}</div>
+                        </div>
+                      ))}
                     </div>
-                    {semExecutorApp.map(c=>(
-                      <div key={c.id} style={{ border:`1px solid ${T.laranja}30`, borderRadius:T.rSm, padding:'9px 11px', marginBottom:7, background:T.laranjaLight }}>
-                        <div style={{ color:T.text, fontWeight:700, fontSize:11, fontFamily:FONT, marginBottom:2 }}>{c.client||'—'}</div>
-                        <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT, marginBottom:2 }}>🚚 {c.transportadoraNome || c.driver || '—'}</div>
-                        <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT, marginBottom:6 }}>📅 {fmt(c.startDate)}</div>
-                        <button onClick={()=>{ if(window.confirm(`Confirmar que o serviço de ${c.client||'—'} foi concluído?`)) handleValidarCard(c) }}
-                          style={{ ...BS, background:T.laranja, color:'white', fontWeight:700, fontSize:10, width:'100%' }}>
-                          ✅ Marcar como concluído
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                  )}
 
-                {/* NF pendente de emissão — bloqueia a conclusão até o analista confirmar */}
-                {nfPendentes.length>0&&(
-                  <div style={{ marginTop:14, paddingTop:10, borderTop:`1px dashed ${T.border}` }}>
-                    <div style={{ color:T.perigo, fontSize:9, fontFamily:FONT, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8 }}>
-                      📄 NF pendente de emissão ({nfPendentes.length})
-                    </div>
-                    {nfPendentes.map(c=>(
-                      <div key={c.id} onClick={()=>{setEditCard(c);setModal('card')}}
-                        style={{ border:`1px solid ${T.perigo}40`, borderRadius:T.rSm, padding:'9px 11px', marginBottom:7, background:T.perigoLight, cursor:'pointer' }}>
-                        <div style={{ color:T.text, fontWeight:700, fontSize:11, fontFamily:FONT, marginBottom:2 }}>{c.client||'—'}</div>
-                        <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT, marginBottom:2 }}>{getSubtypeLabel(c.type,c.subtype)}</div>
-                        <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT }}>📅 {fmt(c.startDate)}</div>
+                  {/* Solicitações */}
+                  {painelTab==='sol'&&(
+                    <>
+                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+                        <span style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:11, textTransform:'uppercase', letterSpacing:'0.07em' }}>📥 Solicitações</span>
+                        <button onClick={()=>setActiveTab('requests')} style={{ color:T.laranja, background:'none', border:'none', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>Ver todas →</button>
                       </div>
-                    ))}
-                  </div>
-                )}
+                      {requests.length===0&&<p style={{ color:T.textMuted, fontSize:11, fontFamily:FONT, margin:0 }}>Nenhuma solicitação.</p>}
+                      {sortByUrgency([...requests].filter(r=>!['cancelado','concluido'].includes(r.status)),'desiredDate').slice(0,6).map(r=>{
+                        const sc={pendente:T.amarelo,aceito:T.verde,recusado:T.perigo}
+                        const sl={pendente:'⏳',aceito:'✅',recusado:'❌'}
+                        return (
+                          <div key={r.id} onClick={()=>setActiveTab('requests')}
+                            style={{ border:`1px solid ${T.border}`, borderRadius:T.rSm, padding:'9px 11px', marginBottom:7, cursor:'pointer', background:T.surfaceAlt }}
+                            onMouseEnter={e=>e.currentTarget.style.borderColor=T.laranja} onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
+                              <span style={{ color:T.text, fontWeight:700, fontSize:11, fontFamily:FONT }}>{r.requesterName||'—'}</span>
+                              <span style={{ color:sc[r.status]||T.textMuted, fontSize:11 }}>{sl[r.status]||'○'}</span>
+                            </div>
+                            <div style={{ color:T.textSec, fontSize:10, fontFamily:FONT }}>{r.unit} · {fmt(r.desiredDate)}</div>
+                          </div>
+                        )
+                      })}
+                    </>
+                  )}
+
+                  {/* Validação — NF primeiro (bloqueia financeiro), depois prontos, depois sem app */}
+                  {painelTab==='val'&&(
+                    <>
+                      {nfPendentes.length>0&&(
+                        <div style={{ marginBottom:14 }}>
+                          <div style={{ background:T.perigo, borderRadius:T.rSm, padding:'4px 10px', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>
+                            <span style={{ color:'white', fontSize:9, fontFamily:FONT, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.07em' }}>📄 NF pendente — bloqueia conclusão</span>
+                            <span style={{ background:'rgba(255,255,255,.3)', color:'white', borderRadius:10, padding:'0 6px', fontSize:9, fontWeight:800 }}>{nfPendentes.length}</span>
+                          </div>
+                          {nfPendentes.map(c=>(
+                            <div key={c.id} onClick={()=>{setEditCard(c);setModal('card')}}
+                              style={{ border:`2px solid ${T.perigo}`, borderRadius:T.rSm, padding:'9px 11px', marginBottom:7, background:T.perigoLight, cursor:'pointer' }}>
+                              <div style={{ color:T.text, fontWeight:700, fontSize:11, fontFamily:FONT, marginBottom:2 }}>{c.client||'—'}</div>
+                              <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT }}>{getSubtypeLabel(c.type,c.subtype)} · {fmt(c.startDate)}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {validacoes.length>0&&(
+                        <div style={{ marginBottom:14 }}>
+                          <div style={{ color:T.verde, fontSize:9, fontFamily:FONT, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8 }}>✅ Prontos para validar</div>
+                          {validacoes.map(c=>(
+                            <div key={c.id} style={{ border:`1px solid ${T.verde}30`, borderRadius:T.rSm, padding:'9px 11px', marginBottom:7, background:T.verdeLight }}>
+                              <div style={{ color:T.text, fontWeight:700, fontSize:11, fontFamily:FONT, marginBottom:2 }}>{c.client||'—'}</div>
+                              <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT, marginBottom:6 }}>👤 {c.driver||'—'} · {fmt(c.startDate)}</div>
+                              {c.conclusaoNota&&<div style={{ color:T.textSec, fontSize:10, fontFamily:FONT, fontStyle:'italic', marginBottom:6, padding:'4px 7px', background:'rgba(0,64,66,.08)', borderRadius:T.rSm }}>"{c.conclusaoNota.slice(0,50)}{c.conclusaoNota.length>50?'..':''}"</div>}
+                              <button onClick={()=>handleValidarCard(c)} style={{ ...BS, background:T.verde, color:'white', fontWeight:700, fontSize:10, width:'100%' }}>✅ Validar e encerrar</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {semExecutorApp.length>0&&(
+                        <div>
+                          <div style={{ color:T.textMuted, fontSize:9, fontFamily:FONT, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8 }}>🚚 Sem app — conclusão manual</div>
+                          {semExecutorApp.map(c=>(
+                            <div key={c.id} style={{ border:`1px solid ${T.laranja}30`, borderRadius:T.rSm, padding:'9px 11px', marginBottom:7, background:T.laranjaLight }}>
+                              <div style={{ color:T.text, fontWeight:700, fontSize:11, fontFamily:FONT, marginBottom:2 }}>{c.client||'—'}</div>
+                              <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT, marginBottom:6 }}>🚚 {c.transportadoraNome||c.driver||'—'} · {fmt(c.startDate)}</div>
+                              <button onClick={()=>{ if(window.confirm(`Confirmar conclusão de ${c.client||'—'}?`)) handleValidarCard(c) }} style={{ ...BS, background:T.laranja, color:'white', fontWeight:700, fontSize:10, width:'100%' }}>✅ Marcar como concluído</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {validacoes.length===0&&semExecutorApp.length===0&&nfPendentes.length===0&&(
+                        <p style={{ color:T.textMuted, fontSize:11, fontFamily:FONT, margin:0 }}>Nenhum serviço aguardando.</p>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
-          </div>
+            )
+          })()}
         </div>
       </>}
 

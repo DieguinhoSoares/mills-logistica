@@ -180,7 +180,7 @@ export function KPIView({ cards, requests }) {
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:14 }}>
         <KPICard title="Atrasados"          value={stats.late}              icon="🔴" color={T.perigo}  bg={T.perigoLight}  sub={stats.late?'endDate < hoje, não concluídos':'Tudo em dia 🎉'}/>
         <KPICard title="Mês Atual"          value={stats.monthCards.length} icon="📆" color={T.amarelo} bg={T.amareloLight} sub="Serviços no mês"/>
-        <KPICard title="Solicitações Pend." value={stats.pendReq}           icon="📥" color="#6A1B9A"   bg="#F3E5F5"        sub="Aguardando resposta"/>
+        <KPICard title="Solicitações Pend." value={stats.pendReq}           icon="📥" color={T.laranjaDeep} bg="#FDEEE9"        sub="Aguardando resposta"/>
         <KPICard title="Taxa de Aceite"     value={`${stats.taxaAceit}%`}   icon="🤝" color={T.sucesso} bg={T.sucessoLight} sub="Solicitações aceitas"/>
       </div>
 
