@@ -1566,9 +1566,7 @@ export function FrotasView() {
                     </>
                   )}
                 </div>
-              </div>
-            )
-          })()}
+          </div>
         </div>
       </>}
 
