@@ -1012,6 +1012,8 @@ export function FrotasView() {
   const [defaultDate,  setDefaultDate]  = useState(null)
   const [exportModal,  setExportModal]  = useState(false)
   const [csvModal,     setCsvModal]     = useState(false)
+  const [maisOpen,     setMaisOpen]     = useState(false)
+  const [painelTab,    setPainelTab]    = useState('resumo')
   const [settingsModal, setSettingsModal] = useState(false)
   const [driversModal,  setDriversModal]  = useState(false)
   const [assignModal,   setAssignModal]   = useState(null)
