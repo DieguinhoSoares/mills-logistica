@@ -954,24 +954,20 @@ function CsvUploadModal({ onLoaded, onClose }) {
         </div>}
 
         {/* Busca de diagnóstico — verificar se cliente específico foi importado */}
-        {status==='done' && clients.length>0 && (() => {
-          const [q,setQ] = [diagQ, setDiagQ]
-          const matches = q.length>=2 ? clients.filter(c=>c.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes(q.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''))) : []
-          return (
-            <div style={{ marginBottom:16 }}>
-              <input value={q} onChange={e=>setQ(e.target.value)} placeholder="🔍 Verificar se cliente foi importado..."
-                style={{ ...IS, fontSize:11 }}/>
-              {q.length>=2 && (
-                <div style={{ marginTop:6 }}>
-                  {matches.length===0
-                    ? <div style={{ color:T.perigo, fontSize:11, fontFamily:FONT }}>❌ "{q}" não encontrado na base importada</div>
-                    : matches.slice(0,5).map(m=><div key={m.name} style={{ color:T.sucesso, fontSize:11, fontFamily:FONT }}>✅ {m.name} · {m.nInternos?.length||0} frota(s)</div>)
-                  }
-                </div>
-              )}
-            </div>
-          )
-        })()}
+        {status==='done' && clients.length>0 && (
+          <div style={{ marginBottom:16 }}>
+            <input value={diagQ} onChange={e=>setDiagQ(e.target.value)} placeholder="🔍 Verificar se cliente foi importado..."
+              style={{ ...IS, fontSize:11 }}/>
+            {diagQ.length>=2 && (
+              <div style={{ marginTop:6 }}>
+                {clients.filter(c=>c.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes(diagQ.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''))).length===0
+                  ? <div style={{ color:T.perigo, fontSize:11, fontFamily:FONT }}>❌ "{diagQ}" não encontrado na base importada</div>
+                  : clients.filter(c=>c.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes(diagQ.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''))).slice(0,5).map(m=><div key={m.name} style={{ color:T.sucesso, fontSize:11, fontFamily:FONT }}>✅ {m.name} · {m.nInternos?.length||0} frota(s)</div>)
+                }
+              </div>
+            )}
+          </div>
+        )}
 
         <div style={{ display:'flex', justifyContent:'flex-end' }}>
           <button onClick={onClose} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>Fechar</button>
@@ -996,6 +992,18 @@ export function FrotasView() {
   const [activeTab,    setActiveTab]    = useState('agenda')
   const [view,         setView]         = useState('semana')
   const [busca,        setBusca]        = useState('')
+  const buscaResultados = useMemo(() => {
+    if (!busca.trim()) return []
+    const normQ = busca.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    const normS = s => String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    return cards.filter(c =>
+      String(c.seqId||'').includes(normQ) ||
+      normS(c.nInterno).includes(normQ) ||
+      normS(c.client).includes(normQ) ||
+      normS(c.clientName).includes(normQ) ||
+      (c.nInternos||[]).some(n=>normS(n).includes(normQ))
+    ).filter(c=>c.status!=='cancelado').slice(0,8)
+  }, [busca, cards])
   const [baseDate,     setBaseDate]     = useState(todayStr())
   const [yr,           setYr]           = useState(new Date().getFullYear())
   const [mo,           setMo]           = useState(new Date().getMonth())
@@ -1372,45 +1380,29 @@ export function FrotasView() {
                   <button onClick={()=>setBusca('')}
                     style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:T.textMuted, fontSize:13, lineHeight:1 }}>×</button>
                 )}
-                {busca.trim().length>=1 && (() => {
-                  const normQ = busca.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-                  const normS = s => String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-                  const resultados = cards.filter(c =>
-                    String(c.seqId||'').includes(normQ) ||
-                    normS(c.nInterno).includes(normQ) ||
-                    normS(c.client).includes(normQ) ||
-                    normS(c.clientName).includes(normQ) ||
-                    (c.nInternos||[]).some(n=>normS(n).includes(normQ))
-                  ).filter(c=>!['cancelado'].includes(c.status)).slice(0,8)
-                  return (
-                    <div style={{ position:'absolute', top:34, right:0, width:320, background:T.surface, borderRadius:T.r, boxShadow:T.shadowLg, border:`1px solid ${T.border}`, zIndex:999, maxHeight:360, overflowY:'auto' }}>
-                      {resultados.length===0 ? (
-                        <div style={{ padding:'14px 16px', color:T.textMuted, fontSize:12, fontFamily:FONT }}>Nenhum resultado encontrado</div>
-                      ) : resultados.map(card=>{
-                        const ct=CARD_TYPES[card.type]
-                        return (
-                          <div key={card.id} onClick={()=>{setEditCard(card);setModal('card');setBusca('')}}
-                            style={{ padding:'10px 14px', borderBottom:`1px solid ${T.border}`, cursor:'pointer', display:'flex', gap:10, alignItems:'flex-start' }}
-                            onMouseEnter={e=>e.currentTarget.style.opacity='.85'}
-                            onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
-                            <div style={{ flexShrink:0, marginTop:1 }}>
-                              <span style={{ background:ct?.bg, color:ct?.color, borderRadius:20, padding:'1px 6px', fontSize:9, fontWeight:700, fontFamily:FONT }}>{ct?.icon} {ct?.short}</span>
+                {busca.trim().length>=1 && (
+                  <div style={{ position:'absolute', top:34, right:0, width:320, background:T.surface, borderRadius:T.r, boxShadow:T.shadowLg, border:`1px solid ${T.border}`, zIndex:999, maxHeight:360, overflowY:'auto' }}>
+                    {buscaResultados.length===0 ? (
+                      <div style={{ padding:'14px 16px', color:T.textMuted, fontSize:12, fontFamily:FONT }}>Nenhum resultado encontrado</div>
+                    ) : buscaResultados.map(card=>{
+                      const ct=CARD_TYPES[card.type]
+                      return (
+                        <div key={card.id} onClick={()=>{setEditCard(card);setModal('card');setBusca('')}}
+                          style={{ padding:'10px 14px', borderBottom:`1px solid ${T.border}`, cursor:'pointer', display:'flex', gap:10, alignItems:'flex-start' }}>
+                          <span style={{ background:ct?.bg, color:ct?.color, borderRadius:20, padding:'1px 6px', fontSize:9, fontWeight:700, fontFamily:FONT, flexShrink:0 }}>{ct?.icon} {ct?.short}</span>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ color:T.text, fontWeight:700, fontSize:12, fontFamily:FONT, marginBottom:2 }}>
+                              {card.seqId ? `#${card.seqId} · ` : ''}{card.client||card.clientName||'—'}
                             </div>
-                            <div style={{ flex:1, minWidth:0 }}>
-                              <div style={{ color:T.text, fontWeight:700, fontSize:12, fontFamily:FONT, marginBottom:2 }}>
-                                {card.seqId ? `#${card.seqId} · ` : ''}{card.client||card.clientName||'—'}
-                              </div>
-                              <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT }}>
-                                {[card.nInterno, ...(card.nInternos||[])].filter(Boolean).join(', ')}
-                                {card.startDate ? ` · ${fmt(card.startDate)}` : ''}
-                              </div>
+                            <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT }}>
+                              {[card.nInterno,...(card.nInternos||[])].filter(Boolean).join(', ')}{card.startDate?` · ${fmt(card.startDate)}`:''}
                             </div>
                           </div>
-                        )
-                      })}
-                    </div>
-                  )
-                })()}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
               {Object.entries(CARD_TYPES).map(([k,v])=>(
                 <div key={k} style={{ display:'flex', alignItems:'center', gap:4, background:v.bg, border:`1px solid ${v.color}40`, borderRadius:20, padding:'2px 9px' }}>
@@ -1566,9 +1558,9 @@ export function FrotasView() {
                     </>
                   )}
                 </div>
-          </div>
-        </div>
-      </>}
+              </div>
+            </div>
+          </>}
 
       {/* REQUESTS TAB */}
       {activeTab==='requests'&&(
