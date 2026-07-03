@@ -270,6 +270,17 @@ function ServicoCard({ card, index, onUpdateStatus }) {
             <StatusBadge status={card.status}/>
           </div>
 
+          {/* Alerta de atraso individual */}
+          {card.endDate && card.endDate < new Date().toISOString().split('T')[0] && !['concluido','cancelado'].includes(card.status) && (
+            <div style={{ background:'#3D1A1A', border:`1px solid #D32F2F40`, borderRadius:T.r, padding:'8px 12px', marginBottom:10, display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ fontSize:16 }}>🚨</span>
+              <div>
+                <div style={{ color:'#FF6B6B', fontFamily:FONT, fontSize:12, fontWeight:800 }}>Serviço em atraso</div>
+                <div style={{ color:'#9E6B6B', fontFamily:FONT, fontSize:10 }}>Data prevista: {card.endDate} — Contate o time de Frotas</div>
+              </div>
+            </div>
+          )}
+
           {/* Interrupção ativa */}
           {card.status==='interrompido' && card.interrupcaoDescricao && (
             <div style={{ background:'#FFF8E1', border:`1px solid #B8860B40`, borderRadius:T.r, padding:'8px 12px', marginBottom:10 }}>
@@ -297,7 +308,7 @@ function ServicoCard({ card, index, onUpdateStatus }) {
           {/* Detalhes */}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
             {[
-              ['📅 Data',       fmt(card.startDate)],
+              ['📅 Data',       `${fmt(card.startDate)}${card.endDate && card.endDate < new Date().toISOString().split('T')[0] && !['concluido','cancelado'].includes(card.status) ? ' 🚨' : ''}`],
               ['⚡ Urgência',   `${ug?.icon} ${ug?.label}`],
               ['🔧 Máquina',    card.machine||'—'],
               ['🔢 N° Interno', card.nInterno||'—'],

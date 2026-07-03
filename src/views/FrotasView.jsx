@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth }        from '../contexts/AuthContext'
 import { useCards, useRequests, useNotifications, useSimClients, useConfig, useDrivers, useMessages, useAllRotogramas, ensureDriverToken } from '../hooks/useFirestore'
 import { MillsLogo, ToastContainer, useToasts, ServiceCard, BrazilMap, MoveModal, NotificationBell, ClientInput, MunicipioInput } from '../components/UI'
-import { T, FONT, CARD_TYPES, CARD_SUBTYPES, URGENCY, BR_STATES, FILIAIS, MONTH_NAMES, WD_SHORT, BS, IS, LS, NB, SUBTYPES_NF } from '../lib/constants'
+import { T, FONT, CARD_TYPES, CARD_SUBTYPES, URGENCY, BR_STATES, FILIAIS, MONTH_NAMES, WD_SHORT, BS, IS, LS, NB, SUBTYPES_NF, URGENCY_SLA_MS, sortByUrgency } from '../lib/constants'
 import { fmt, todayStr, getWeekDays, getMonthWeeks, cardsForDay, detectConflicts, parseSIMCsv, getSubtypeLabel, findRelatedPendingRequest } from '../lib/utils'
 import Papa from 'papaparse'
 import { db } from '../lib/firebase'
@@ -724,10 +724,10 @@ function RequestsKanban({ requests, teamsWebhookUrl, onRespond, onCancel, profil
   const [cancelNote,setCancelNote] = useState('')
   const [saving,    setSaving]     = useState(false)
   const groups={
-    pendente: requests.filter(r=>r.status==='pendente'),
-    aceito:   requests.filter(r=>r.status==='aceito'),
-    concluido: requests.filter(r=>r.status==='concluido'),
-    recusado: requests.filter(r=>r.status==='recusado'),
+    pendente:  sortByUrgency(requests.filter(r=>r.status==='pendente'),  'desiredDate'),
+    aceito:    sortByUrgency(requests.filter(r=>r.status==='aceito'),    'desiredDate'),
+    concluido: sortByUrgency(requests.filter(r=>r.status==='concluido'), 'desiredDate'),
+    recusado:  sortByUrgency(requests.filter(r=>r.status==='recusado'),  'desiredDate'),
   }
   const cols=[
     {key:'pendente',label:'⏳ Pendentes',color:T.amarelo,bg:T.amareloLight},
@@ -749,8 +749,47 @@ function RequestsKanban({ requests, teamsWebhookUrl, onRespond, onCancel, profil
       setSaving(false)
     }
   }
+  // Faixa de atenção: críticos/altos próximos de estourar o SLA
+  const now = Date.now()
+  const urgentes = groups.pendente.filter(r => {
+    const sla = URGENCY_SLA_MS[r.urgency]
+    if (!sla || !['critico','alto'].includes(r.urgency)) return false
+    const vence = new Date(r.desiredDate).getTime() + sla
+    return vence - now < 2 * 3600000 // menos de 2h pra vencer
+  })
+
   return (
     <>
+      {urgentes.length > 0 && (
+        <div style={{ background:'#1A1612', borderRadius:T.r, padding:'10px 14px', marginBottom:12, flexShrink:0 }}>
+          <div style={{ color:'#9E9590', fontSize:9, fontFamily:FONT, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>
+            🚨 Atenção agora — {urgentes.length} {urgentes.length===1?'item':'itens'} próximo{urgentes.length===1?'':'s'} do prazo
+          </div>
+          {urgentes.map(r => {
+            const ug = URGENCY[r.urgency]
+            const vence = new Date(r.desiredDate).getTime() + URGENCY_SLA_MS[r.urgency]
+            const diffH = Math.max(0, Math.round((vence - now) / 60000)) // minutos
+            const label = diffH < 60 ? `${diffH}min` : `${Math.round(diffH/60)}h`
+            const borda = r.urgency==='critico' ? '#D32F2F' : '#E65100'
+            const bg    = r.urgency==='critico' ? 'rgba(211,47,47,.15)' : 'rgba(230,81,0,.15)'
+            return (
+              <div key={r.id} style={{ background:bg, border:`1px solid ${borda}`, borderRadius:T.rSm, padding:'7px 10px', marginBottom:6, display:'flex', alignItems:'center', gap:8 }}>
+                <span style={{ fontSize:13 }}>{ug?.icon}</span>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ color:'#fff', fontFamily:FONT, fontWeight:700, fontSize:11, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+                    {r.requesterName||'—'} · {r.clientName||r.plantaObra||'—'}
+                  </div>
+                  <div style={{ color:'#9E9590', fontFamily:FONT, fontSize:10 }}>vence em {label}</div>
+                </div>
+                <button onMouseDown={()=>setReviewing(r)}
+                  style={{ ...BS, background:borda, color:'white', fontSize:10, fontWeight:700, padding:'4px 10px', whiteSpace:'nowrap' }}>
+                  Avaliar →
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
       {reviewing&&<RequestReviewModal req={reviewing} teamsWebhookUrl={teamsWebhookUrl} onRespond={onRespond} onClose={()=>setReviewing(null)} profile={profile} simClients={simClients}/>}
       {messaging&&<MessageThread requestId={messaging.id} profile={profile} onClose={()=>setMessaging(null)}/>}
       {cancelling&&(
@@ -979,8 +1018,12 @@ export function FrotasView() {
       // Reatribuição de motorista/transportadora feita no próprio formulário de edição
       driver:      f.transportadoraNome || f.driverName || f.driver || editCard?.driver || '',
       driverId:    f.transportadoraNome ? '' : (f.driverId !== undefined ? f.driverId : editCard?.driverId || ''),
-      client:      f.clientName || f.client || '',
-      plantaObra:  f.clientName || f.plantaObra || '',
+      client:          f.clientName || f.client || '',
+      plantaObra:      f.clientName || f.plantaObra || '',
+      // Preservar estado de confirmação de NF — não apagar ao editar
+      nfConfirmada:    f.nfConfirmada    ?? editCard?.nfConfirmada    ?? false,
+      nfConfirmadaPor: f.nfConfirmadaPor ?? editCard?.nfConfirmadaPor ?? '',
+      nfConfirmadaEm:  f.nfConfirmadaEm  ?? editCard?.nfConfirmadaEm  ?? null,
       origin:      f.originCity?.s || f.origin || editCard?.origin || '',
       destination: f.destCity?.s   || f.destination || editCard?.destination || '',
       originCity:  f.originCity?.m || f.originCity || '',
@@ -1145,6 +1188,12 @@ export function FrotasView() {
           authorRole:profile?.role||'frotas', type:'status_change',
           statusEvent:'concluido', createdAt:serverTimestamp(),
         })
+        // Notificar solicitante via Teams webhook (mesma config usada no aceite)
+        if (config?.teamsWebhookUrl && card.client) {
+          notifyTeams(config.teamsWebhookUrl,
+            `✅ Serviço concluído: ${card.client} (${card.nInterno||'—'}) — ${card.destCity||card.destination||'—'}. Validado por ${profile?.name||'Frotas'}.`
+          ).catch(()=>{})
+        }
         if (card.requesterId) {
           await addDoc(collection(db,'notifications'), {
             userId:card.requesterId, requestId:card.requestId,

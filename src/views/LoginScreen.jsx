@@ -3,7 +3,14 @@ import { useAuth } from '../contexts/AuthContext'
 import { T, FONT, FILIAIS, IS, LS } from '../lib/constants'
 
 function MillsLogoFull() {
-  return <img src="/mills-logistica/mills-logo.png" alt="mills" height={52} style={{ display:'block' }}/>
+  return (
+    <svg height="44" viewBox="0 0 130 44" fill="none">
+      <rect width="130" height="44" rx="8" fill="#F37021"/>
+      <text x="10" y="30" fontFamily="Nunito, Arial Rounded MT Bold, sans-serif"
+        fontWeight="900" fontSize="26" fill="white" letterSpacing="-0.5">mills</text>
+      <rect x="76" y="8" width="7" height="7" rx="1.5" fill="white" opacity="0.9"/>
+    </svg>
+  )
 }
 
 export function LoginScreen() {
@@ -16,7 +23,6 @@ export function LoginScreen() {
   const [unit,     setUnit]     = useState('')
   const [error,    setError]    = useState('')
   const [loading,  setLoading]  = useState(false)
-  const [showPass, setShowPass] = useState(false)
 
   const handle = async () => {
     setError(''); setLoading(true)
@@ -81,7 +87,7 @@ export function LoginScreen() {
             <div style={{ marginBottom:12 }}>
               <label style={LS}>Perfil de acesso</label>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
-                {[['solicitante','👤','Solicitante'],['frotas','🚛','Frotas']].map(([v,ic,l]) => (
+                {[['solicitante','👤','Solicitante'],['frotas','🚛','Frotas'],['master','⭐','Master']].map(([v,ic,l]) => (
                   <div key={v} onClick={() => setRole(v)}
                     style={{ border:`2px solid ${role===v?T.laranja:T.border}`, borderRadius:T.r, padding:'9px 6px', cursor:'pointer', textAlign:'center',
                       background:role===v?T.laranjaXLight:T.surface, transition:'all .12s' }}>
@@ -106,17 +112,10 @@ export function LoginScreen() {
               placeholder="seu@mills.com.br" onKeyDown={e=>e.key==='Enter'&&handle()}/>
           </div>
           <div style={{ marginBottom:18 }}>
-  <label style={LS}>Senha</label>
-  <div style={{ position:'relative' }}>
-    <input type={showPass?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)}
-      style={{ ...IS, paddingRight:40 }}
-      placeholder="••••••••" onKeyDown={e=>e.key==='Enter'&&handle()}/>
-    <button type="button" onClick={()=>setShowPass(p=>!p)}
-      style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', fontSize:16, color:T.textMuted, padding:0 }}>
-      {showPass ? '🙈' : '👁'}
-    </button>
-  </div>
-</div>
+            <label style={LS}>Senha</label>
+            <input type="password" value={password} onChange={e=>setPassword(e.target.value)} style={IS}
+              placeholder="••••••••" onKeyDown={e=>e.key==='Enter'&&handle()}/>
+          </div>
 
           {error && <div style={{ background:T.perigoLight, color:T.perigo, borderRadius:T.rSm, padding:'9px 12px', fontSize:12, marginBottom:14, fontFamily:FONT, fontWeight:700 }}>⚠️ {error}</div>}
 
@@ -126,10 +125,7 @@ export function LoginScreen() {
           </button>
         </div>
         <div style={{ textAlign:'center', marginTop:16, color:'rgba(255,255,255,0.45)', fontSize:10, fontFamily:FONT, letterSpacing:'0.08em' }}>
-          Mills Pesados Locação, Serviços e Logística S.A. 
-          <div style={{ textAlign:'center', marginTop:6, color:'rgba(255,255,255,0.45)', fontSize:10, fontFamily:FONT, letterSpacing:'0.08em' }}>
-  Segurança para sonhar mais alto
-</div>
+          mills infraestrutura · Segurança para sonhar mais alto
         </div>
       </div>
     </div>

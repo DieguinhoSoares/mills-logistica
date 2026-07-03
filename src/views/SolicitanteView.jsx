@@ -52,11 +52,11 @@ export function SolicitanteView({ simClients }) {
   }
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return requests
+    if (!search.trim()) return sortByUrgency(requests, 'desiredDate')
     const normQ = search.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
     const normS  = s => String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
     const q = normQ // alias
-    return requests.filter(r =>
+    return sortByUrgency(requests.filter(r =>
       normS(r.clientName).includes(normQ) ||
       normS(r.machine).includes(normQ) ||
       normS(r.originCityName||r.origin).includes(normQ) ||
@@ -64,7 +64,7 @@ export function SolicitanteView({ simClients }) {
       normS(r.nInterno).includes(normQ) ||
       normS(r.requesterName).includes(normQ) ||
       normS(r.status).includes(normQ)
-    )
+    ), 'desiredDate')
   }, [requests, search])
 
   return (
@@ -139,71 +139,92 @@ export function SolicitanteView({ simClients }) {
           </div>
         )}
 
-        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-          {filtered.map(r => {
-            const sc        = STATUS_CONFIG[r.status] || STATUS_CONFIG.pendente
-            const ct        = CARD_TYPES[r.type]
-            const ug        = URGENCY[r.urgency]
-            const nfs       = r.nfsRetorno||[]
-            const nInternos = r.nInternos||(r.nInterno?[r.nInterno]:[])
-            return (
-              <motion.div key={r.id} layout initial={{ opacity:0, y:5 }} animate={{ opacity:1, y:0 }}
-                style={{ background:T.surface, border:`1.5px solid ${sc.color}25`, borderRadius:T.rLg, padding:'16px 18px', boxShadow:T.shadow }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:9 }}>
-                  <div style={{ display:'flex', gap:7, flexWrap:'wrap' }}>
-                    <span style={{ background:ct?.bg, border:`1px solid ${ct?.color}40`, borderRadius:20, padding:'2px 9px', color:ct?.color, fontSize:9, fontWeight:800, fontFamily:FONT }}>{ct?.icon} {ct?.short}</span>
-                    {r.subtype && <span style={{ background:T.infoLight, borderRadius:20, padding:'2px 9px', color:T.info, fontSize:9, fontWeight:800, fontFamily:FONT }}>{getSubtypeLabel(r.type,r.subtype)}</span>}
-                    <span style={{ background:ug?.bg, borderRadius:20, padding:'2px 9px', color:ug?.color, fontSize:9, fontWeight:800, fontFamily:FONT }}>{ug?.icon} {ug?.label}</span>
+        {/* Vista em colunas por estágio — escondida durante busca */}
+        {!search && (
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:8, alignItems:'start' }}>
+            {[
+              { key:'pendentes', label:'⏳ Em análise', statuses:['pendente','pendente_supervisor','pendente_gerente'], color:T.amarelo, bg:T.amareloLight },
+              { key:'aceitas',   label:'✅ Aceitas',    statuses:['aceito'],    color:T.verde,   bg:T.verdeLight   },
+              { key:'historico', label:'📋 Histórico',  statuses:['concluido','recusado','cancelado'], color:T.textMuted, bg:T.surfaceAlt },
+            ].map(col => {
+              const items = sortByUrgency(requests.filter(r => col.statuses.includes(r.status)), 'desiredDate')
+              return (
+                <div key={col.key} style={{ background:col.bg, border:`1px solid ${col.color}30`, borderRadius:T.rLg, padding:'10px 12px', minHeight:80 }}>
+                  <div style={{ color:col.color, fontFamily:FONT, fontWeight:800, fontSize:10, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>
+                    {col.label}
+                    {items.length > 0 && <span style={{ background:col.color+'30', borderRadius:10, padding:'1px 7px', fontSize:10 }}>{items.length}</span>}
                   </div>
-                  <span style={{ background:sc.bg, border:`1px solid ${sc.color}40`, borderRadius:20, padding:'3px 11px', color:sc.color, fontSize:11, fontWeight:800, fontFamily:FONT, whiteSpace:'nowrap' }}>{sc.label}</span>
+                  {items.length===0 && <div style={{ color:T.textMuted, fontFamily:FONT, fontSize:11, textAlign:'center', padding:'16px 0' }}>—</div>}
+                  {items.map(r => {
+                    const sc = STATUS_CONFIG[r.status] || STATUS_CONFIG.pendente
+                    const ct = CARD_TYPES[r.type]
+                    const ug = URGENCY[r.urgency]
+                    return (
+                      <motion.div key={r.id} layout initial={{ opacity:0, y:4 }} animate={{ opacity:1, y:0 }}
+                        style={{ background:T.surface, border:`1.5px solid ${sc.color}20`, borderRadius:T.r, padding:'10px 12px', marginBottom:8, boxShadow:T.shadow }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+                          <span style={{ background:ct?.bg, border:`1px solid ${ct?.color}40`, borderRadius:20, padding:'1px 7px', color:ct?.color, fontSize:9, fontWeight:800, fontFamily:FONT }}>{ct?.icon} {ct?.short}</span>
+                          <span style={{ fontSize:11 }}>{ug?.icon}</span>
+                        </div>
+                        <div style={{ color:T.text, fontWeight:700, fontSize:12, fontFamily:FONT, marginBottom:2 }}>{r.clientName||r.plantaObra||'—'}</div>
+                        <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT, marginBottom:5 }}>{fmt(r.desiredDate)} · {r.nInterno||'—'}</div>
+                        <span style={{ background:sc.bg, color:sc.color, borderRadius:20, padding:'1px 8px', fontSize:9, fontWeight:700, fontFamily:FONT }}>{sc.label}</span>
+                        {r.responseNote && (
+                          <div style={{ marginTop:6, padding:'5px 8px', background:T.perigoLight, borderRadius:T.rSm, color:T.perigo, fontSize:10, fontFamily:FONT }}>{r.responseNote}</div>
+                        )}
+                        <div style={{ display:'flex', gap:6, marginTop:7, flexWrap:'wrap' }}>
+                          <button onClick={()=>setMessaging(r)} style={{ ...BS, background:T.infoLight, color:T.info, border:`1px solid ${T.info}30`, fontSize:10, fontWeight:700 }}>💬</button>
+                          {(r.status==='recusado' || r.status==='cancelado') && (
+                            <button onClick={()=>setReopenData(r)} style={{ ...BS, background:T.laranjaLight, color:T.laranja, border:`1px solid ${T.laranja}40`, fontSize:10, fontWeight:700, flex:1 }}>🔄 Reabrir</button>
+                          )}
+                        </div>
+                      </motion.div>
+                    )
+                  })}
                 </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:8 }}>
-                  {[
-                    ['Planta/Obra',   r.clientName||'—'],
-                    ['Equipamento',   r.machine||'—'],
-                    ['Rota',          `${r.originCityName||r.origin||'—'} → ${r.destCityName||r.destination||'—'}`],
-                    ['Data desejada', fmt(r.desiredDate)],
-                    ['Urgência',      `${ug?.icon} ${ug?.label} (${URGENCY_SLA[r.urgency]||'—'})`],
-                    ['N° Internos',   nInternos.length>0?nInternos.join(', '):'—'],
-                  ].map(([l,v]) => (
-                    <div key={l}>
-                      <div style={{ color:T.textMuted, fontSize:9, textTransform:'uppercase', letterSpacing:'0.07em', fontFamily:FONT, marginBottom:2 }}>{l}</div>
-                      <div style={{ color:T.text, fontWeight:700, fontSize:11, fontFamily:FONT }}>{v}</div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Lista flat — só visível quando há busca ativa */}
+        {search && (
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            {filtered.length===0 && (
+              <div style={{ textAlign:'center', padding:'40px 0', color:T.textMuted, fontFamily:FONT }}>
+                <div style={{ fontSize:44, marginBottom:10 }}>🔍</div>
+                <p>Nenhuma solicitação encontrada.</p>
+              </div>
+            )}
+            {filtered.map(r => {
+              const sc = STATUS_CONFIG[r.status] || STATUS_CONFIG.pendente
+              const ct = CARD_TYPES[r.type]
+              const ug = URGENCY[r.urgency]
+              return (
+                <motion.div key={r.id} layout initial={{ opacity:0, y:5 }} animate={{ opacity:1, y:0 }}
+                  style={{ background:T.surface, border:`1.5px solid ${sc.color}25`, borderRadius:T.rLg, padding:'14px 16px', boxShadow:T.shadow }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
+                    <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                      <span style={{ background:ct?.bg, border:`1px solid ${ct?.color}40`, borderRadius:20, padding:'2px 9px', color:ct?.color, fontSize:9, fontWeight:800, fontFamily:FONT }}>{ct?.icon} {ct?.short}</span>
+                      {r.subtype && <span style={{ background:T.infoLight, borderRadius:20, padding:'2px 9px', color:T.info, fontSize:9, fontWeight:800, fontFamily:FONT }}>{getSubtypeLabel(r.type,r.subtype)}</span>}
+                      <span style={{ background:sc.bg, borderRadius:20, padding:'2px 9px', color:sc.color, fontSize:9, fontWeight:800, fontFamily:FONT }}>{sc.label}</span>
                     </div>
-                  ))}
-                </div>
-                {nfs.length>0 && (
-                  <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginBottom:8 }}>
-                    <span style={{ color:T.textMuted, fontSize:10, fontFamily:FONT }}>📄 NFs:</span>
-                    {nfs.map(n=><span key={n} style={{ background:T.verdeLight, color:T.verde, borderRadius:20, padding:'1px 8px', fontSize:10, fontWeight:700, fontFamily:FONT }}>{n}</span>)}
+                    <span style={{ fontSize:14 }}>{ug?.icon}</span>
                   </div>
-                )}
-                {r.podeEmbarcar && (
-                  <div style={{ marginBottom:8, color:T.textSec, fontSize:10, fontFamily:FONT }}>
-                    🚚 Embarque: {r.podeEmbarcar==='sim'?'Pode embarcar normalmente':'Requer equipamento especial'}
-                    {r.destinoOficina&&` · Destino: ${r.destinoOficina==='mills'?'Oficina Mills':'Concessionária'}`}
+                  <div style={{ color:T.text, fontWeight:700, fontSize:14, fontFamily:FONT, marginBottom:4 }}>{r.clientName||r.plantaObra||'—'}</div>
+                  <div style={{ color:T.textMuted, fontSize:11, fontFamily:FONT, marginBottom:8 }}>{fmt(r.desiredDate)} · {r.nInterno||'—'} · {r.originCityName||r.origin||'—'} → {r.destCityName||r.destination||'—'}</div>
+                  {r.responseNote && <div style={{ padding:'6px 10px', background:T.perigoLight, borderRadius:T.rSm, color:T.perigo, fontSize:10, fontFamily:FONT, marginBottom:8 }}>{r.responseNote}</div>}
+                  <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                    <button onClick={()=>setMessaging(r)} style={{ ...BS, background:T.infoLight, color:T.info, border:`1px solid ${T.info}30`, fontSize:11, fontWeight:700 }}>💬 Histórico</button>
+                    {(r.status==='recusado' || r.status==='cancelado') && (
+                      <button onClick={()=>setReopenData(r)} style={{ ...BS, background:T.laranjaLight, color:T.laranja, border:`1px solid ${T.laranja}40`, fontSize:11, fontWeight:700 }}>🔄 Reabrir e ajustar</button>
+                    )}
                   </div>
-                )}
-                {r.transportadoraNome && (
-                  <div style={{ marginBottom:8, padding:'6px 10px', background:T.infoLight, borderRadius:T.rSm, color:T.info, fontSize:10, fontFamily:FONT, fontWeight:700 }}>
-                    🚚 Transportadora: {r.transportadoraNome}{r.transportadoraCnpj&&` · CNPJ: ${r.transportadoraCnpj}`}
-                  </div>
-                )}
-                {r.responseNote && (
-                  <div style={{ marginTop:8, padding:'8px 12px', background:r.status==='aceito'?T.verdeLight:T.perigoLight, borderRadius:T.rSm, color:r.status==='aceito'?T.verde:T.perigo, fontFamily:FONT, fontSize:11, fontWeight:700 }}>
-                    {r.status==='aceito'?'✅':r.status==='cancelado'?'🚫':'❌'} {r.responseNote}
-                  </div>
-                )}
-                <div style={{ marginTop:10, display:'flex', gap:8, justifyContent:'flex-end' }}>
-                  <button onClick={()=>setMessaging(r)} style={{ ...BS, background:T.infoLight, color:T.info, border:`1px solid ${T.info}30`, fontSize:11, fontWeight:700 }}>💬 Histórico</button>
-                  {(r.status==='recusado' || r.status==='cancelado') && (
-                    <button onClick={()=>setReopenData(r)} style={{ ...BS, background:T.laranjaLight, color:T.laranja, border:`1px solid ${T.laranja}40`, fontSize:11, fontWeight:700 }}>🔄 Reabrir e ajustar</button>
-                  )}
-                </div>
-              </motion.div>
-            )
-          })}
-        </div>
+                </motion.div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {messaging && <MessageThread requestId={messaging.id} profile={profile} onClose={()=>setMessaging(null)}/>}

@@ -3,12 +3,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
 import { useRequests, useManagerialRequests, useNotifications, useConfig } from '../hooks/useFirestore'
 import { MillsLogo, NotificationBell, ToastContainer, useToasts } from '../components/UI'
-import { T, FONT, CARD_TYPES, URGENCY, BS, IS, LS } from '../lib/constants'
+import { T, FONT, CARD_TYPES, URGENCY, BS, IS, LS, URGENCY_SLA_MS, sortByUrgency } from '../lib/constants'
 import { fmt, getSubtypeLabel } from '../lib/utils'
 import { db } from '../lib/firebase'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
 import { FreteEstimativa } from '../components/FreteEstimativa'
-import { RequestForm } from '../components/RequestForm'
 
 const STATUS_CONFIG = {
   pendente_supervisor: { label:'⏳ Aguard. Supervisor', color:'#B8860B', bg:'#FFF8E1' },
@@ -39,27 +38,41 @@ function ApprovalModal({ req, profile, onApprove, onRefuse, onClose, isMobile, s
 
   const handleApprove = async () => {
     setSaving(true)
-    await onApprove(req.id, note, profile?.name, profile?.role)
-    await addDoc(collection(db,'requests',req.id,'messages'), {
-      text: note || `Aprovado pelo ${stepLabel}.`,
-      authorId: profile?.uid||'', authorName: profile?.name||stepLabel,
-      authorRole: profile?.role||'gerente',
-      type:'status_change', statusEvent:'aprovado_gerencial', createdAt:serverTimestamp(),
-    })
-    setSaving(false); onClose()
+    try {
+      await onApprove(req.id, note, profile?.name, profile?.role)
+      await addDoc(collection(db,'requests',req.id,'messages'), {
+        text: note || `Aprovado pelo ${stepLabel}.`,
+        authorId: profile?.uid||'', authorName: profile?.name||stepLabel,
+        authorRole: profile?.role||'gerente',
+        type:'status_change', statusEvent:'aprovado_gerencial', createdAt:serverTimestamp(),
+      })
+      onClose()
+    } catch (err) {
+      console.error('Erro ao aprovar:', err)
+      alert('Erro ao aprovar. Tente novamente.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleRefuse = async () => {
     if (!note.trim()) return
     setSaving(true)
-    await onRefuse(req.id, note, profile?.name)
-    await addDoc(collection(db,'requests',req.id,'messages'), {
-      text: `Recusado pelo ${stepLabel}. Motivo: ${note}`,
-      authorId: profile?.uid||'', authorName: profile?.name||stepLabel,
-      authorRole: profile?.role||'gerente',
-      type:'status_change', statusEvent:'recusado_gerencial', createdAt:serverTimestamp(),
-    })
-    setSaving(false); onClose()
+    try {
+      await onRefuse(req.id, note, profile?.name)
+      await addDoc(collection(db,'requests',req.id,'messages'), {
+        text: `Recusado pelo ${stepLabel}. Motivo: ${note}`,
+        authorId: profile?.uid||'', authorName: profile?.name||stepLabel,
+        authorRole: profile?.role||'gerente',
+        type:'status_change', statusEvent:'recusado_gerencial', createdAt:serverTimestamp(),
+      })
+      onClose()
+    } catch (err) {
+      console.error('Erro ao recusar:', err)
+      alert('Erro ao recusar. Tente novamente.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -86,16 +99,7 @@ function ApprovalModal({ req, profile, onApprove, onRefuse, onClose, isMobile, s
             <span style={{ background:ct?.bg, border:`1px solid ${ct?.color}40`, borderRadius:20, padding:'3px 10px', color:ct?.color, fontSize:10, fontWeight:700, fontFamily:FONT }}>{ct?.icon} {ct?.short}</span>
             <span style={{ background:ug?.bg, borderRadius:20, padding:'3px 10px', color:ug?.color, fontSize:10, fontWeight:700, fontFamily:FONT }}>{ug?.icon} {ug?.label}</span>
             {req.subtype && <span style={{ background:T.infoLight, borderRadius:20, padding:'3px 10px', color:T.info, fontSize:10, fontWeight:700, fontFamily:FONT }}>{getSubtypeLabel(req.type, req.subtype)}</span>}
-            {req.movimento==='retorno' && <span style={{ background:T.amareloLight, borderRadius:20, padding:'3px 10px', color:'#B8860B', fontSize:10, fontWeight:700, fontFamily:FONT }}>📥 Retorno</span>}
           </div>
-
-          {req.movimento==='retorno' && (
-            <div style={{ marginBottom:10, padding:'8px 12px', background:T.amareloLight, borderRadius:T.rSm, border:`1px solid ${T.amarelo}40` }}>
-              <div style={{ color:'#B8860B', fontSize:9, textTransform:'uppercase', letterSpacing:'0.07em', fontFamily:FONT, fontWeight:700, marginBottom:3 }}>🔗 Referência informada pelo solicitante</div>
-              <div style={{ color:T.text, fontWeight:700, fontSize:12, fontFamily:FONT }}>{req.refOrigem || 'Não informada — confirme com o solicitante qual atendimento está sendo encerrado.'}</div>
-              <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT, marginTop:3 }}>O vínculo definitivo com o card de origem é feito pela Frotas ao designar o motorista.</div>
-            </div>
-          )}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
             {[
               ['Solicitante',   req.requesterName||'—'],
@@ -299,7 +303,7 @@ function DesktopRequestCard({ req, profile, onView }) {
 
 export function GerenteView({ simClients = [] }) {
   const { profile, logout }   = useAuth()
-  const { requests: allReqs, submitRequest, approveAsSupervisor, refuseAsSupervisor, approveAsGerente, refuseAsGerente } = useRequests(profile?.role)
+  const { requests: allReqs, approveAsSupervisor, refuseAsSupervisor, approveAsGerente, refuseAsGerente } = useRequests(profile?.role)
   const { requests: mgrReqs } = useManagerialRequests()
   const { notifications, unreadCount, markAllRead, markRead } = useNotifications()
   const { config, saveConfig } = useConfig()
@@ -313,51 +317,55 @@ export function GerenteView({ simClients = [] }) {
   const [waPhone,      setWaPhone]    = useState('')
   const [waApikey,     setWaApikey]   = useState('')
   const [savedWa,      setSavedWa]    = useState(false)
-  const [newReqModal,  setNewReqModal] = useState(false)
 
   const role = profile?.role
 
   const pendingSupervisor = mgrReqs.filter(r=>r.status==='pendente_supervisor')
   const pendingGerente    = mgrReqs.filter(r=>r.status==='pendente_gerente')
-  const myPending =
+  const myPending = sortByUrgency(
     role==='supervisor' ? pendingSupervisor :
     role==='gerente'    ? pendingGerente    :
-    role==='master'     ? [...pendingSupervisor, ...pendingGerente] : []
+    role==='master'     ? [...pendingSupervisor, ...pendingGerente] : [],
+    'desiredDate'
+  )
 
   const filtered = filterStatus==='todos' ? mgrReqs : mgrReqs.filter(r=>r.status===filterStatus)
 
   const handleApproveFromModal = async (id, note, name, r) => {
     const req = mgrReqs.find(x=>x.id===id)
     if (!req) return
-    if (r==='supervisor' || (r==='master' && req.status==='pendente_supervisor')) await approveAsSupervisor(id, note, name, r)
-    else await approveAsGerente(id, note, name, r)
-    addToast('Solicitação aprovada!', 'success')
-  }
-
-  const handleNewRequest = async data => {
     try {
-      await submitRequest(data)
-      addToast('✅ Solicitação aberta com sucesso.', 'success')
-      setNewReqModal(false)
+      if (r==='supervisor' || (r==='master' && req.status==='pendente_supervisor')) await approveAsSupervisor(id, note, name, r)
+      else await approveAsGerente(id, note, name, r)
+      addToast('Solicitação aprovada!', 'success')
     } catch (err) {
-      console.error('Erro ao abrir solicitação:', err)
-      addToast(`❌ Erro ao abrir solicitação: ${err.message}`, 'error')
-      throw err
+      console.error('Erro ao aprovar solicitação:', err)
+      addToast('Erro ao aprovar. Tente novamente.', 'error')
     }
   }
 
   const handleRefuseFromModal = async (id, note, name) => {
     const req = mgrReqs.find(x=>x.id===id)
     if (!req) return
-    if (role==='supervisor' || (role==='master' && req.status==='pendente_supervisor')) await refuseAsSupervisor(id, note, name)
-    else await refuseAsGerente(id, note, name)
-    addToast('Solicitação recusada.', 'info')
+    try {
+      if (role==='supervisor' || (role==='master' && req.status==='pendente_supervisor')) await refuseAsSupervisor(id, note, name)
+      else await refuseAsGerente(id, note, name)
+      addToast('Solicitação recusada.', 'info')
+    } catch (err) {
+      console.error('Erro ao recusar solicitação:', err)
+      addToast('Erro ao recusar. Tente novamente.', 'error')
+    }
   }
 
   const handleSaveWhatsapp = async () => {
-    await saveConfig({ whatsappPhone: waPhone, whatsappApikey: waApikey })
-    setSavedWa(true); setTimeout(()=>setSavedWa(false), 2000)
-    addToast('WhatsApp configurado!', 'success')
+    try {
+      await saveConfig({ whatsappPhone: waPhone, whatsappApikey: waApikey })
+      setSavedWa(true); setTimeout(()=>setSavedWa(false), 2000)
+      addToast('WhatsApp configurado!', 'success')
+    } catch (err) {
+      console.error('Erro ao salvar configuração do WhatsApp:', err)
+      addToast('Erro ao salvar. Tente novamente.', 'error')
+    }
   }
 
   const roleLabel = { supervisor:'👷 SUPERVISOR', gerente:'👔 GERENTE', master:'⭐ MASTER' }[role] || ''
@@ -378,9 +386,6 @@ export function GerenteView({ simClients = [] }) {
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
       <ToastContainer toasts={toasts} onDismiss={dismiss}/>
       {reviewing && <ApprovalModal req={reviewing} profile={profile} isMobile={true} onApprove={handleApproveFromModal} onRefuse={handleRefuseFromModal} onClose={()=>setReviewing(null)} simClients={simClients}/>}
-      {newReqModal && <RequestForm simClients={simClients} profile={profile}
-        title="➕ Abrir Solicitação" submitLabel="➕ Enviar"
-        onSubmit={handleNewRequest} onClose={()=>setNewReqModal(false)}/>}
 
       {/* Header mobile */}
       <div style={{ background:T.verde, padding:'12px 16px', display:'flex', alignItems:'center', justifyContent:'space-between', boxShadow:T.shadowMd, flexShrink:0 }}>
@@ -392,7 +397,6 @@ export function GerenteView({ simClients = [] }) {
           </div>
         </div>
         <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-          <button onClick={()=>setNewReqModal(true)} title="Abrir solicitação em nome próprio" style={{ background:T.laranja, border:'none', color:'white', borderRadius:T.r, padding:'5px 10px', fontFamily:FONT, fontWeight:700, fontSize:11, cursor:'pointer' }}>+ Solicitação</button>
           <NotificationBell notifications={notifications} unreadCount={unreadCount} onMarkAllRead={markAllRead} onMarkRead={markRead}/>
           <button onClick={logout} style={{ background:'rgba(255,255,255,0.15)', border:'1px solid rgba(255,255,255,0.2)', color:'white', borderRadius:T.r, padding:'5px 10px', fontFamily:FONT, fontSize:11, cursor:'pointer' }}>Sair</button>
         </div>
@@ -510,9 +514,6 @@ export function GerenteView({ simClients = [] }) {
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
       <ToastContainer toasts={toasts} onDismiss={dismiss}/>
       {reviewing && <ApprovalModal req={reviewing} profile={profile} isMobile={false} onApprove={handleApproveFromModal} onRefuse={handleRefuseFromModal} onClose={()=>setReviewing(null)} simClients={simClients}/>}
-      {newReqModal && <RequestForm simClients={simClients} profile={profile}
-        title="➕ Abrir Solicitação" submitLabel="➕ Enviar"
-        onSubmit={handleNewRequest} onClose={()=>setNewReqModal(false)}/>}
 
       <div style={{ background:T.verde, padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:56, flexShrink:0, boxShadow:T.shadowMd }}>
         <div style={{ display:'flex', alignItems:'center', gap:12 }}>
@@ -532,7 +533,6 @@ export function GerenteView({ simClients = [] }) {
               {t.badge>0 && <span style={{ position:'absolute', top:-4, right:-4, background:T.perigo, color:'white', borderRadius:20, fontSize:9, fontWeight:700, padding:'0 5px', fontFamily:FONT }}>{t.badge}</span>}
             </button>
           ))}
-          <button onClick={()=>setNewReqModal(true)} style={{ ...BS, background:T.laranja, color:'white', fontWeight:700, fontSize:11 }}>+ Abrir Solicitação</button>
           <NotificationBell notifications={notifications} unreadCount={unreadCount} onMarkAllRead={markAllRead} onMarkRead={markRead}/>
           <button onClick={logout} style={{ ...BS, background:'rgba(255,255,255,0.15)', color:'white', border:'1px solid rgba(255,255,255,0.2)', fontSize:11 }}>Sair</button>
         </div>
@@ -564,6 +564,30 @@ export function GerenteView({ simClients = [] }) {
             </div>
           </div>
           {subTab==='pendentes' && (<>
+            {urgentesGer.length > 0 && (
+              <div style={{ background:'#1A1612', borderRadius:T.r, padding:'12px 16px', marginBottom:14 }}>
+                <div style={{ color:'#9E9590', fontSize:9, fontFamily:FONT, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>
+                  🚨 Atenção agora — {urgentesGer.length} {urgentesGer.length===1?'item':'itens'} próximo{urgentesGer.length===1?'':'s'} do prazo
+                </div>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
+                  {urgentesGer.map(r => {
+                    const vence = new Date(r.desiredDate).getTime() + URGENCY_SLA_MS[r.urgency]
+                    const diffM = Math.max(0, Math.round((vence - now) / 60000))
+                    const borda = r.urgency==='critico' ? '#D32F2F' : '#E65100'
+                    return (
+                      <div key={r.id} onClick={()=>setReviewing(r)}
+                        style={{ background:r.urgency==='critico'?'rgba(211,47,47,.15)':'rgba(230,81,0,.15)', border:`1px solid ${borda}`, borderRadius:T.rSm, padding:'8px 12px', cursor:'pointer', flex:'1 1 280px', display:'flex', justifyContent:'space-between', alignItems:'center', gap:10 }}>
+                        <div>
+                          <div style={{ color:'#fff', fontFamily:FONT, fontSize:12, fontWeight:700 }}>{URGENCY[r.urgency]?.icon} {r.requesterName||'—'}</div>
+                          <div style={{ color:'#9E9590', fontFamily:FONT, fontSize:10 }}>{r.clientName||'—'} · {r.desiredDate||'—'}</div>
+                        </div>
+                        <span style={{ color:borda, fontFamily:FONT, fontSize:11, fontWeight:700, whiteSpace:'nowrap' }}>vence em {diffM<60?`${diffM}min`:`${Math.round(diffM/60)}h`}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
             {myPending.length===0 && (
               <div style={{ textAlign:'center', padding:'40px 0', color:T.textMuted, fontFamily:FONT }}>
                 <div style={{ fontSize:44, marginBottom:10 }}>✅</div>

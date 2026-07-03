@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
 import { MillsLogo, ToastContainer, useToasts, BrazilMap, NotificationBell } from '../components/UI'
 import { KPIView } from './KPIView'
-import { T, FONT, CARD_TYPES, BS, IS, LS } from '../lib/constants'
+import { T, FONT, CARD_TYPES, BS, IS, LS, sortByUrgency } from '../lib/constants'
 import { detectConflicts, fmt, getSubtypeLabel } from '../lib/utils'
 import { doc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore'
 import { db } from '../lib/firebase'
@@ -322,9 +322,9 @@ export function MasterView({ simClients = [] }) {
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:16 }}>
               {[
-                { l:'Em aberto',         v:mgrReqs.filter(r=>!['concluido','cancelado','recusado'].includes(r.status)).length, c:T.laranja, bg:T.laranjaLight },
+                { l:'Em aberto',         v:mgrReqs.filter(r=>['pendente_supervisor','pendente_gerente','pendente','aceito'].includes(r.status)).length, c:T.laranja, bg:T.laranjaLight },
                 { l:'Aguard. Aprovação', v:pendingAprov,                                                                       c:'#B8860B', bg:'#FFF8E1'     },
-                { l:'No time de Frotas', v:mgrReqs.filter(r=>['pendente','aceito'].includes(r.status)).length,                 c:T.verde,   bg:T.verdeLight  },
+                { l:'Com o Frotas',      v:mgrReqs.filter(r=>['pendente','aceito'].includes(r.status)).length,                 c:T.verde,   bg:T.verdeLight  },
                 { l:'Recusadas',         v:mgrReqs.filter(r=>r.status==='recusado').length,                                    c:T.perigo,  bg:T.perigoLight },
               ].map(s=>(
                 <div key={s.l} style={{ background:s.bg, border:`1px solid ${s.c}30`, borderRadius:T.rLg, padding:'12px 14px', boxShadow:T.shadow }}>
@@ -342,7 +342,7 @@ export function MasterView({ simClients = [] }) {
               ))}
             </div>
             <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-              {(filterAprov==='todos'?mgrReqs:mgrReqs.filter(r=>r.status===filterAprov)).map(r => {
+              {sortByUrgency(filterAprov==='todos'?mgrReqs:mgrReqs.filter(r=>r.status===filterAprov),'desiredDate').map(r => {
                 const ct = CARD_TYPES[r.type]
                 const sc = { pendente_supervisor:{label:'⏳ Aguard. Supervisor',color:'#B8860B',bg:'#FFF8E1'}, pendente_gerente:{label:'📋 Aguard. Gerência',color:T.info,bg:T.infoLight}, pendente:{label:'🚛 No time de Frotas',color:T.verde,bg:T.verdeLight}, aceito:{label:'✅ Aceito',color:T.sucesso,bg:T.sucessoLight}, recusado:{label:'❌ Recusado',color:T.perigo,bg:T.perigoLight} }[r.status] || {}
                 const canApprove = ['pendente_supervisor','pendente_gerente'].includes(r.status)
