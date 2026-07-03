@@ -1317,7 +1317,7 @@ export function FrotasView() {
                   <div onClick={e=>e.stopPropagation()} style={{ position:'absolute', top:36, right:0, background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.rLg, boxShadow:T.shadowLg, zIndex:999, minWidth:200, padding:8 }}>
                     <button onClick={()=>{setCsvModal(true);setMaisOpen(false)}}
                       style={{ width:'100%', textAlign:'left', padding:'8px 12px', borderRadius:T.rSm, border:'none', background:'transparent', cursor:'pointer', fontFamily:FONT, fontSize:12, color:T.text, display:'flex', justifyContent:'space-between', alignItems:'center' }}
-                      onMouseEnter={e=>e.currentTarget.style.background=T.surfaceAlt} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                      onMouseEnter={e=>e.currentTarget.style.opacity='.85'} onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
                       <span>⬆️ Atualizar base SIM</span>
                       {simClients.length>0
                         ? <span style={{ color:T.verde, fontSize:10, fontWeight:700 }}>({simClients.length})</span>
@@ -1325,18 +1325,18 @@ export function FrotasView() {
                     </button>
                     <button onClick={()=>{setDriversModal(true);setMaisOpen(false)}}
                       style={{ width:'100%', textAlign:'left', padding:'8px 12px', borderRadius:T.rSm, border:'none', background:'transparent', cursor:'pointer', fontFamily:FONT, fontSize:12, color:T.text }}
-                      onMouseEnter={e=>e.currentTarget.style.background=T.surfaceAlt} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                      onMouseEnter={e=>e.currentTarget.style.opacity='.85'} onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
                       👤 Motoristas
                     </button>
                     <button onClick={()=>{setSettingsModal(true);setMaisOpen(false)}}
                       style={{ width:'100%', textAlign:'left', padding:'8px 12px', borderRadius:T.rSm, border:'none', background:'transparent', cursor:'pointer', fontFamily:FONT, fontSize:12, color:T.text }}
-                      onMouseEnter={e=>e.currentTarget.style.background=T.surfaceAlt} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                      onMouseEnter={e=>e.currentTarget.style.opacity='.85'} onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
                       ⚙️ Configurações
                     </button>
                     <div style={{ height:1, background:T.border, margin:'4px 8px' }}/>
                     <button onClick={()=>{logout();setMaisOpen(false)}}
                       style={{ width:'100%', textAlign:'left', padding:'8px 12px', borderRadius:T.rSm, border:'none', background:'transparent', cursor:'pointer', fontFamily:FONT, fontSize:12, color:T.perigo }}
-                      onMouseEnter={e=>e.currentTarget.style.background=T.perigoLight} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                      onMouseEnter={e=>e.currentTarget.style.opacity='.85'} onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
                       Sair
                     </button>
                   </div>
@@ -1398,8 +1398,8 @@ export function FrotasView() {
                         return (
                           <div key={card.id} onClick={()=>{setEditCard(card);setModal('card');setBusca('')}}
                             style={{ padding:'10px 14px', borderBottom:`1px solid ${T.border}`, cursor:'pointer', display:'flex', gap:10, alignItems:'flex-start' }}
-                            onMouseEnter={e=>e.currentTarget.style.background=T.surfaceAlt}
-                            onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                            onMouseEnter={e=>e.currentTarget.style.opacity='.85'}
+                            onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
                             <div style={{ flexShrink:0, marginTop:1 }}>
                               <span style={{ background:ct?.bg, color:ct?.color, borderRadius:20, padding:'1px 6px', fontSize:9, fontWeight:700, fontFamily:FONT }}>{ct?.icon} {ct?.short}</span>
                             </div>
