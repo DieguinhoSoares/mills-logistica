@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
 import { MillsLogo, ToastContainer, useToasts, BrazilMap, NotificationBell } from '../components/UI'
 import { KPIView } from './KPIView'
-import { T, FONT, CARD_TYPES, BS, IS, LS, sortByUrgency } from '../lib/constants'
+import { T, FONT, CARD_TYPES, BS, IS, LS } from '../lib/constants'
 import { detectConflicts, fmt, getSubtypeLabel } from '../lib/utils'
 import { doc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore'
 import { db } from '../lib/firebase'
@@ -46,6 +46,15 @@ function CancelCardModal({ card, onConfirm, onClose }) {
   )
 }
 
+// sortByUrgency inline
+const _URGENCY_ORDER = { critico: 0, alto: 1, medio: 2, baixo: 3 }
+function sortByUrgency(items, dateField) {
+  return [...items].sort((a, b) => {
+    const d = (_URGENCY_ORDER[a.urgency]??99) - (_URGENCY_ORDER[b.urgency]??99)
+    if (d !== 0) return d
+    return new Date(a[dateField||'desiredDate']||'9999') - new Date(b[dateField||'desiredDate']||'9999')
+  })
+}
 export function MasterView({ simClients = [] }) {
   const { profile, logout }                         = useAuth()
   const { cards, deleteCard }                       = useCards()

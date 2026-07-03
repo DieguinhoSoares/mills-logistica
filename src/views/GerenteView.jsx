@@ -3,12 +3,22 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
 import { useRequests, useManagerialRequests, useNotifications, useConfig } from '../hooks/useFirestore'
 import { MillsLogo, NotificationBell, ToastContainer, useToasts } from '../components/UI'
-import { T, FONT, CARD_TYPES, URGENCY, BS, IS, LS, URGENCY_SLA_MS, sortByUrgency } from '../lib/constants'
+import { T, FONT, CARD_TYPES, URGENCY, BS, IS, LS } from '../lib/constants'
 import { fmt, getSubtypeLabel } from '../lib/utils'
 import { db } from '../lib/firebase'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
 import { FreteEstimativa } from '../components/FreteEstimativa'
 
+// sortByUrgency + URGENCY_SLA_MS inline
+const _URGENCY_ORDER = { critico: 0, alto: 1, medio: 2, baixo: 3 }
+const URGENCY_SLA_MS = { critico: 4*3600000, alto: 24*3600000, medio: 3*86400000, baixo: 7*86400000 }
+function sortByUrgency(items, dateField) {
+  return [...items].sort((a, b) => {
+    const d = (_URGENCY_ORDER[a.urgency]??99) - (_URGENCY_ORDER[b.urgency]??99)
+    if (d !== 0) return d
+    return new Date(a[dateField||'desiredDate']||'9999') - new Date(b[dateField||'desiredDate']||'9999')
+  })
+}
 const STATUS_CONFIG = {
   pendente_supervisor: { label:'⏳ Aguard. Supervisor', color:'#B8860B', bg:'#FFF8E1' },
   pendente_gerente:    { label:'📋 Aguard. Gerência',   color:T.info,    bg:T.infoLight },

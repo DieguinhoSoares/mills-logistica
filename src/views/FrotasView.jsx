@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth }        from '../contexts/AuthContext'
 import { useCards, useRequests, useNotifications, useSimClients, useConfig, useDrivers, useMessages, useAllRotogramas, ensureDriverToken } from '../hooks/useFirestore'
 import { MillsLogo, ToastContainer, useToasts, ServiceCard, BrazilMap, MoveModal, NotificationBell, ClientInput, MunicipioInput } from '../components/UI'
-import { T, FONT, CARD_TYPES, CARD_SUBTYPES, URGENCY, BR_STATES, FILIAIS, MONTH_NAMES, WD_SHORT, BS, IS, LS, NB, SUBTYPES_NF, URGENCY_SLA_MS, sortByUrgency } from '../lib/constants'
+import { T, FONT, CARD_TYPES, CARD_SUBTYPES, URGENCY, BR_STATES, FILIAIS, MONTH_NAMES, WD_SHORT, BS, IS, LS, NB, SUBTYPES_NF } from '../lib/constants'
 import { fmt, todayStr, getWeekDays, getMonthWeeks, cardsForDay, detectConflicts, parseSIMCsv, getSubtypeLabel, findRelatedPendingRequest } from '../lib/utils'
 import Papa from 'papaparse'
 import { db } from '../lib/firebase'
@@ -717,6 +717,16 @@ function AssignDriverModal({ req, drivers, simClients, cards, onConfirm, onCance
   )
 }
 
+// sortByUrgency + URGENCY_SLA_MS inline
+const _URGENCY_ORDER = { critico: 0, alto: 1, medio: 2, baixo: 3 }
+const URGENCY_SLA_MS = { critico: 4*3600000, alto: 24*3600000, medio: 3*86400000, baixo: 7*86400000 }
+function sortByUrgency(items, dateField) {
+  return [...items].sort((a, b) => {
+    const d = (_URGENCY_ORDER[a.urgency]??99) - (_URGENCY_ORDER[b.urgency]??99)
+    if (d !== 0) return d
+    return new Date(a[dateField||'desiredDate']||'9999') - new Date(b[dateField||'desiredDate']||'9999')
+  })
+}
 function RequestsKanban({ requests, teamsWebhookUrl, onRespond, onCancel, profile, simClients }) {
   const [reviewing, setReviewing]  = useState(null)
   const [messaging, setMessaging]  = useState(null)
