@@ -1171,6 +1171,8 @@ export function FrotasView() {
     c.status !== 'cancelado' &&
     !c.nfConfirmada
   )
+  const totalValidacao = validacoes.length + semExecutorApp.length
+  const totalNF        = nfPendentes.length
 
   const relatedRequest = editCard ? findRelatedPendingRequest(editCard, requests) : null
 
@@ -1340,9 +1342,7 @@ export function FrotasView() {
                   </div>
                 )}
                 {maisOpen&&<div onClick={()=>setMaisOpen(false)} style={{ position:'fixed', inset:0, zIndex:998 }}/>}
-              </div>
-            )
-          })()}
+          </div>
         </div>
       </div>
 
@@ -1461,12 +1461,7 @@ export function FrotasView() {
           <BrazilMap cards={cards}/>
 
           {/* PAINEL ÚNICO com abas: Resumo / Solicitações / Validação */}
-          {(()=>{
-            const [painelTab,setPainelTab]=useState('resumo')
-            const totalValidacao=validacoes.length+semExecutorApp.length
-            const totalNF=nfPendentes.length
-            return (
-              <div style={{ background:T.surface, borderRadius:T.rLg, border:`1px solid ${T.border}`, display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:T.shadow }}>
+          <div style={{ background:T.surface, borderRadius:T.rLg, border:`1px solid ${T.border}`, display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:T.shadow }}>
                 {/* Abas */}
                 <div style={{ display:'flex', borderBottom:`1px solid ${T.border}`, flexShrink:0 }}>
                   {[
