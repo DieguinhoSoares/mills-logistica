@@ -120,7 +120,7 @@ export function LoginScreen() {
           </button>
         </div>
         <div style={{ textAlign:'center', marginTop:16, color:'rgba(255,255,255,0.45)', fontSize:10, fontFamily:FONT, letterSpacing:'0.08em' }}>
-          mills infraestrutura · Gestão Logística
+          Mills Pesados e Intralogística · Segurança para sonhar mais alto
         </div>
       </div>
     </div>
