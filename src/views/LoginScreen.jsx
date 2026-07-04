@@ -4,12 +4,7 @@ import { T, FONT, FILIAIS, IS, LS } from '../lib/constants'
 
 function MillsLogoFull() {
   return (
-    <svg height="44" viewBox="0 0 130 44" fill="none">
-      <rect width="130" height="44" rx="8" fill="#F37021"/>
-      <text x="10" y="30" fontFamily="Nunito, Arial Rounded MT Bold, sans-serif"
-        fontWeight="900" fontSize="26" fill="white" letterSpacing="-0.5">mills</text>
-      <rect x="76" y="8" width="7" height="7" rx="1.5" fill="white" opacity="0.9"/>
-    </svg>
+    <img src="/mills-logistica/mills-logo.png" alt="mills" height="44" style={{ display:'block' }}/>
   )
 }
 
@@ -64,7 +59,7 @@ export function LoginScreen() {
               <MillsLogoFull/>
             </div>
             <div style={{ color:T.verde, fontFamily:FONT, fontWeight:900, fontSize:13, letterSpacing:'0.15em', textTransform:'uppercase', marginBottom:3 }}>GESTÃO DE FROTAS</div>
-            <div style={{ color:T.textMuted, fontSize:11, letterSpacing:'0.06em' }}>Logística · Operações de Campo</div>
+            <div style={{ color:T.textMuted, fontSize:11, letterSpacing:'0.06em' }}>Segurança para sonhar mais alto</div>
           </div>
 
           <div style={{ display:'flex', gap:0, marginBottom:22, background:T.surfaceLow, borderRadius:T.rLg, padding:4 }}>
@@ -125,7 +120,7 @@ export function LoginScreen() {
           </button>
         </div>
         <div style={{ textAlign:'center', marginTop:16, color:'rgba(255,255,255,0.45)', fontSize:10, fontFamily:FONT, letterSpacing:'0.08em' }}>
-          mills infraestrutura · Segurança para sonhar mais alto
+          mills infraestrutura · Gestão Logística
         </div>
       </div>
     </div>

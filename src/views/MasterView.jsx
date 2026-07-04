@@ -195,11 +195,27 @@ export function MasterView({ simClients = [] }) {
     addToast('WhatsApp configurado!', 'success')
   }
 
+  const handleMigration = async () => {
+    setMigrating(true)
+    try {
+      const fixed = await backfillSeqIds()
+      setMigrateLog(`${fixed} cards corrigidos com sucesso.`)
+    } catch(err) {
+      setMigrateLog('Erro na migração: ' + err.message)
+    } finally {
+      setMigrating(false)
+    }
+  }
+
   const handleSaveTollguru = async () => {
     await saveConfig({ tollguruApikey: tollguruKey })
     setSavedToll(true); setTimeout(()=>setSavedToll(false), 2000)
     addToast('TollGuru configurado!', 'success')
   }
+
+  const backupLastAt = backupStatus?.lastBackupAt?.toDate ? backupStatus.lastBackupAt.toDate() : null
+  const backupHorasAtras = backupLastAt ? (Date.now() - backupLastAt.getTime()) / 3600000 : null
+  const backupStale = !backupStatus || !backupLastAt || backupHorasAtras > 26
 
   return (
     <div style={{ background:T.bg, height:'100vh', display:'flex', flexDirection:'column', overflow:'hidden', fontFamily:FONT }}>
@@ -259,22 +275,16 @@ export function MasterView({ simClients = [] }) {
         </div>
       </div>
 
-      {(() => {
-        const lastAt = backupStatus?.lastBackupAt?.toDate ? backupStatus.lastBackupAt.toDate() : null
-        const horasAtras = lastAt ? (Date.now() - lastAt.getTime()) / 3600000 : null
-        const stale = !backupStatus || !lastAt || horasAtras > 26
-        if (!stale) return null
-        return (
-          <div style={{ background:T.perigoLight, borderBottom:`1px solid ${T.perigo}40`, padding:'8px 20px', display:'flex', alignItems:'center', gap:8 }}>
-            <span style={{ color:T.perigo, fontWeight:700, fontSize:12, fontFamily:FONT }}>
-              ⚠️ Backup {lastAt ? `desatualizado — última execução há ${Math.round(horasAtras)}h` : 'nunca foi confirmado nesta base'}.
-            </span>
-            <span style={{ color:T.textSec, fontSize:11, fontFamily:FONT }}>
-              Verifique se alguém com perfil Master abriu o sistema hoje — o backup roda automaticamente nesse momento.
-            </span>
-          </div>
-        )
-      })()}
+      {backupStale && (
+        <div style={{ background:T.perigoLight, borderBottom:`1px solid ${T.perigo}40`, padding:'8px 20px', display:'flex', alignItems:'center', gap:8 }}>
+          <span style={{ color:T.perigo, fontWeight:700, fontSize:12, fontFamily:FONT }}>
+            ⚠️ Backup {backupLastAt ? `desatualizado — última execução há ${Math.round(backupHorasAtras)}h` : 'nunca foi confirmado nesta base'}.
+          </span>
+          <span style={{ color:T.textSec, fontSize:11, fontFamily:FONT }}>
+            Verifique se alguém com perfil Master abriu o sistema hoje — o backup roda automaticamente nesse momento.
+          </span>
+        </div>
+      )}
 
       <div style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column' }}>
         {tab==='kpis' && <KPIView cards={cards} requests={requests}/>}
