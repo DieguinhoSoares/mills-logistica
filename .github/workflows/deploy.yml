@@ -18,6 +18,12 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Lint (erros bloqueiam o deploy; warnings não)
+        run: npm run lint:ci
+
+      - name: Testes (freteCalc + ordenação de filas)
+        run: npm test
+
       - name: Build
         run: npm run build
         env:
