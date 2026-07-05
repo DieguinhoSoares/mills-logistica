@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react'
+import { useState, useRef, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth }        from '../contexts/AuthContext'
 import { useCards, useRequests, useNotifications, useSimClients, useConfig, useDrivers, useMessages, useAllRotogramas, ensureDriverToken } from '../hooks/useFirestore'
@@ -1019,6 +1019,8 @@ export function FrotasView() {
   const [assignModal,   setAssignModal]   = useState(null)
   const [rotogramaModal,setRotogramaModal]= useState(null)
   const [pendingCardForm, setPendingCardForm] = useState(null)
+  const [mapModal,     setMapModal]     = useState(false)
+  const [rodapeSlide,  setRodapeSlide]  = useState(0) // 0 = timeline de hoje, 1 = KPIs rápidos
 
   const hoje      = todayStr()
   const atrasados = cards.filter(c=>c.endDate&&c.endDate<hoje&&!['concluido','cancelado'].includes(c.status))
@@ -1272,6 +1274,14 @@ export function FrotasView() {
     }
   }
 
+  // Alterna a cada 30s entre a timeline de hoje e os KPIs rápidos no espaço liberado pelo mapa
+  useEffect(() => {
+    const iv = setInterval(() => setRodapeSlide(s => s === 0 ? 1 : 0), 30000)
+    return () => clearInterval(iv)
+  }, [])
+
+  const cardsHoje = cards.filter(c => c.startDate === todayStr() && c.status !== 'cancelado').sort((a,b)=>(a.startDate||'').localeCompare(b.startDate||''))
+
   return (
     <div style={{ background:T.bg, height:'100vh', display:'flex', flexDirection:'column', overflow:'hidden', fontFamily:'IBM Plex Sans,sans-serif' }}>
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Barlow+Condensed:wght@400;600;700;800&display=swap" rel="stylesheet"/>
@@ -1444,10 +1454,57 @@ export function FrotasView() {
     </div>
 
     <div style={{ flex:'0 0 36%', display:'grid', gridTemplateColumns:'1fr 310px', gap:10, padding:'0 20px 14px', minHeight:0, overflow:'hidden' }}>
-          {/* MAPA — ganha mais espaço */}
-          <BrazilMap cards={cards}/>
+          {/* Espaço liberado pelo mapa — timeline de hoje / KPIs rápidos, alternando a cada 30s */}
+          <div style={{ background:T.surface, borderRadius:T.rLg, border:`1px solid ${T.border}`, boxShadow:T.shadow, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'9px 13px', borderBottom:`1px solid ${T.border}`, flexShrink:0 }}>
+              <span style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:11, textTransform:'uppercase', letterSpacing:'0.06em' }}>
+                {rodapeSlide===0 ? '🕐 Serviços de hoje' : '⚡ KPIs rápidos'}
+              </span>
+              <div style={{ display:'flex', gap:5, alignItems:'center' }}>
+                <button onClick={()=>setMapModal(true)} title="Ver mapa" style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}`, fontSize:11, padding:'3px 9px' }}>🗺 Mapa</button>
+                {[0,1].map(i=>(
+                  <div key={i} onClick={()=>setRodapeSlide(i)} style={{ width:6, height:6, borderRadius:'50%', cursor:'pointer', background:rodapeSlide===i?T.laranja:T.border }}/>
+                ))}
+              </div>
+            </div>
+            <div style={{ flex:1, overflowY:'auto', padding:12 }}>
+              {rodapeSlide===0 ? (
+                cardsHoje.length===0 ? (
+                  <p style={{ color:T.textMuted, fontSize:11, fontFamily:FONT, margin:0 }}>Nenhum serviço para hoje.</p>
+                ) : cardsHoje.map(c=>{
+                  const ct = CARD_TYPES[c.type]
+                  const atrasado = atrasados.some(a=>a.id===c.id)
+                  return (
+                    <div key={c.id} onClick={()=>{setEditCard(c);setModal('card')}}
+                      style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 10px', marginBottom:6, borderRadius:T.rSm, cursor:'pointer',
+                        border:`1px solid ${atrasado?T.perigo:T.border}`, background:atrasado?T.perigoLight:T.surfaceAlt }}>
+                      <span style={{ background:ct?.bg, color:ct?.color, borderRadius:20, padding:'1px 6px', fontSize:9, fontWeight:700, fontFamily:FONT, flexShrink:0 }}>{ct?.icon} {ct?.short}</span>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ color:T.text, fontWeight:700, fontSize:11, fontFamily:FONT }}>{c.client||'—'}</div>
+                        <div style={{ color:T.textMuted, fontSize:9, fontFamily:FONT }}>{c.driver||c.transportadoraNome||'sem motorista'}{atrasado?' · ⚠ atrasado':''}</div>
+                      </div>
+                    </div>
+                  )
+                })
+              ) : (
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                  {[
+                    ['Serviços/semana', cardsAtivos.length,  T.laranja, T.laranjaLight],
+                    ['Atrasados',       atrasados.length,    T.perigo,  T.perigoLight],
+                    ['Atribuídos',      atribuidos.length,   T.info,    T.infoLight],
+                    ['Rotas otimiz.',   conflicts.length,    '#B8860B', T.amareloLight],
+                  ].map(([l,v,color,bg])=>(
+                    <div key={l} style={{ background:bg, border:`1px solid ${color}30`, borderRadius:T.r, padding:'10px 12px' }}>
+                      <div style={{ color, fontFamily:FONT, fontWeight:900, fontSize:22, lineHeight:1 }}>{v}</div>
+                      <div style={{ color:T.textSec, fontSize:9, fontFamily:FONT, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', marginTop:3 }}>{l}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
 
-          {/* PAINEL ÚNICO com abas: Resumo / Solicitações / Validação */}
+          {/* PAINEL ÚNICO com abas: Resumo / Solicitações / Validação — 100% da altura agora */}
           <div style={{ background:T.surface, borderRadius:T.rLg, border:`1px solid ${T.border}`, display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:T.shadow }}>
                 {/* Abas */}
                 <div style={{ display:'flex', borderBottom:`1px solid ${T.border}`, flexShrink:0 }}>
@@ -1620,6 +1677,21 @@ export function FrotasView() {
         {rotogramaModal&&<RotogramaModal driver={rotogramaModal} cards={cards} profile={profile} rotogramaAtivo={rotogramas.find(r=>r.driverId===rotogramaModal.id)||null} onClose={()=>setRotogramaModal(null)} addToast={addToast}/>}
         {csvModal&&<CsvUploadModal onLoaded={async clients=>{await uploadClients(clients);setCsvModal(false);addToast(`${clients.length} registros sincronizados para todos os usuários.`,'success');}} onClose={()=>setCsvModal(false)}/>}
         {settingsModal&&<SettingsModal config={config} onSave={saveConfig} onClose={()=>setSettingsModal(false)}/>}
+        {mapModal&&(
+          <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.35)', zIndex:1500, display:'flex', alignItems:'center', justifyContent:'center' }}
+            onClick={e=>e.target===e.currentTarget&&setMapModal(false)}>
+            <motion.div initial={{ scale:.96, opacity:0 }} animate={{ scale:1, opacity:1 }}
+              style={{ background:T.surface, borderRadius:T.rLg, width:320, maxWidth:'92vw', maxHeight:'85vh', overflow:'hidden', boxShadow:T.shadowLg, border:`1px solid ${T.border}` }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 14px', borderBottom:`1px solid ${T.border}` }}>
+                <span style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:12 }}>🗺 Mapa de rotas</span>
+                <button onClick={()=>setMapModal(false)} style={{ background:'none', border:'none', color:T.textMuted, fontSize:20, cursor:'pointer' }}>×</button>
+              </div>
+              <div style={{ padding:10 }}>
+                <BrazilMap cards={cards}/>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </AnimatePresence>
     </div>
   )
