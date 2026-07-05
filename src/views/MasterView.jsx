@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
-import { MillsLogo, ToastContainer, useToasts, BrazilMap, NotificationBell } from '../components/UI'
+import { MillsLogo, ToastContainer, useToasts, BrazilMap, NotificationBell, ConfirmModal } from '../components/UI'
 import { KPIView } from './KPIView'
 import { T, FONT, CARD_TYPES, BS, IS, LS } from '../lib/constants'
-import { detectConflicts, fmt, getSubtypeLabel } from '../lib/utils'
+import { detectConflicts, fmt, getSubtypeLabel, sortByUrgency } from '../lib/utils'
 import { doc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore'
 import { db } from '../lib/firebase'
-import { useCards, useRequests, useNotifications, useConfig, usePendingUsers, useManagerialRequests, runDailyBackup, useMessages, useAllUsers, useBackupStatus } from '../hooks/useFirestore'
+import { useCards, useRequests, useNotifications, useConfig, usePendingUsers, useManagerialRequests, runDailyBackup, useMessages, useAllUsers, useBackupStatus, notifyUser, backfillSeqIds } from '../hooks/useFirestore'
 import { FreteEstimativa } from '../components/FreteEstimativa'
 import { MessageThread }    from '../components/MessageThread'
 import { ExportModal }      from '../components/ExportModal'
@@ -46,15 +46,6 @@ function CancelCardModal({ card, onConfirm, onClose }) {
   )
 }
 
-// sortByUrgency inline
-const _URGENCY_ORDER = { critico: 0, alto: 1, medio: 2, baixo: 3 }
-function sortByUrgency(items, dateField) {
-  return [...items].sort((a, b) => {
-    const d = (_URGENCY_ORDER[a.urgency]??99) - (_URGENCY_ORDER[b.urgency]??99)
-    if (d !== 0) return d
-    return new Date(a[dateField||'desiredDate']||'9999') - new Date(b[dateField||'desiredDate']||'9999')
-  })
-}
 export function MasterView({ simClients = [] }) {
   const { profile, logout }                         = useAuth()
   const { cards, deleteCard }                       = useCards()
@@ -68,6 +59,7 @@ export function MasterView({ simClients = [] }) {
   const { pendingUsers, approveUser, refuseUser }   = usePendingUsers()
   const { users: allUsers, toggleUserStatus, updateUserRole } = useAllUsers()
   const [tab,           setTab]           = useState('kpis')
+  const [deleteTarget, setDeleteTarget] = useState(null) // card aguardando confirmação de exclusão
   const [cancelModal,   setCancelModal]   = useState(null)
   const [approvingRole, setApprovingRole] = useState({})
   const [approvalModal, setApprovalModal] = useState(null)
@@ -161,7 +153,7 @@ export function MasterView({ simClients = [] }) {
     await updateDoc(doc(db,'cards',card.id), { status:'cancelado', cancelReason:reason, cancelledAt:serverTimestamp(), cancelledBy:profile?.name||'Master', updatedAt:serverTimestamp() })
     if (card.requestId) {
       const req = requests.find(r => r.id===card.requestId)
-      if (req?.requesterId) await addDoc(collection(db,'notifications'), { userId:req.requesterId, requestId:card.requestId, type:'service_cancelled', title:'🚫 Serviço cancelado', message:`O serviço de ${card.client} foi cancelado. Motivo: ${reason}`, read:false, createdAt:serverTimestamp() })
+      if (req?.requesterId) await notifyUser(req.requesterId, 'service_cancelled', '🚫 Serviço cancelado', `O serviço de ${card.client} foi cancelado. Motivo: ${reason}`, card.requestId)
     }
     setCancelModal(null)
     addToast(`Serviço de ${card.client} cancelado.`, 'info')
@@ -244,6 +236,9 @@ export function MasterView({ simClients = [] }) {
 
       {exportModal && <ExportModal cards={cards} onClose={()=>setExportModal(false)}/>}
       {cancelModal && <CancelCardModal card={cancelModal} onConfirm={r=>handleCancelCard(cancelModal,r)} onClose={()=>setCancelModal(null)}/>}
+      <ConfirmModal open={!!deleteTarget} danger title="Excluir serviço"
+        message={`Excluir o serviço de ${deleteTarget?.client||'este card'}? Esta ação não pode ser desfeita.`}
+        confirmLabel="🗑 Excluir" onConfirm={()=>{deleteCard(deleteTarget.id);setDeleteTarget(null)}} onCancel={()=>setDeleteTarget(null)}/>
       {approvalModal && <ApprovalModal req={approvalModal} profile={profile} simClients={simClients} onApprove={handleMasterApprove} onRefuse={handleMasterRefuse} onClose={()=>setApprovalModal(null)}/>}
       {messaging && <MessageThread requestId={messaging} profile={profile} onClose={()=>setMessaging(null)}/>}
 
@@ -572,7 +567,7 @@ export function MasterView({ simClients = [] }) {
                           <div style={{ fontFamily:FONT, fontSize:10, color:T.textMuted }}>📅 {fmt(c.startDate)} · 👤 {c.driver||'—'} · {c.originCity||c.origin||'—'} → {c.destCity||c.destination||'—'}</div>
                         </div>
                         <div style={{ display:'flex', gap:6 }}>
-                        <button onClick={() => { if(window.confirm(`Excluir o serviço de ${c.client||'este card'}? Esta ação não pode ser desfeita.`)) deleteCard(c.id) }}
+                        <button onClick={() => setDeleteTarget(c)}
                           style={{ ...BS, background:T.surfaceAlt, color:T.perigo, border:`1px solid ${T.perigo}40`, fontSize:11, fontWeight:700, flexShrink:0 }}>🗑 Excluir</button>
                         <button onClick={() => setCancelModal(c)} style={{ ...BS, background:T.perigoLight, color:T.perigo, border:`1px solid ${T.perigo}40`, fontSize:11, fontWeight:700, flexShrink:0 }}>🚫 Cancelar</button>
                       </div>

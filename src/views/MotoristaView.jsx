@@ -4,6 +4,7 @@ import { db } from '../lib/firebase'
 import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { T, FONT, CARD_TYPES, URGENCY } from '../lib/constants'
 import { fmt } from '../lib/utils'
+import { ConfirmModal } from '../components/UI'
 
 const INTERRUPCAO_MOTIVOS = [
   { value:'quebra_veiculo',    label:'🔧 Quebra do veículo' },
@@ -407,16 +408,22 @@ export function MotoristaView({ token }) {
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState(null)
   const [tab,       setTab]       = useState('hoje')
+  const [paradaRemover, setParadaRemover] = useState(null) // parada do rotograma aguardando confirmação de remoção
 
   useEffect(() => {
     if (!token) { setError('Link inválido.'); setLoading(false); return }
+    // Guarda os unsubscribes internos — sem isso, a cada mudança no doc do motorista
+    // novos listeners de cards/rotograma eram criados sem nunca desligar os antigos
+    // (vazamento de memória + leituras duplicadas no Firestore).
+    let unsubCards = null, unsubRot = null
     const q = query(collection(db,'drivers'), where('token','==',token), where('active','==',true))
     const unsub = onSnapshot(q, async snap => {
       if (snap.empty) { setError('Link inválido ou motorista inativo.'); setLoading(false); return }
       const driverData = { id:snap.docs[0].id, ...snap.docs[0].data() }
       setDriver(driverData)
+      unsubCards?.(); unsubRot?.()
       const cardsQ = query(collection(db,'cards'), where('driverId','==',driverData.id))
-      onSnapshot(cardsQ, cardsSnap => {
+      unsubCards = onSnapshot(cardsQ, cardsSnap => {
         // Mantém serviços cancelados visíveis (com o badge "🚫 Cancelado") em vez de
         // sumir silenciosamente da tela do motorista sem nenhuma explicação.
         const all = cardsSnap.docs.map(d=>({id:d.id,...d.data()}))
@@ -424,12 +431,12 @@ export function MotoristaView({ token }) {
         setCards(all); setLoading(false)
       })
       const rotQ = query(collection(db,'rotogramas'), where('driverId','==',driverData.id), where('status','==','ativo'))
-      onSnapshot(rotQ, rotSnap => {
+      unsubRot = onSnapshot(rotQ, rotSnap => {
         if (!rotSnap.empty) setRotograma({id:rotSnap.docs[0].id,...rotSnap.docs[0].data()})
         else setRotograma(null)
       })
     }, ()=>{ setError('Erro ao carregar dados.'); setLoading(false) })
-    return unsub
+    return () => { unsub(); unsubCards?.(); unsubRot?.() }
   }, [token])
 
   const handleUpdateStatus = async (cardId, novoStatus, extra={}) => {
@@ -567,15 +574,6 @@ export function MotoristaView({ token }) {
                   const expirado = concluido && concluidoEm && (Date.now()-concluidoEm.getTime()) > 48*3600*1000
                   if(expirado) return null
 
-                  const handleRemoverParada = async () => {
-                    if(!window.confirm(`Remover "${parada.cliente}" do rotograma?`)) return
-                    try {
-                      const novasParadas = rotograma.paradas.filter(p=>p.cardId!==parada.cardId)
-                      await updateDoc(doc(db,'rotogramas',rotograma.id), { paradas:novasParadas, updatedAt:serverTimestamp() })
-                      setRotograma(prev=>prev?{...prev,paradas:novasParadas}:null)
-                    } catch(e){ console.error('Erro ao remover parada:',e) }
-                  }
-
                   return (
                     <div key={parada.cardId} style={{ display:'flex', gap:10, marginBottom:10, opacity:concluido?0.6:1 }}>
                       <div style={{ display:'flex', flexDirection:'column', alignItems:'center' }}>
@@ -587,7 +585,7 @@ export function MotoristaView({ token }) {
                           <span style={{ background:ct?.bg, color:ct?.color, borderRadius:20, padding:'1px 7px', fontSize:9, fontWeight:700, fontFamily:FONT }}>{ct?.icon} {ct?.short}</span>
                           <div style={{ display:'flex', alignItems:'center', gap:5 }}>
                             <StatusBadge status={card.status}/>
-                            <button onClick={handleRemoverParada}
+                            <button onClick={()=>setParadaRemover(parada)}
                               style={{ background:T.perigoLight, border:`1px solid ${T.perigo}30`, borderRadius:T.rSm, padding:'1px 6px', cursor:'pointer', color:T.perigo, fontSize:10, fontFamily:FONT, fontWeight:700 }}>
                               × Remover
                             </button>
@@ -613,6 +611,19 @@ export function MotoristaView({ token }) {
           </>
         )}
       </div>
+
+      <ConfirmModal open={!!paradaRemover} danger title="Remover parada"
+        message={`Remover "${paradaRemover?.cliente}" do rotograma?`}
+        confirmLabel="× Remover"
+        onConfirm={async ()=>{
+          try {
+            const novasParadas = rotograma.paradas.filter(p=>p.cardId!==paradaRemover.cardId)
+            await updateDoc(doc(db,'rotogramas',rotograma.id), { paradas:novasParadas, updatedAt:serverTimestamp() })
+            setRotograma(prev=>prev?{...prev,paradas:novasParadas}:null)
+          } catch(e){ console.error('Erro ao remover parada:',e) }
+          setParadaRemover(null)
+        }}
+        onCancel={()=>setParadaRemover(null)}/>
     </div>
   )
 }

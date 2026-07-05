@@ -5,21 +5,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
 import { useRequests, useNotifications, useMessages } from '../hooks/useFirestore'
 import { MillsLogo, NotificationBell, ClientInput, FrotaInput, MunicipioInput, ToastContainer, useToasts } from '../components/UI'
-import { T, FONT, CARD_TYPES, CARD_SUBTYPES, URGENCY, IS, LS, BS } from '../lib/constants'
-import { fmt, todayStr, getSubtypeLabel } from '../lib/utils'
+import { T, FONT, CARD_TYPES, CARD_SUBTYPES, URGENCY, URGENCY_SLA, IS, LS, BS } from '../lib/constants'
+import { fmt, todayStr, getSubtypeLabel, sortByUrgency } from '../lib/utils'
 import { db } from '../lib/firebase'
 import { MessageThread } from '../components/MessageThread'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
-
-// sortByUrgency inline — não depende de export do constants.js
-const _URGENCY_ORDER = { critico: 0, alto: 1, medio: 2, baixo: 3 }
-function sortByUrgency(items, dateField) {
-  return [...items].sort((a, b) => {
-    const d = (_URGENCY_ORDER[a.urgency]??99) - (_URGENCY_ORDER[b.urgency]??99)
-    if (d !== 0) return d
-    return new Date(a[dateField||'desiredDate']||'9999') - new Date(b[dateField||'desiredDate']||'9999')
-  })
-}
 
 const STATUS_CONFIG = {
   pendente_supervisor: { label:'⏳ Aguard. Supervisor',  color:'#B8860B',  bg:'#FFF8E1'      },
@@ -31,7 +21,6 @@ const STATUS_CONFIG = {
   concluido:           { label:'✅ Concluído',             color:T.verde,    bg:T.verdeLight  },
 }
 
-const URGENCY_SLA = { critico:'até 4h', alto:'até 24h', medio:'até 3 dias', baixo:'até 7 dias' }
 const SUBTYPES_NF       = ['desmobilizacao','rollout','quebra_contrato','troca_tecnica','sinistro','garantia']
 const SUBTYPES_EMBARQUE = ['troca_tecnica','sinistro','garantia']
 const SUBTYPES_OFICINA  = ['garantia']

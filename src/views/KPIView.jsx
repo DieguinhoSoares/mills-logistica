@@ -49,20 +49,22 @@ function BarChart({ title, data, color }) {
 
 function DonutChart({ title, data }) {
   const total = data.reduce((s,d)=>s+d.value,0)||1
-  let offset = 0
   const R=34, C=2*Math.PI*R
+  // Offsets pré-calculados — mutar acumulador dentro do .map no JSX é frágil
+  // (quebra com StrictMode double-render e é flagrado pelo lint de hooks)
+  const segs = []
+  let acc = 0
+  for (const d of data) { const dashLen = d.value/total*C; segs.push({ ...d, dashLen, offset: acc }); acc += dashLen }
   return (
     <div style={{ background:T.surface, borderRadius:T.rLg, border:`1px solid ${T.border}`, padding:'14px 16px', boxShadow:T.shadow }}>
       <div style={{ fontFamily:FONT, fontWeight:800, fontSize:10, color:T.text, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:12 }}>{title}</div>
       <div style={{ display:'flex', gap:14, alignItems:'center' }}>
         <svg width="82" height="82" viewBox="0 0 82 82" style={{ flexShrink:0 }}>
           <circle cx="41" cy="41" r={R} fill="none" stroke={T.surfaceLow} strokeWidth="9"/>
-          {data.map((d,i) => {
-            const pct=d.value/total, dashLen=pct*C
-            const el=<circle key={i} cx="41" cy="41" r={R} fill="none" stroke={d.color} strokeWidth="9"
-              strokeDasharray={`${dashLen} ${C}`} strokeDashoffset={-offset} transform="rotate(-90 41 41)" strokeLinecap="round"/>
-            offset+=dashLen; return el
-          })}
+          {segs.map((d,i) => (
+            <circle key={i} cx="41" cy="41" r={R} fill="none" stroke={d.color} strokeWidth="9"
+              strokeDasharray={`${d.dashLen} ${C}`} strokeDashoffset={-d.offset} transform="rotate(-90 41 41)" strokeLinecap="round"/>
+          ))}
           <text x="41" y="46" textAnchor="middle" fontFamily="IBM Plex Sans,sans-serif" fontWeight="900" fontSize="13" fill={T.text}>{total}</text>
         </svg>
         <div style={{ flex:1, display:'flex', flexDirection:'column', gap:5 }}>
