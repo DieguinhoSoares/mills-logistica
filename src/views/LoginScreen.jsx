@@ -81,8 +81,13 @@ export function LoginScreen() {
             </div>
             <div style={{ marginBottom:12 }}>
               <label style={LS}>Perfil de acesso</label>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
-                {[['solicitante','👤','Solicitante'],['frotas','🚛','Frotas'],['master','⭐','Master']].map(([v,ic,l]) => (
+              {/* Master removido do autocadastro — acesso mais sensível do sistema não deve
+                  ser auto-selecionável por qualquer visitante (mesmo que o status 'pendente'
+                  já exija aprovação depois). Supervisor e Gerente entram aqui porque já eram
+                  roles funcionais no app (roteadas em App.tsx e usadas na cadeia de aprovação),
+                  só não apareciam nesta tela — item pendente há tempo na lista. */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                {[['solicitante','👤','Solicitante'],['frotas','🚛','Frotas'],['supervisor','🧭','Supervisor'],['gerente','📋','Gerente']].map(([v,ic,l]) => (
                   <div key={v} onClick={() => setRole(v)}
                     style={{ border:`2px solid ${role===v?T.laranja:T.border}`, borderRadius:T.r, padding:'9px 6px', cursor:'pointer', textAlign:'center',
                       background:role===v?T.laranjaXLight:T.surface, transition:'all .12s' }}>
@@ -90,6 +95,9 @@ export function LoginScreen() {
                     <div style={{ fontFamily:FONT, fontWeight:800, fontSize:10, color:role===v?T.laranja:T.textSec }}>{l}</div>
                   </div>
                 ))}
+              </div>
+              <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT, marginTop:6, lineHeight:1.4 }}>
+                Precisa de acesso Master? Peça para um Master já ativo alterar seu perfil em Usuários, depois de aprovado.
               </div>
             </div>
             <div style={{ marginBottom:12 }}>

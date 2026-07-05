@@ -17,6 +17,7 @@ const PERFIS = [
   ['solicitante', '📋 Solicitante'],
   ['supervisor',  '👷 Supervisor de Programação'],
   ['gerente',     '👔 Gerente de Manutenção'],
+  ['master',      '⭐ Master'],
 ]
 
 

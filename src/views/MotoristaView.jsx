@@ -4,6 +4,7 @@ import { db } from '../lib/firebase'
 import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { T, FONT, CARD_TYPES, URGENCY } from '../lib/constants'
 import { fmt } from '../lib/utils'
+import { notifyRoles, notifyUser } from '../hooks/useFirestore'
 import { ConfirmModal } from '../components/UI'
 
 const INTERRUPCAO_MOTIVOS = [
@@ -448,6 +449,19 @@ export function MotoristaView({ token }) {
       ...(novoStatus==='interrompido'         ? { interrompidoEm:serverTimestamp() } : {}),
       ...extra,
     })
+    // Interrupção em campo é urgente e antes não avisava ninguém — nem Frotas,
+    // nem o solicitante ficavam sabendo até alguém olhar o calendário por acaso.
+    if (novoStatus === 'interrompido') {
+      const card = cards.find(c => c.id === cardId)
+      if (card) {
+        const motivoLabel = extra.interrupcaoDescricao || 'Motivo não informado'
+        const msg = `${driver?.name||'Motorista'} interrompeu o serviço de ${card.client||card.machine||'—'} (${card.nInterno||'—'}). Motivo: ${motivoLabel}`
+        await notifyRoles(['frotas'], 'service_interrupted', '⏸ Serviço interrompido em campo', msg, card.requestId||null)
+        if (card.requesterId) {
+          await notifyUser(card.requesterId, 'service_interrupted', '⏸ Seu serviço foi interrompido', msg, card.requestId||null)
+        }
+      }
+    }
   }
 
   const today      = new Date().toISOString().split('T')[0]
