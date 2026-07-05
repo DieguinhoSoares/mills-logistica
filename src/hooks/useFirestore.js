@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc,
-  query, orderBy, where, serverTimestamp, setDoc, getDoc, limit,
+  query, orderBy, where, serverTimestamp, setDoc, getDoc, getDocs, limit,
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { useAuth } from '../contexts/AuthContext'
@@ -54,6 +54,17 @@ export function getInitialStatus(type, subtype) {
 export function needsGerenteApproval(type, subtype) {
   const FRETE_GERENCIAL = ['troca_tecnica','garantia','sinistro']
   return (type==='freteMillsInterno'||type==='freteCliente') && FRETE_GERENCIAL.includes(subtype)
+}
+
+// Notifica todos os usuários ATIVOS de um ou mais roles (busca o UID real em
+// 'users' antes de gravar). Corrige o bug em que notifyUser('gerente', ...) era
+// chamado com a string literal do role em vez de um UID — o filtro do sininho é
+// where('userId','==',user.uid), então essas notificações nunca apareciam para
+// ninguém (alerta fantasma).
+async function notifyRoles(roles, type, title, message, requestId = null) {
+  const q = query(collection(db,'users'), where('role','in', roles), where('status','==','ativo'))
+  const snap = await getDocs(q)
+  await Promise.all(snap.docs.map(d => notifyUser(d.id, type, title, message, requestId)))
 }
 
 // Helper único para criar notificações in-app (item 12 da revisão).
@@ -207,96 +218,99 @@ export function useRequests(roleFilter) {
     }
   }
 
-  const approveAsSupervisor = async (id, note, approverName, approverRole) => {
-    const snap = await getDoc(doc(db,'requests',id))
-    const req  = { id, ...snap.data() }
-    const logEntry = { step:'supervisor', approver:approverName, role:approverRole, note, at:new Date().toISOString(), action:'approved' }
-    const nextStatus = req.needsGerenteApproval ? 'pendente_gerente' : 'pendente'
-    await updateDoc(doc(db,'requests',id), {
-      status:               nextStatus,
-      approvalLog:          [...(req.approvalLog||[]), logEntry],
-      supervisorApprovedAt: serverTimestamp(),
-      supervisorApprovedBy: approverName,
-      updatedAt:            serverTimestamp(),
-    })
-    await notifyUser(req.requesterId, 'supervisor_approved', '✅ Aprovado pelo Supervisor',
-      note || 'Sua solicitação foi aprovada pelo supervisor.', id)
-    if (req.needsGerenteApproval) {
-      await notifyUser('gerente', 'pending_gerente_approval', '📋 Solicitação aguarda sua aprovação',
-        `${req.requesterName} · ${req.machine||''} · ${req.originCityName||''} → ${req.destCityName||''}`, id)
-      const cfg = await getDoc(doc(db,'config','settings'))
-      const s   = cfg.exists() ? cfg.data() : {}
-      if (s.whatsappPhone && s.whatsappApikey) {
-        const msg = `📋 Solicitação aprovada pelo Supervisor — aguarda sua aprovação\nSolicitante: ${req.requesterName||'—'} · ${req.machine||'—'}\nRota: ${req.originCityName||req.origin||'—'} → ${req.destCityName||req.destination||'—'}\n👉 Abrir e aprovar: https://dieguinhosoares.github.io/mills-logistica/`
-        await notifyWhatsApp(s.whatsappPhone, s.whatsappApikey, msg)
-      }
+  return { requests, loading, submitRequest, respondRequest }
+}
+
+// ── Ações de aprovação em cadeia (Supervisor → Gerente/Master) ─────────────
+// Funções standalone (não são hooks): não dependem de nenhum listener em tempo
+// real, só de getDoc/updateDoc pontuais. Ficavam presas dentro de useRequests()
+// só por conveniência — mas isso obrigava qualquer tela que precisasse delas
+// (GerenteView) a montar um segundo listener completo da coleção 'requests'
+// só para pegar essas 5 funções, sem nunca usar os dados que ele retornava
+// (item da revisão: "listener fantasma"). Extraídas aqui, GerenteView não
+// precisa mais chamar useRequests() e o listener duplicado desaparece.
+export async function approveAsSupervisor(id, note, approverName, approverRole) {
+  const snap = await getDoc(doc(db,'requests',id))
+  const req  = { id, ...snap.data() }
+  const logEntry = { step:'supervisor', approver:approverName, role:approverRole, note, at:new Date().toISOString(), action:'approved' }
+  const nextStatus = req.needsGerenteApproval ? 'pendente_gerente' : 'pendente'
+  await updateDoc(doc(db,'requests',id), {
+    status:               nextStatus,
+    approvalLog:          [...(req.approvalLog||[]), logEntry],
+    supervisorApprovedAt: serverTimestamp(),
+    supervisorApprovedBy: approverName,
+    updatedAt:            serverTimestamp(),
+  })
+  await notifyUser(req.requesterId, 'supervisor_approved', '✅ Aprovado pelo Supervisor',
+    note || 'Sua solicitação foi aprovada pelo supervisor.', id)
+  if (req.needsGerenteApproval) {
+    await notifyRoles(['gerente','master'], 'pending_gerente_approval', '📋 Solicitação aguarda sua aprovação',
+      `${req.requesterName} · ${req.machine||''} · ${req.originCityName||''} → ${req.destCityName||''}`, id)
+    const cfg = await getDoc(doc(db,'config','settings'))
+    const s   = cfg.exists() ? cfg.data() : {}
+    if (s.whatsappPhone && s.whatsappApikey) {
+      const msg = `📋 Solicitação aprovada pelo Supervisor — aguarda sua aprovação\nSolicitante: ${req.requesterName||'—'} · ${req.machine||'—'}\nRota: ${req.originCityName||req.origin||'—'} → ${req.destCityName||req.destination||'—'}\n👉 Abrir e aprovar: https://dieguinhosoares.github.io/mills-logistica/`
+      await notifyWhatsApp(s.whatsappPhone, s.whatsappApikey, msg)
     }
   }
-
-  const refuseAsSupervisor = async (id, note, approverName) => {
-    const snap = await getDoc(doc(db,'requests',id))
-    const req  = { id, ...snap.data() }
-    const logEntry = { step:'supervisor', approver:approverName, note, at:new Date().toISOString(), action:'refused' }
-    await updateDoc(doc(db,'requests',id), {
-      status:'recusado', responseNote:note,
-      approvalLog:[...(req.approvalLog||[]), logEntry],
-      updatedAt:serverTimestamp(),
-    })
-    await notifyUser(req.requesterId, 'request_rejected', '❌ Solicitação recusada pelo Supervisor',
-      note||'Sua solicitação foi recusada.', id)
-  }
-
-  const approveAsGerente = async (id, note, approverName, approverRole) => {
-    const snap = await getDoc(doc(db,'requests',id))
-    const req  = { id, ...snap.data() }
-    const logEntry = { step:'gerente', approver:approverName, role:approverRole, note, at:new Date().toISOString(), action:'approved' }
-    await updateDoc(doc(db,'requests',id), {
-      status:'pendente',
-      approvalLog:[...(req.approvalLog||[]), logEntry],
-      gerenteApprovedAt:serverTimestamp(),
-      gerenteApprovedBy:approverName,
-      updatedAt:serverTimestamp(),
-    })
-    await notifyUser(req.requesterId, 'gerente_approved', '✅ Aprovado pela Gerência',
-      note||'Sua solicitação foi aprovada pela gerência e encaminhada para o time de Frotas.', id)
-  }
-
-  const refuseAsGerente = async (id, note, approverName) => {
-    const snap = await getDoc(doc(db,'requests',id))
-    const req  = { id, ...snap.data() }
-    const logEntry = { step:'gerente', approver:approverName, note, at:new Date().toISOString(), action:'refused' }
-    await updateDoc(doc(db,'requests',id), {
-      status:'recusado', responseNote:note,
-      approvalLog:[...(req.approvalLog||[]), logEntry],
-      updatedAt:serverTimestamp(),
-    })
-    await notifyUser(req.requesterId, 'request_rejected', '❌ Solicitação recusada pela Gerência',
-      note||'Sua solicitação foi recusada pela gerência.', id)
-  }
-
-  const approveAsMaster = async (id, note, approverName) => {
-    const snap = await getDoc(doc(db,'requests',id))
-    const req  = { id, ...snap.data() }
-    const logEntry = { step:'master', approver:approverName, role:'master', note, at:new Date().toISOString(), action:'approved' }
-    await updateDoc(doc(db,'requests',id), {
-      status:'pendente',
-      approvalLog:[...(req.approvalLog||[]), logEntry],
-      masterApprovedAt:serverTimestamp(),
-      masterApprovedBy:approverName,
-      updatedAt:serverTimestamp(),
-    })
-    await notifyUser(req.requesterId, 'master_approved', '✅ Aprovado pelo Master',
-      note||'Sua solicitação foi aprovada e encaminhada para o time de Frotas.', id)
-  }
-
-  return {
-    requests, loading,
-    submitRequest, respondRequest,
-    approveAsSupervisor, refuseAsSupervisor,
-    approveAsGerente, refuseAsGerente,
-    approveAsMaster,
-  }
 }
+
+export async function refuseAsSupervisor(id, note, approverName) {
+  const snap = await getDoc(doc(db,'requests',id))
+  const req  = { id, ...snap.data() }
+  const logEntry = { step:'supervisor', approver:approverName, note, at:new Date().toISOString(), action:'refused' }
+  await updateDoc(doc(db,'requests',id), {
+    status:'recusado', responseNote:note,
+    approvalLog:[...(req.approvalLog||[]), logEntry],
+    updatedAt:serverTimestamp(),
+  })
+  await notifyUser(req.requesterId, 'request_rejected', '❌ Solicitação recusada pelo Supervisor',
+    note||'Sua solicitação foi recusada.', id)
+}
+
+export async function approveAsGerente(id, note, approverName, approverRole) {
+  const snap = await getDoc(doc(db,'requests',id))
+  const req  = { id, ...snap.data() }
+  const logEntry = { step:'gerente', approver:approverName, role:approverRole, note, at:new Date().toISOString(), action:'approved' }
+  await updateDoc(doc(db,'requests',id), {
+    status:'pendente',
+    approvalLog:[...(req.approvalLog||[]), logEntry],
+    gerenteApprovedAt:serverTimestamp(),
+    gerenteApprovedBy:approverName,
+    updatedAt:serverTimestamp(),
+  })
+  await notifyUser(req.requesterId, 'gerente_approved', '✅ Aprovado pela Gerência',
+    note||'Sua solicitação foi aprovada pela gerência e encaminhada para o time de Frotas.', id)
+}
+
+export async function refuseAsGerente(id, note, approverName) {
+  const snap = await getDoc(doc(db,'requests',id))
+  const req  = { id, ...snap.data() }
+  const logEntry = { step:'gerente', approver:approverName, note, at:new Date().toISOString(), action:'refused' }
+  await updateDoc(doc(db,'requests',id), {
+    status:'recusado', responseNote:note,
+    approvalLog:[...(req.approvalLog||[]), logEntry],
+    updatedAt:serverTimestamp(),
+  })
+  await notifyUser(req.requesterId, 'request_rejected', '❌ Solicitação recusada pela Gerência',
+    note||'Sua solicitação foi recusada pela gerência.', id)
+}
+
+export async function approveAsMaster(id, note, approverName) {
+  const snap = await getDoc(doc(db,'requests',id))
+  const req  = { id, ...snap.data() }
+  const logEntry = { step:'master', approver:approverName, role:'master', note, at:new Date().toISOString(), action:'approved' }
+  await updateDoc(doc(db,'requests',id), {
+    status:'pendente',
+    approvalLog:[...(req.approvalLog||[]), logEntry],
+    masterApprovedAt:serverTimestamp(),
+    masterApprovedBy:approverName,
+    updatedAt:serverTimestamp(),
+  })
+  await notifyUser(req.requesterId, 'master_approved', '✅ Aprovado pelo Master',
+    note||'Sua solicitação foi aprovada e encaminhada para o time de Frotas.', id)
+}
+
 
 export function useNotifications() {
   const { user } = useAuth()
@@ -507,26 +521,50 @@ export function useManagerialRequests() {
   return { requests, loading }
 }
 
-export async function runDailyBackup(cards, requests) {
-  try {
-    const today = new Date().toISOString().split('T')[0]
-    const ref = doc(db,'backups',today)
-    const existing = await getDoc(ref)
-    if (existing.exists()) {
-      await setDoc(doc(db,'system','backupStatus'), { lastCheckAt:serverTimestamp(), lastBackupDate:today }, { merge:true })
-      return
+// Divide um array em "pedaços" cujo JSON fica sempre abaixo de maxBytes.
+// Necessário porque um único documento do Firestore tem limite de 1.048.576
+// bytes — o backup monolítico anterior (1 doc com cards+requests inteiros)
+// estourou esse limite (1.464.134 bytes) assim que o histórico cresceu, e
+// falhava em silêncio (erro só visível no console do navegador).
+function chunkBySize(items, maxBytes = 700000) {
+  const chunks = []
+  let current = [], currentSize = 2 // "[]"
+  for (const item of items) {
+    const size = JSON.stringify(item).length + 1
+    if (current.length > 0 && currentSize + size > maxBytes) {
+      chunks.push(current); current = []; currentSize = 2
     }
-    await setDoc(ref, {
-      date:today, createdAt:serverTimestamp(),
-      cardsCount:cards.length, requestsCount:requests.length,
-      cards:cards.map(c=>({...c})), requests:requests.map(r=>({...r})),
-    })
-    await setDoc(doc(db,'system','backupStatus'), {
-      lastBackupAt:serverTimestamp(), lastBackupDate:today,
-      lastCheckAt:serverTimestamp(), cardsCount:cards.length, requestsCount:requests.length,
-    }, { merge:true })
-    console.log('Backup OK:', today)
-  } catch(e) { console.warn('Backup error:', e) }
+    current.push(item); currentSize += size
+  }
+  if (current.length > 0) chunks.push(current)
+  return chunks
+}
+
+export async function runDailyBackup(cards, requests) {
+  const today = new Date().toISOString().split('T')[0]
+  const ref = doc(db,'backups',today)
+  const existing = await getDoc(ref)
+  if (existing.exists()) {
+    await setDoc(doc(db,'system','backupStatus'), { lastCheckAt:serverTimestamp(), lastBackupDate:today }, { merge:true })
+    return
+  }
+  const cardChunks    = chunkBySize(cards.map(c=>({...c})))
+  const requestChunks = chunkBySize(requests.map(r=>({...r})))
+  await Promise.all([
+    ...cardChunks.map((chunk,i) => setDoc(doc(db,'backups',today,'cardsChunks',String(i)), { items:chunk })),
+    ...requestChunks.map((chunk,i) => setDoc(doc(db,'backups',today,'requestsChunks',String(i)), { items:chunk })),
+  ])
+  // Documento "índice" — pequeno, só metadados. Sempre cabe no limite.
+  await setDoc(ref, {
+    date:today, createdAt:serverTimestamp(),
+    cardsCount:cards.length, requestsCount:requests.length,
+    cardChunks:cardChunks.length, requestChunks:requestChunks.length,
+  })
+  await setDoc(doc(db,'system','backupStatus'), {
+    lastBackupAt:serverTimestamp(), lastBackupDate:today,
+    lastCheckAt:serverTimestamp(), cardsCount:cards.length, requestsCount:requests.length,
+  }, { merge:true })
+  console.log('Backup OK:', today, `(${cardChunks.length} chunk(s) de cards, ${requestChunks.length} de requests)`)
 }
 
 // Monitoramento de backup — MasterView usa pra exibir alerta quando atrasado.
