@@ -198,6 +198,7 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
   const [form,   setForm]   = useState(initial)
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
+  const [step,   setStep]   = useState(1)
   const set = (k,v) => { setForm(p=>({...p,[k]:v})); setErrors(p=>({...p,[k]:undefined})) }
 
   const needsNF             = SUBTYPES_NF.includes(form.subtype)
@@ -225,6 +226,32 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
     if (form.desiredDateEnd && form.desiredDateEnd < form.desiredDate) e.desiredDateEnd = true
     setErrors(e); return Object.keys(e).length===0
   }
+
+  // Validação por passo do wizard — só bloqueia o avanço com os campos daquele passo
+  const STEP_LABELS = ['Tipo', 'Cliente / Equipamento', 'Datas / Motorista', 'Observações']
+  const validateStep = (n) => {
+    const e = {}
+    if (n === 1) {
+      if (!form.subtype) e.subtype = true
+    }
+    if (n === 2) {
+      if (form.semCliente) { if (!form.localLivre) e.localLivre = true }
+      else                 { if (!form.clientName) e.clientName = true }
+      if (!frotaOpcional && form.nInternos.length===0) e.nInternos = true
+      if (needsMaquinaReserva && form.nInternosReserva.length===0) e.machine = true
+    }
+    if (n === 3) {
+      if (!form.originCity) e.originCity = true
+      if (!form.destCity)   e.destCity   = true
+      if (form.desiredDateEnd && form.desiredDateEnd < form.desiredDate) e.desiredDateEnd = true
+      if (needsEmbarque && form.podeEmbarcar===null) e.podeEmbarcar   = true
+      if (needsOficina  && !form.destinoOficina)     e.destinoOficina = true
+    }
+    setErrors(prev=>({ ...prev, ...e }))
+    return Object.keys(e).length===0
+  }
+  const goNext = () => { if (validateStep(step)) setStep(s=>Math.min(4,s+1)) }
+  const goBack = () => setStep(s=>Math.max(1,s-1))
 
   const handleSubmit = async () => {
     if (!validate()) return
@@ -274,13 +301,89 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
           <button onClick={onClose} style={{ background:'none', border:'none', color:T.textMuted, fontSize:24, cursor:'pointer' }}>×</button>
         </div>
 
-        {initialData?.responseNote && (
+        {/* Indicador de progresso — 4 passos */}
+        <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:20 }}>
+          {STEP_LABELS.map((label,i)=>{
+            const n = i+1
+            const done = n < step, active = n === step
+            return (
+              <div key={n} style={{ display:'flex', alignItems:'center', flex:n<4?1:'0 0 auto', gap:6 }}>
+                <div onClick={()=>{ if (n < step) setStep(n) }}
+                  style={{ display:'flex', alignItems:'center', gap:6, cursor: n<step?'pointer':'default' }}>
+                  <div style={{ width:22, height:22, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
+                    background: done?T.verde:active?T.laranja:T.surfaceAlt,
+                    border: `1px solid ${done?T.verde:active?T.laranja:T.border}`,
+                    color: (done||active)?'white':T.textMuted, fontFamily:FONT, fontWeight:800, fontSize:11, flexShrink:0 }}>
+                    {done ? '✓' : n}
+                  </div>
+                  <span style={{ color: active?T.text:T.textMuted, fontFamily:FONT, fontWeight:active?700:500, fontSize:11, whiteSpace:'nowrap' }}>{label}</span>
+                </div>
+                {n<4 && <div style={{ flex:1, height:2, background: n<step?T.verde:T.border, borderRadius:2 }}/>}
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Avisos críticos — sempre visíveis, independente do passo do wizard */}
+        {relatedRequest && isCardEdit && !form._dismissRelated && (
+          <div style={{ marginBottom:18, padding:'12px 14px', background:T.amareloLight, borderRadius:T.r, border:`1px solid ${T.amarelo}60` }}>
+            <div style={{ color:T.textSec, fontFamily:FONT, fontWeight:800, fontSize:13, marginBottom:6 }}>
+              ⚠️ Existe uma solicitação pendente que parece ser este mesmo serviço
+            </div>
+            <div style={{ color:T.text, fontFamily:FONT, fontSize:12, marginBottom:3 }}>
+              <strong>Solicitante:</strong> {relatedRequest.requesterName || '—'}
+            </div>
+            <div style={{ color:T.text, fontFamily:FONT, fontSize:12, marginBottom:3 }}>
+              <strong>Pedido em:</strong> {relatedRequest.createdAt?.toDate ? relatedRequest.createdAt.toDate().toLocaleDateString('pt-BR') : '—'}
+              {' · '}<strong>Nº interno:</strong> {relatedRequest.nInterno || '—'}
+            </div>
+            {relatedRequest.description && (
+              <div style={{ marginTop:6, padding:'8px 10px', background:T.surface, borderRadius:T.rSm, color:T.textSec, fontFamily:FONT, fontSize:11, fontStyle:'italic' }}>
+                "{relatedRequest.description}"
+              </div>
+            )}
+            <div style={{ display:'flex', gap:8, marginTop:10 }}>
+              <button onClick={()=>onUseOriginalRequest?.(relatedRequest, initialData.id)}
+                style={{ ...BS, background:T.laranja, color:'white', fontWeight:700, fontSize:11 }}>
+                🔗 Usar a solicitação original
+              </button>
+              <button onClick={()=>set('_dismissRelated', true)}
+                style={{ ...BS, background:'none', color:T.textMuted, border:`1px solid ${T.border}`, fontWeight:700, fontSize:11 }}>
+                Não é a mesma coisa
+              </button>
+            </div>
+          </div>
+        )}
+
+        {initialData?.status === 'cancelado' && isCardEdit && (
+          <div style={{ marginBottom:18, padding:'12px 14px', background:T.perigoLight, borderRadius:T.r, border:`1px solid ${T.perigo}40` }}>
+            <div style={{ color:T.perigo, fontFamily:FONT, fontWeight:800, fontSize:13, marginBottom:4 }}>🚫 Este serviço está cancelado</div>
+            {initialData.cancelReason && (
+              <div style={{ color:T.textSec, fontFamily:FONT, fontSize:11, marginBottom:8 }}>
+                Motivo: <em>{initialData.cancelReason}</em>{initialData.cancelledBy ? ` — por ${initialData.cancelledBy}` : ''}
+              </div>
+            )}
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={()=>onDelete?.(initialData.id)}
+                style={{ ...BS, background:T.perigo, color:'white', fontWeight:700, fontSize:11 }}>
+                🗑 Remover da agenda
+              </button>
+              <button onClick={()=>onSubmit({ ...initialData, status:'em_dia', cancelReason:null, cancelledAt:null, cancelledBy:null })}
+                style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}`, fontWeight:700, fontSize:11 }}>
+                ♻️ Reabrir serviço
+              </button>
+            </div>
+          </div>
+        )}
+
+        {initialData?.responseNote && step===1 && (
           <div style={{ marginBottom:14, padding:'10px 13px', background:T.amareloLight, borderRadius:T.r, border:`1px solid ${T.amarelo}40` }}>
             <div style={{ color:'#B8860B', fontFamily:FONT, fontSize:11, fontWeight:700 }}>🔄 Reabertura — ajuste os campos necessários e envie novamente.</div>
             <div style={{ color:T.textSec, fontFamily:FONT, fontSize:11, marginTop:4 }}>Motivo da recusa: <em>{initialData.responseNote}</em></div>
           </div>
         )}
 
+        {step===1 && <>
         {/* Tipo de Serviço */}
         <div style={{ marginBottom:14 }}>
           <label style={LS}>Tipo de Serviço <span style={{ color:T.perigo }}>*</span></label>
@@ -299,7 +402,9 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
         <SubtypeSelect type={form.type} value={form.subtype}
           onChange={v=>{set('subtype',v);set('podeEmbarcar',null);set('destinoOficina','');set('movimento','saida');set('refOrigem','');if(v==='movimentacao')set('semCliente',true)}}
           error={errors.subtype}/>
+        </>}
 
+        {step===2 && <>
         {/* Planta/Obra — ou identificação livre quando não há cliente envolvido */}
         <div style={{ marginBottom:14 }}>
           <label style={{ display:'flex', alignItems:'center', gap:6, marginBottom:8, cursor:'pointer' }}>
@@ -356,6 +461,31 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
           {errors.nInternos && <div style={{ color:T.perigo, fontSize:10, fontFamily:FONT, marginTop:3 }}>⚠ Informe ao menos um N° interno</div>}
         </div>
 
+        {/* Equipamento Reserva */}
+        {needsMaquinaReserva && (
+          <div style={{ marginBottom:14 }}>
+            <ChipInput
+              label={<>🚜 N° Interno(s) do Equipamento Reserva <span style={{ color:T.perigo }}>*</span></>}
+              placeholder="Ex: TES01234 — N° interno da reserva + Enter..."
+              values={form.nInternosReserva}
+              onChange={v=>set('nInternosReserva',v)}
+              validateFrota={true}
+              hint="Informe o(s) N° interno(s) da(s) máquina(s) que será(ão) enviada(s) ao cliente · Padrão: XXX00000"/>
+            {errors.machine && <div style={{ color:T.perigo, fontSize:10, fontFamily:FONT, marginTop:3 }}>⚠ Informe ao menos um equipamento reserva</div>}
+          </div>
+        )}
+
+        {/* Aviso múltiplas máquinas */}
+        {needsMaquinaReserva && form.nInternosReserva.length > 1 && (
+          <div style={{ marginBottom:14, padding:'10px 13px', background:'#FFF3E0', borderRadius:T.r, border:`1px solid #E65100` }}>
+            <div style={{ color:'#E65100', fontFamily:FONT, fontSize:11, fontWeight:700 }}>
+              ⚠️ Solicitação contém mais de 1 máquina — será utilizada a Prancha 3 eixos.
+            </div>
+          </div>
+        )}
+        </>}
+
+        {step===3 && <>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14 }}>
           {/* Urgência */}
           <div>
@@ -373,29 +503,6 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
             <input value={form.om||''} onChange={e=>set('om',e.target.value)}
               placeholder="Nº da Ordem de Manutenção..." style={IS}/>
           </div>
-
-          {/* Equipamento Reserva */}
-          {needsMaquinaReserva && (
-            <div style={{ gridColumn:'1/-1' }}>
-              <ChipInput
-                label={<>🚜 N° Interno(s) do Equipamento Reserva <span style={{ color:T.perigo }}>*</span></>}
-                placeholder="Ex: TES01234 — N° interno da reserva + Enter..."
-                values={form.nInternosReserva}
-                onChange={v=>set('nInternosReserva',v)}
-                validateFrota={true}
-                hint="Informe o(s) N° interno(s) da(s) máquina(s) que será(ão) enviada(s) ao cliente · Padrão: XXX00000"/>
-              {errors.machine && <div style={{ color:T.perigo, fontSize:10, fontFamily:FONT, marginTop:3 }}>⚠ Informe ao menos um equipamento reserva</div>}
-            </div>
-          )}
-
-          {/* Aviso múltiplas máquinas */}
-          {needsMaquinaReserva && form.nInternosReserva.length > 1 && (
-            <div style={{ gridColumn:'1/-1', padding:'10px 13px', background:'#FFF3E0', borderRadius:T.r, border:`1px solid #E65100` }}>
-              <div style={{ color:'#E65100', fontFamily:FONT, fontSize:11, fontWeight:700 }}>
-                ⚠️ Solicitação contém mais de 1 máquina — será utilizada a Prancha 3 eixos.
-              </div>
-            </div>
-          )}
 
           {/* Cidades */}
           <div>
@@ -571,57 +678,10 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
             )}
           </div>
         )}
+        </>}
 
-        {relatedRequest && isCardEdit && !form._dismissRelated && (
-          <div style={{ marginBottom:18, padding:'12px 14px', background:T.amareloLight, borderRadius:T.r, border:`1px solid ${T.amarelo}60` }}>
-            <div style={{ color:T.textSec, fontFamily:FONT, fontWeight:800, fontSize:13, marginBottom:6 }}>
-              ⚠️ Existe uma solicitação pendente que parece ser este mesmo serviço
-            </div>
-            <div style={{ color:T.text, fontFamily:FONT, fontSize:12, marginBottom:3 }}>
-              <strong>Solicitante:</strong> {relatedRequest.requesterName || '—'}
-            </div>
-            <div style={{ color:T.text, fontFamily:FONT, fontSize:12, marginBottom:3 }}>
-              <strong>Pedido em:</strong> {relatedRequest.createdAt?.toDate ? relatedRequest.createdAt.toDate().toLocaleDateString('pt-BR') : '—'}
-              {' · '}<strong>Nº interno:</strong> {relatedRequest.nInterno || '—'}
-            </div>
-            {relatedRequest.description && (
-              <div style={{ marginTop:6, padding:'8px 10px', background:T.surface, borderRadius:T.rSm, color:T.textSec, fontFamily:FONT, fontSize:11, fontStyle:'italic' }}>
-                "{relatedRequest.description}"
-              </div>
-            )}
-            <div style={{ display:'flex', gap:8, marginTop:10 }}>
-              <button onClick={()=>onUseOriginalRequest?.(relatedRequest, initialData.id)}
-                style={{ ...BS, background:T.laranja, color:'white', fontWeight:700, fontSize:11 }}>
-                🔗 Usar a solicitação original
-              </button>
-              <button onClick={()=>set('_dismissRelated', true)}
-                style={{ ...BS, background:'none', color:T.textMuted, border:`1px solid ${T.border}`, fontWeight:700, fontSize:11 }}>
-                Não é a mesma coisa
-              </button>
-            </div>
-          </div>
-        )}
-
-        {initialData?.status === 'cancelado' && isCardEdit && (
-          <div style={{ marginBottom:18, padding:'12px 14px', background:T.perigoLight, borderRadius:T.r, border:`1px solid ${T.perigo}40` }}>
-            <div style={{ color:T.perigo, fontFamily:FONT, fontWeight:800, fontSize:13, marginBottom:4 }}>🚫 Este serviço está cancelado</div>
-            {initialData.cancelReason && (
-              <div style={{ color:T.textSec, fontFamily:FONT, fontSize:11, marginBottom:8 }}>
-                Motivo: <em>{initialData.cancelReason}</em>{initialData.cancelledBy ? ` — por ${initialData.cancelledBy}` : ''}
-              </div>
-            )}
-            <div style={{ display:'flex', gap:8 }}>
-              <button onClick={()=>onDelete?.(initialData.id)}
-                style={{ ...BS, background:T.perigo, color:'white', fontWeight:700, fontSize:11 }}>
-                🗑 Remover da agenda
-              </button>
-              <button onClick={()=>onSubmit({ ...initialData, status:'em_dia', cancelReason:null, cancelledAt:null, cancelledBy:null })}
-                style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}`, fontWeight:700, fontSize:11 }}>
-                ♻️ Reabrir serviço
-              </button>
-            </div>
-          </div>
-        )}
+        {step===4 && <>
+        
 
         {/* Descrição */}
         <div style={{ marginBottom:18 }}>
@@ -630,18 +690,33 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
             style={{ ...IS, height:70, resize:'vertical' }} placeholder="Descreva a operação, prazos, contato no local..."/>
         </div>
 
+        </>}
+
         {Object.keys(errors).length>0 && (
           <div style={{ marginBottom:12, padding:'10px 13px', background:T.perigoLight, borderRadius:T.r, border:`1px solid ${T.perigo}40` }}>
-            <div style={{ color:T.perigo, fontFamily:FONT, fontSize:11, fontWeight:700 }}>⚠ Preencha todos os campos obrigatórios antes de enviar.</div>
+            <div style={{ color:T.perigo, fontFamily:FONT, fontSize:11, fontWeight:700 }}>⚠ Preencha todos os campos obrigatórios antes de {step<4?'avançar':'enviar'}.</div>
           </div>
         )}
 
-        <div style={{ display:'flex', justifyContent:'flex-end', gap:10 }}>
-          <button onClick={onClose} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>Cancelar</button>
-          <button onClick={handleSubmit} disabled={saving}
-            style={{ ...BS, background:saving?T.borderMid:T.laranja, color:'white', fontWeight:900, fontSize:13 }}>
-            {saving ? '⏳ Salvando...' : (submitLabel || (initialData ? '🔄 Reenviar Solicitação' : '📤 Enviar Solicitação'))}
-          </button>
+        <div style={{ display:'flex', justifyContent:'space-between', gap:10 }}>
+          <div>
+            {step > 1 && (
+              <button onClick={goBack} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>← Voltar</button>
+            )}
+          </div>
+          <div style={{ display:'flex', gap:10 }}>
+            <button onClick={onClose} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>Cancelar</button>
+            {step < 4 ? (
+              <button onClick={goNext} style={{ ...BS, background:T.laranja, color:'white', fontWeight:900, fontSize:13 }}>
+                Avançar →
+              </button>
+            ) : (
+              <button onClick={handleSubmit} disabled={saving}
+                style={{ ...BS, background:saving?T.borderMid:T.laranja, color:'white', fontWeight:900, fontSize:13 }}>
+                {saving ? '⏳ Salvando...' : (submitLabel || (initialData ? '🔄 Reenviar Solicitação' : '📤 Enviar Solicitação'))}
+              </button>
+            )}
+          </div>
         </div>
       </motion.div>
     </div>
