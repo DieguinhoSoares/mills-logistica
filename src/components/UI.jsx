@@ -302,7 +302,7 @@ export function ServiceCard({ card, conflicts, onEdit, onDragStart, compact=fals
   const isCancelado = card.status === 'cancelado'
   const semVinculo = !card.requestId && !card.cardOrigemId   // card criado direto pelo Frotas
   // Subtipo legível — remove underscores e capitaliza
-  const subtypeLabel = card.subtype ? card.subtype.replace(/_/g,' ').replace(/\w/g, l=>l.toUpperCase()) : null
+  const subtypeLabel = card.subtype ? card.subtype.replace(/_/g,' ').replace(/\b\w/g, l=>l.toUpperCase()) : null
   return (
     <motion.div layout whileHover={{ y:-1, boxShadow:T.shadowMd }}
       draggable onDragStart={e=>onDragStart?.(e,card)} onClick={()=>onEdit?.(card)}
@@ -503,6 +503,32 @@ export function MoveModal({ card, targetDate, onConfirm, onCancel }) {
             style={{ background:reason.trim()?T.laranja:'#CCC', color:'white', border:'none', borderRadius:T.r, padding:'8px 16px', cursor:'pointer', fontFamily:FONT, fontWeight:700, fontSize:12 }}>Confirmar</button>
         </div>
       </motion.div>
+    </div>
+  )
+}
+
+// ─── ConfirmModal — substitui window.confirm (item 18 da revisão) ────────────
+// Uso: <ConfirmModal open={!!alvo} title="..." message="..." confirmLabel="Excluir"
+//        danger onConfirm={...} onCancel={()=>setAlvo(null)}/>
+export function ConfirmModal({ open, title='Confirmar ação', message, confirmLabel='Confirmar', cancelLabel='Cancelar', danger=false, onConfirm, onCancel }) {
+  if (!open) return null
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.5)', zIndex:3000, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(3px)' }}
+      onClick={e=>e.target===e.currentTarget&&onCancel()}>
+      <div style={{ background:T.surface, borderRadius:T.rLg, padding:'22px 24px', width:380, maxWidth:'92vw', boxShadow:T.shadowLg, border:`1px solid ${T.border}` }}>
+        <div style={{ color:T.text, fontFamily:FONT, fontWeight:800, fontSize:15, marginBottom:8 }}>{danger?'⚠️ ':''}{title}</div>
+        {message && <div style={{ color:T.textSec, fontFamily:FONT, fontSize:12, lineHeight:1.5, marginBottom:18 }}>{message}</div>}
+        <div style={{ display:'flex', justifyContent:'flex-end', gap:8 }}>
+          <button onClick={onCancel}
+            style={{ padding:'8px 16px', borderRadius:T.r, border:`1px solid ${T.border}`, background:T.surfaceAlt, color:T.textSec, fontFamily:FONT, fontWeight:700, fontSize:12, cursor:'pointer' }}>
+            {cancelLabel}
+          </button>
+          <button onClick={onConfirm}
+            style={{ padding:'8px 16px', borderRadius:T.r, border:'none', background:danger?T.perigo:T.laranja, color:'white', fontFamily:FONT, fontWeight:800, fontSize:12, cursor:'pointer' }}>
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

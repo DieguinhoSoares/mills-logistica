@@ -12,11 +12,10 @@
 // ============================================================
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { T, FONT, CARD_TYPES, CARD_SUBTYPES, URGENCY, IS, LS, BS, SUBTYPES_NF } from '../lib/constants'
+import { T, FONT, CARD_TYPES, CARD_SUBTYPES, URGENCY, URGENCY_SLA, IS, LS, BS, SUBTYPES_NF } from '../lib/constants'
 import { todayStr } from '../lib/utils'
 import { ClientInput, MunicipioInput } from '../components/UI'
 
-const URGENCY_SLA = { critico:'até 4h', alto:'até 24h', medio:'até 3 dias', baixo:'até 7 dias' }
 const SUBTYPES_EMBARQUE       = ['troca_tecnica','sinistro','garantia']
 const SUBTYPES_OFICINA        = ['garantia']
 const SUBTYPES_MAQUINA_RESERVA = ['troca_tecnica','sinistro','garantia']
@@ -276,7 +275,7 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
       onClose()
     } catch (err) {
       console.error('Erro ao enviar formulário:', err)
-      alert('Não foi possível enviar. Verifique sua conexão e tente novamente.')
+      setErrors(p=>({ ...p, _submit: 'Não foi possível enviar. Verifique sua conexão e tente novamente.' }))
     } finally {
       setSaving(false)
     }
@@ -692,9 +691,14 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
 
         </>}
 
-        {Object.keys(errors).length>0 && (
+        {Object.keys(errors).filter(k=>k!=='_submit'&&errors[k]).length>0 && (
           <div style={{ marginBottom:12, padding:'10px 13px', background:T.perigoLight, borderRadius:T.r, border:`1px solid ${T.perigo}40` }}>
             <div style={{ color:T.perigo, fontFamily:FONT, fontSize:11, fontWeight:700 }}>⚠ Preencha todos os campos obrigatórios antes de {step<4?'avançar':'enviar'}.</div>
+          </div>
+        )}
+        {errors._submit && (
+          <div style={{ marginBottom:12, padding:'10px 13px', background:T.perigoLight, borderRadius:T.r, border:`1px solid ${T.perigo}40` }}>
+            <div style={{ color:T.perigo, fontFamily:FONT, fontSize:11, fontWeight:700 }}>⚠ {errors._submit}</div>
           </div>
         )}
 
