@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc,
-  query, orderBy, where, serverTimestamp, setDoc, getDoc,
+  query, orderBy, where, serverTimestamp, setDoc, getDoc, limit,
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { useAuth } from '../contexts/AuthContext'
@@ -10,7 +10,12 @@ export function useCards() {
   const [cards,   setCards]   = useState([])
   const [loading, setLoading] = useState(true)
   useEffect(() => {
-    const q = query(collection(db,'cards'), orderBy('startDate','asc'))
+    // Janela móvel (item 15 da revisão): últimos 180 dias + todos os futuros.
+    // Sem isso a coleção inteira era baixada em tempo real — custo de leitura e
+    // memória crescendo linearmente com o histórico. Relatórios de períodos mais
+    // antigos podem ler sob demanda com getDocs se um dia for necessário.
+    const cutoff = new Date(Date.now() - 180*86400000).toISOString().split('T')[0]
+    const q = query(collection(db,'cards'), where('startDate','>=',cutoff), orderBy('startDate','asc'))
     const unsub = onSnapshot(q,
       snap => { setCards(snap.docs.map(d=>({ id:d.id, ...d.data() }))); setLoading(false) },
       err  => { console.warn('cards:', err); setLoading(false) }
@@ -51,9 +56,21 @@ export function needsGerenteApproval(type, subtype) {
   return (type==='freteMillsInterno'||type==='freteCliente') && FRETE_GERENCIAL.includes(subtype)
 }
 
+// Helper único para criar notificações in-app (item 12 da revisão).
+// Evita repetir o mesmo addDoc em 9 lugares com riscos de divergência de shape.
+export async function notifyUser(userId, type, title, message, requestId = null) {
+  await addDoc(collection(db,'notifications'), {
+    userId, type, title, message,
+    ...(requestId ? { requestId } : {}),
+    read: false, createdAt: serverTimestamp(),
+  })
+}
+
 async function notifyWhatsApp(phone, apikey, msg) {
   try {
-    await fetch(`https://api.callmebot.com/whatsapp.php?phone=${phone}&text=${encodeURIComponent(msg)}&apikey=${apikey}`)
+    // mode:'no-cors' — o CallMeBot não envia headers CORS; sem isso o fetch é
+    // bloqueado pelo browser e a notificação nunca sai (falha silenciosa).
+    await fetch(`https://api.callmebot.com/whatsapp.php?phone=${phone}&text=${encodeURIComponent(msg)}&apikey=${apikey}`, { mode:'no-cors' })
   } catch(e) { console.warn('WhatsApp:', e) }
 }
 
@@ -72,7 +89,7 @@ export function useRequests(roleFilter) {
     } else if (roleFilter === 'gerente') {
       q = query(collection(db,'requests'), where('needsGerenteApproval','==',true), orderBy('createdAt','desc'))
     } else {
-      q = query(collection(db,'requests'), orderBy('createdAt','desc'))
+      q = query(collection(db,'requests'), orderBy('createdAt','desc'), limit(500))
     }
     const unsub = onSnapshot(q,
       snap => { setRequests(snap.docs.map(d=>({ id:d.id, ...d.data() }))); setLoading(false) },
@@ -176,13 +193,10 @@ export function useRequests(roleFilter) {
     })
     const req = requests.find(r=>r.id===id)
     if (req) {
-      await addDoc(collection(db,'notifications'), {
-        userId:req.requesterId, requestId:id,
-        type:   status==='aceito'?'request_accepted':'request_rejected',
-        title:  status==='aceito'?'✅ Solicitação aceita!':'❌ Solicitação recusada',
-        message:note||(status==='aceito'?'Sua solicitação foi aceita.':'Sua solicitação foi recusada.'),
-        read:false, createdAt:serverTimestamp(),
-      })
+      await notifyUser(req.requesterId,
+        status==='aceito'?'request_accepted':'request_rejected',
+        status==='aceito'?'✅ Solicitação aceita!':'❌ Solicitação recusada',
+        note||(status==='aceito'?'Sua solicitação foi aceita.':'Sua solicitação foi recusada.'), id)
       if (teamsWebhookUrl) {
         const { sendTeamsNotification } = await import('../lib/utils')
         await sendTeamsNotification(teamsWebhookUrl,
@@ -205,19 +219,11 @@ export function useRequests(roleFilter) {
       supervisorApprovedBy: approverName,
       updatedAt:            serverTimestamp(),
     })
-    await addDoc(collection(db,'notifications'), {
-      userId:req.requesterId, requestId:id,
-      type:'supervisor_approved', title:'✅ Aprovado pelo Supervisor',
-      message: note || 'Sua solicitação foi aprovada pelo supervisor.',
-      read:false, createdAt:serverTimestamp(),
-    })
+    await notifyUser(req.requesterId, 'supervisor_approved', '✅ Aprovado pelo Supervisor',
+      note || 'Sua solicitação foi aprovada pelo supervisor.', id)
     if (req.needsGerenteApproval) {
-      await addDoc(collection(db,'notifications'), {
-        userId:'gerente', requestId:id,
-        type:'pending_gerente_approval', title:'📋 Solicitação aguarda sua aprovação',
-        message:`${req.requesterName} · ${req.machine||''} · ${req.originCityName||''} → ${req.destCityName||''}`,
-        read:false, createdAt:serverTimestamp(),
-      })
+      await notifyUser('gerente', 'pending_gerente_approval', '📋 Solicitação aguarda sua aprovação',
+        `${req.requesterName} · ${req.machine||''} · ${req.originCityName||''} → ${req.destCityName||''}`, id)
       const cfg = await getDoc(doc(db,'config','settings'))
       const s   = cfg.exists() ? cfg.data() : {}
       if (s.whatsappPhone && s.whatsappApikey) {
@@ -236,12 +242,8 @@ export function useRequests(roleFilter) {
       approvalLog:[...(req.approvalLog||[]), logEntry],
       updatedAt:serverTimestamp(),
     })
-    await addDoc(collection(db,'notifications'), {
-      userId:req.requesterId, requestId:id,
-      type:'request_rejected', title:'❌ Solicitação recusada pelo Supervisor',
-      message:note||'Sua solicitação foi recusada.',
-      read:false, createdAt:serverTimestamp(),
-    })
+    await notifyUser(req.requesterId, 'request_rejected', '❌ Solicitação recusada pelo Supervisor',
+      note||'Sua solicitação foi recusada.', id)
   }
 
   const approveAsGerente = async (id, note, approverName, approverRole) => {
@@ -255,12 +257,8 @@ export function useRequests(roleFilter) {
       gerenteApprovedBy:approverName,
       updatedAt:serverTimestamp(),
     })
-    await addDoc(collection(db,'notifications'), {
-      userId:req.requesterId, requestId:id,
-      type:'gerente_approved', title:'✅ Aprovado pela Gerência',
-      message:note||'Sua solicitação foi aprovada pela gerência e encaminhada para o time de Frotas.',
-      read:false, createdAt:serverTimestamp(),
-    })
+    await notifyUser(req.requesterId, 'gerente_approved', '✅ Aprovado pela Gerência',
+      note||'Sua solicitação foi aprovada pela gerência e encaminhada para o time de Frotas.', id)
   }
 
   const refuseAsGerente = async (id, note, approverName) => {
@@ -272,12 +270,8 @@ export function useRequests(roleFilter) {
       approvalLog:[...(req.approvalLog||[]), logEntry],
       updatedAt:serverTimestamp(),
     })
-    await addDoc(collection(db,'notifications'), {
-      userId:req.requesterId, requestId:id,
-      type:'request_rejected', title:'❌ Solicitação recusada pela Gerência',
-      message:note||'Sua solicitação foi recusada pela gerência.',
-      read:false, createdAt:serverTimestamp(),
-    })
+    await notifyUser(req.requesterId, 'request_rejected', '❌ Solicitação recusada pela Gerência',
+      note||'Sua solicitação foi recusada pela gerência.', id)
   }
 
   const approveAsMaster = async (id, note, approverName) => {
@@ -291,12 +285,8 @@ export function useRequests(roleFilter) {
       masterApprovedBy:approverName,
       updatedAt:serverTimestamp(),
     })
-    await addDoc(collection(db,'notifications'), {
-      userId:req.requesterId, requestId:id,
-      type:'master_approved', title:'✅ Aprovado pelo Master',
-      message:note||'Sua solicitação foi aprovada e encaminhada para o time de Frotas.',
-      read:false, createdAt:serverTimestamp(),
-    })
+    await notifyUser(req.requesterId, 'master_approved', '✅ Aprovado pelo Master',
+      note||'Sua solicitação foi aprovada e encaminhada para o time de Frotas.', id)
   }
 
   return {
@@ -313,7 +303,7 @@ export function useNotifications() {
   const [notifications, setNotifications] = useState([])
   useEffect(() => {
     if (!user) return
-    const q = query(collection(db,'notifications'), where('userId','==',user.uid), orderBy('createdAt','desc'))
+    const q = query(collection(db,'notifications'), where('userId','==',user.uid), orderBy('createdAt','desc'), limit(100))
     const unsub = onSnapshot(q, snap=>setNotifications(snap.docs.map(d=>({ id:d.id, ...d.data() }))), ()=>{})
     return unsub
   }, [user])
@@ -398,11 +388,8 @@ export function usePendingUsers() {
   }, [])
   const approveUser = async (userId, role) => {
     await updateDoc(doc(db,'users',userId), { status:'ativo', role, approvedAt:new Date().toISOString() })
-    await addDoc(collection(db,'notifications'), {
-      userId, type:'account_approved', title:'✅ Acesso liberado!',
-      message:`Seu cadastro foi aprovado. Perfil: ${role}.`,
-      read:false, createdAt:serverTimestamp(),
-    })
+    await notifyUser(userId, 'account_approved', '✅ Acesso liberado!',
+      `Seu cadastro foi aprovado. Perfil: ${role}.`)
   }
   const refuseUser = async (userId) => {
     await updateDoc(doc(db,'users',userId), { status:'recusado', refusedAt:new Date().toISOString() })
