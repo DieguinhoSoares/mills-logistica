@@ -61,7 +61,7 @@ export function needsGerenteApproval(type, subtype) {
 // chamado com a string literal do role em vez de um UID — o filtro do sininho é
 // where('userId','==',user.uid), então essas notificações nunca apareciam para
 // ninguém (alerta fantasma).
-async function notifyRoles(roles, type, title, message, requestId = null) {
+export async function notifyRoles(roles, type, title, message, requestId = null) {
   const q = query(collection(db,'users'), where('role','in', roles), where('status','==','ativo'))
   const snap = await getDocs(q)
   await Promise.all(snap.docs.map(d => notifyUser(d.id, type, title, message, requestId)))
@@ -75,6 +75,16 @@ export async function notifyUser(userId, type, title, message, requestId = null)
     ...(requestId ? { requestId } : {}),
     read: false, createdAt: serverTimestamp(),
   })
+}
+
+// Mensagem padrão de "nova solicitação pronta para atribuição" — reaproveitada
+// nos 3 pontos em que uma solicitação pode chegar ao status 'pendente' (pronta
+// para o time de Frotas): criação direta, reenvio direto, e fim da cadeia de
+// aprovação (Gerente/Master). Sem isso, Frotas só descobria olhando a tela.
+function fleetReadyMessage(req) {
+  const tipo = { freteMillsInterno:'Frete Mills', freteCliente:'Frete Cliente', guindauto:'Guindauto' }[req.type] || req.type
+  const sub  = req.subtype ? ' · ' + String(req.subtype).replace(/_/g,' ') : ''
+  return `${req.requesterName||'—'} · ${tipo}${sub} · ${req.clientName||req.client||'—'} · ${req.originCityName||req.origin||'—'} → ${req.destCityName||req.destination||'—'}`
 }
 
 async function notifyWhatsApp(phone, apikey, msg) {
@@ -171,6 +181,10 @@ export function useRequests(roleFilter) {
         statusEvent:'reenviada',
         createdAt:  serverTimestamp(),
       })
+      if (status === 'pendente') {
+        await notifyRoles(['frotas'], 'request_ready_for_fleet', '📥 Solicitação pronta para atribuição',
+          fleetReadyMessage(payload), reqId)
+      }
       return
     }
 
@@ -195,6 +209,9 @@ export function useRequests(roleFilter) {
         const msg  = `📋 Nova solicitação aguardando aprovação\nTipo: ${tipo}${sub} · Cliente: ${data.clientName||'—'} · Solicitante: ${data.requesterName||profile?.name||'—'} · Rota: ${data.originCityName||data.origin||'—'} → ${data.destCityName||data.destination||'—'}\nUrgência: ${urg}\n👉 Abrir e aprovar: https://dieguinhosoares.github.io/mills-logistica/`
         await notifyWhatsApp(s.whatsappPhone, s.whatsappApikey, msg)
       }
+    } else if (status === 'pendente') {
+      await notifyRoles(['frotas'], 'request_ready_for_fleet', '📥 Solicitação pronta para atribuição',
+        fleetReadyMessage(data), null)
     }
   }
 
@@ -281,6 +298,8 @@ export async function approveAsGerente(id, note, approverName, approverRole) {
   })
   await notifyUser(req.requesterId, 'gerente_approved', '✅ Aprovado pela Gerência',
     note||'Sua solicitação foi aprovada pela gerência e encaminhada para o time de Frotas.', id)
+  await notifyRoles(['frotas'], 'request_ready_for_fleet', '📥 Solicitação pronta para atribuição',
+    fleetReadyMessage(req), id)
 }
 
 export async function refuseAsGerente(id, note, approverName) {
@@ -309,6 +328,8 @@ export async function approveAsMaster(id, note, approverName) {
   })
   await notifyUser(req.requesterId, 'master_approved', '✅ Aprovado pelo Master',
     note||'Sua solicitação foi aprovada e encaminhada para o time de Frotas.', id)
+  await notifyRoles(['frotas'], 'request_ready_for_fleet', '📥 Solicitação pronta para atribuição',
+    fleetReadyMessage(req), id)
 }
 
 
