@@ -37,7 +37,7 @@ export function FrotasView() {
   const [busca,        setBusca]        = useState('')
   const buscaResultados = useMemo(() => {
     if (!busca.trim()) return []
-    const normQ = busca.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    const normQ = busca.trim().toLowerCase().normalize('NFD').replace(/[\u00-\u036f]/g,'')
     const normS = s => String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
     return cards.filter(c =>
       String(c.seqId||'').includes(normQ) ||
@@ -315,7 +315,7 @@ export function FrotasView() {
 
   // Alterna a cada 30s entre a timeline de hoje e os KPIs rápidos no espaço liberado pelo mapa
   useEffect(() => {
-    const iv = setInterval(() => setRodapeSlide(s => s === 0 ? 1 : 0), 30000)
+    const iv = setInterval(() => setRodapeSlide(s => s === 0 ? 1 : 0), 10000)
     return () => clearInterval(iv)
   }, [])
 
