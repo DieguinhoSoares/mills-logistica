@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
-import { useRequests, useManagerialRequests, useNotifications, useConfig } from '../hooks/useFirestore'
+import { useManagerialRequests, useNotifications, useConfig, approveAsSupervisor, refuseAsSupervisor, approveAsGerente, refuseAsGerente } from '../hooks/useFirestore'
 import { MillsLogo, NotificationBell, ToastContainer, useToasts } from '../components/UI'
 import { T, FONT, CARD_TYPES, URGENCY, URGENCY_SLA_MS, BS, IS, LS } from '../lib/constants'
 import { fmt, getSubtypeLabel, sortByUrgency } from '../lib/utils'
@@ -310,7 +310,9 @@ function DesktopRequestCard({ req, profile, onView }) {
 
 export function GerenteView({ simClients = [] }) {
   const { profile, logout }   = useAuth()
-  const { requests: allReqs, approveAsSupervisor, refuseAsSupervisor, approveAsGerente, refuseAsGerente } = useRequests(profile?.role)
+  // approveAsSupervisor/refuseAsSupervisor/approveAsGerente/refuseAsGerente agora são
+  // funções standalone importadas direto — não criam mais um listener duplicado
+  // e sem uso da coleção 'requests' (ver notas em useFirestore.js).
   const { requests: mgrReqs } = useManagerialRequests()
   const { notifications, unreadCount, markAllRead, markRead } = useNotifications()
   const { config, saveConfig } = useConfig()

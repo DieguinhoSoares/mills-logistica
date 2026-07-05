@@ -7,7 +7,7 @@ import { T, FONT, CARD_TYPES, BS, IS, LS } from '../lib/constants'
 import { detectConflicts, fmt, getSubtypeLabel, sortByUrgency } from '../lib/utils'
 import { doc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore'
 import { db } from '../lib/firebase'
-import { useCards, useRequests, useNotifications, useConfig, usePendingUsers, useManagerialRequests, runDailyBackup, useMessages, useAllUsers, useBackupStatus, notifyUser, backfillSeqIds } from '../hooks/useFirestore'
+import { useCards, useRequests, useNotifications, useConfig, usePendingUsers, useManagerialRequests, runDailyBackup, useMessages, useAllUsers, useBackupStatus, notifyUser, backfillSeqIds, approveAsSupervisor, refuseAsSupervisor, approveAsGerente, refuseAsGerente } from '../hooks/useFirestore'
 import { FreteEstimativa } from '../components/FreteEstimativa'
 import { MessageThread }    from '../components/MessageThread'
 import { ExportModal }      from '../components/ExportModal'
@@ -49,9 +49,7 @@ function CancelCardModal({ card, onConfirm, onClose }) {
 export function MasterView({ simClients = [] }) {
   const { profile, logout }                         = useAuth()
   const { cards, deleteCard }                       = useCards()
-  const { requests, respondRequest,
-          approveAsSupervisor, refuseAsSupervisor,
-          approveAsGerente,    refuseAsGerente }     = useRequests('master')
+  const { requests, respondRequest }                = useRequests('master')
   const { requests: mgrReqs }                       = useManagerialRequests()
   const { notifications, unreadCount, markAllRead } = useNotifications()
   const { config, saveConfig }                      = useConfig()
@@ -74,7 +72,12 @@ export function MasterView({ simClients = [] }) {
   const backupStatus = useBackupStatus()
 
   useEffect(() => {
-    if (cards.length > 0 || requests.length > 0) runDailyBackup(cards, requests).catch(console.warn)
+    if (cards.length > 0 || requests.length > 0) {
+      runDailyBackup(cards, requests).catch(err => {
+        console.error('Backup error:', err)
+        addToast(`❌ Falha no backup automático: ${err.message}`, 'error')
+      })
+    }
   }, [cards.length, requests.length])
 
   const pending       = requests.filter(r => r.status==='pendente').length
