@@ -752,7 +752,7 @@ export function calcularFrete({
   if (!veiculoId) return null
 
   const ajuste = outroEstado ? 1.12 : 1
-  let valorIda = 0, valorRetorno = 0, valorEscolta = 0, valorDiaria = 0
+  let valorIda, valorRetorno, valorEscolta = 0, valorDiaria = 0
 
   // ── Guindauto ────────────────────────────────────────────────
   if (isGuindauto) {

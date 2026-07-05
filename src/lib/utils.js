@@ -305,3 +305,6 @@ export function parseSIMCsv(text, Papa) {
   console.log(`✅ SIM parsed: ${clients.length} clientes, ${result.data.length} linhas`)
   return clients
 }
+
+// Re-export da fonte única em constants.js — mantém compatível quem importa de utils
+export { sortByUrgency } from './constants'

@@ -85,6 +85,8 @@ export const CARD_SUBTYPES = {
 
 // Ordenação de urgência para filas de aprovação (crítico primeiro)
 export const URGENCY_ORDER = { critico: 0, alto: 1, medio: 2, baixo: 3 }
+// Rótulos de SLA exibidos ao usuário (fonte única — não duplicar nas views)
+export const URGENCY_SLA = { critico:'até 4h', alto:'até 24h', medio:'até 3 dias', baixo:'até 7 dias' }
 // SLA em milissegundos — usado para calcular "vence em Xh" na faixa de atenção
 export const URGENCY_SLA_MS = { critico: 4*3600000, alto: 24*3600000, medio: 3*86400000, baixo: 7*86400000 }
 
@@ -93,7 +95,10 @@ export function sortByUrgency(items, dateField='desiredDate') {
   return [...items].sort((a, b) => {
     const byUrgency = (URGENCY_ORDER[a.urgency]??99) - (URGENCY_ORDER[b.urgency]??99)
     if (byUrgency !== 0) return byUrgency
-    return new Date(a[dateField]||'9999') - new Date(b[dateField]||'9999')
+    // Datas ausentes ou inválidas vão para o fim, nunca para o topo
+    const da = a[dateField] ? new Date(a[dateField]).getTime() : Infinity
+    const db = b[dateField] ? new Date(b[dateField]).getTime() : Infinity
+    return (isNaN(da) ? Infinity : da) - (isNaN(db) ? Infinity : db)
   })
 }
 
