@@ -98,9 +98,23 @@ const GRUPO_VEICULO = {
   'Mini Compactador Tandem 2 a 3 t / Liso':    '3/4',      // 2,5t
   'Mini Compactador 1,5 t':                    '3/4',      // 1,5t
   // Caminhão Basculante — peso VAZIO (viaja embarcado, sem carga, sobre prancha)
-  'Caminhão Basculante Toco (2 eixos)':        'prancha3', // ~8,5t vazio — força prancha (ver FORCA_PRANCHA)
-  'Caminhão Basculante Truçado (3 eixos)':     'prancha3', // ~11,5t vazio
-  'Caminhão Basculante Bitruck (4+ eixos)':    'prancha3', // ~16,0t vazio
+  // Nomenclatura corrigida em 2026-07 para bater com "Grupo de modelo" real do
+  // SIM (por m³ de caçamba), confirmado via BASE_SIM_06_07.csv — a nomenclatura
+  // anterior (por eixos) nunca existiu no SIM, então nenhum destes 95 ativos
+  // reais (10+66+5+14) tinha cobertura, mesmo a tabela "parecendo" completa.
+  'Caminhão Basculante 6x4 / 14 m³':           'prancha3',
+  'Caminhão Basculante 6x4 / 16 m³':           'prancha3',
+  'Caminhão Basculante 6x4 / 20 m³':           'prancha3',
+  'Caminhão Basculante 8x4 / 22 m³':           'prancha3',
+  'Caminhão Comboio 4x2 / 6 m³':               'prancha3',
+  'Caminhão Comboio 6x4 / 10 m³':              'prancha3',
+  'Caminhão Pipa 6X4 / 20 m³':                 'prancha3',
+  'Caminhão Plataforma 6x4 / 11mt':            'prancha3',
+  // Trator Agrícola — 3 de 9 faixas confirmadas com ficha técnica real do
+  // fabricante (John Deere), 2026-07. Cobre 121 de 158 ativos dessa família.
+  'Trator Agrícola 220 a 230 CV':               'truck',    // JD 7M 230: 9,2t
+  'Trator Agrícola 250 a 270 CV':               'bitruck',  // JD 8270R: 14,0t
+  'Trator Agrícola 140 a 159 CV':               'bitruck',  // JD 6150J: 8,55t mas 2,65m de largura > limite do Truck (2,60m)
 }
 
 // ── PESO OPERACIONAL POR GRUPO DE MODELO (t) ─────────────────
@@ -144,14 +158,26 @@ const PESO_GRUPO = {
   'Compactador de Pneus 26 a 28 t / 9 Pneus': 27.0,
   'Mini Compactador Tandem 2 a 3 t / Liso':    2.5,
   'Mini Compactador 1,5 t':                    1.5,
-  'Caminhão Basculante Toco (2 eixos)':        8.5,   // peso vazio, estimado
-  'Caminhão Basculante Truçado (3 eixos)':     14.6,  // Fonte: mills.com.br — média Volvo VM-330 Basculante (13,6t) + Mercedes AXOR-4144 Basculante (15,5t)
-  'Caminhão Basculante Bitruck (4+ eixos)':    16.0,  // peso vazio, estimado
-  // ⚠️ Categorias novas — confirmar se aparecem como "Grupo de Modelo" separado no CSV do SIM.
-  // Se o SIM classificar esses caminhões dentro de "Basculante", remover as 3 linhas abaixo.
-  'Caminhão Comboio':                          13.5,  // Fonte: mills.com.br (Volvo VM-270/VM-290, ambos 13,5t)
-  'Caminhão Pipa/Irrigadeira':                 15.3,  // Fonte: mills.com.br (Volvo VM-270 Pipa 15,3t; Mercedes Atego 2730 15,3t — idêntico)
-  'Caminhão Plataforma':                       13.6,  // estimado = mesmo chassi do Basculante (Volvo VM-330); sem peso/dimensão publicado
+  // Peso VAZIO (o caminhão viaja embarcado sobre a prancha, sem carga).
+  // Âncoras reais Mills: Volvo VM-330 Basculante 13,6t · Mercedes AXOR-4144
+  // Basculante 15,5t. As faixas de 14/16/20/22 m³ interpolam entre essas duas
+  // âncoras (mais m³ de caçamba → chassi mais robusto → mais pesado vazio) —
+  // ainda ESTIMADO por interpolação, não é ficha técnica exata por m³.
+  'Caminhão Basculante 6x4 / 14 m³':           13.6,  // = Volvo VM-330 (âncora real)
+  'Caminhão Basculante 6x4 / 16 m³':           14.6,  // interpolado (média das 2 âncoras)
+  'Caminhão Basculante 6x4 / 20 m³':           15.5,  // = Mercedes AXOR-4144 (âncora real)
+  'Caminhão Basculante 8x4 / 22 m³':           17.0,  // estimado — eixo extra (8x4) sobre a âncora AXOR-4144
+  'Caminhão Comboio 4x2 / 6 m³':               11.0,  // estimado — chassi menor (4x2) que o Comboio 6x4
+  'Caminhão Comboio 6x4 / 10 m³':              13.5,  // Fonte: mills.com.br (Volvo VM-270/VM-290, ambos 13,5t)
+  'Caminhão Pipa 6X4 / 20 m³':                 15.3,  // Fonte: mills.com.br (Volvo VM-270 Pipa 15,3t; Mercedes Atego 2730 15,3t — idêntico)
+  'Caminhão Plataforma 6x4 / 11mt':            13.6,  // estimado = mesmo chassi do Basculante (Volvo VM-330); sem peso/dimensão publicado
+  // Trator Agrícola — Fonte: deere.com.br (ficha técnica oficial do fabricante).
+  // Peso "base sem lastro" quando disponível; senão, o lastro máximo informado
+  // (ver nota em cada linha) — ainda não é a ficha exata da Mills, mas é dado
+  // real do fabricante em vez de uma faixa "chutada" como as outras 6 abaixo.
+  'Trator Agrícola 220 a 230 CV':               9.2,   // JD 7M 230 — peso base sem lastro (lastro máx eleva a 12,65t)
+  'Trator Agrícola 250 a 270 CV':               14.0,  // JD 8270R — peso de fábrica sem lastro, config. mais pesada (13,1–14,0t)
+  'Trator Agrícola 140 a 159 CV':               8.55,  // JD 6150J — lastro máximo informado (peso base sem lastro não publicado)
 }
 
 // ── LARGURA DE TRANSPORTE POR GRUPO DE MODELO (m) ─────────────
@@ -208,12 +234,17 @@ const LARGURA_GRUPO = {
   'Mini Compactador Tandem 2 a 3 t / Liso':    1.30,  // estimado, classe Cat CB2.5
   'Mini Compactador 1,5 t':                    1.30,  // Cat CB1.8
   // Caminhão Basculante — largura padrão de via (todos os portes ficam na faixa legal de 2,60m)
-  'Caminhão Basculante Toco (2 eixos)':        2.55,  // estimado
-  'Caminhão Basculante Truçado (3 eixos)':     2.60,  // Fonte: mills.com.br — Volvo VM-330 e Mercedes AXOR-4144 Basculante, ambos 2,60m
-  'Caminhão Basculante Bitruck (4+ eixos)':    2.60,  // estimado
-  'Caminhão Comboio':                          2.60,  // Fonte: mills.com.br (Volvo VM-270/VM-290)
-  'Caminhão Pipa/Irrigadeira':                 2.60,  // Fonte: mills.com.br (Volvo VM-270 Pipa; Mercedes Atego 2730)
-  'Caminhão Plataforma':                       2.60,  // estimado = mesmo chassi do Basculante (Volvo VM-330)
+  'Caminhão Basculante 6x4 / 14 m³':           2.55,  // estimado
+  'Caminhão Basculante 6x4 / 16 m³':           2.60,  // Fonte: mills.com.br — Volvo VM-330 e Mercedes AXOR-4144 Basculante, ambos 2,60m
+  'Caminhão Basculante 6x4 / 20 m³':           2.60,  // idem
+  'Caminhão Basculante 8x4 / 22 m³':           2.60,  // estimado (largura de via legal, não muda com m³)
+  'Caminhão Comboio 4x2 / 6 m³':               2.60,  // estimado
+  'Caminhão Comboio 6x4 / 10 m³':              2.60,  // Fonte: mills.com.br (Volvo VM-270/VM-290)
+  'Caminhão Pipa 6X4 / 20 m³':                 2.60,  // Fonte: mills.com.br (Volvo VM-270 Pipa; Mercedes Atego 2730)
+  'Caminhão Plataforma 6x4 / 11mt':            2.60,  // estimado = mesmo chassi do Basculante (Volvo VM-330)
+  'Trator Agrícola 220 a 230 CV':               2.50,  // JD 7M 230 — largura não publicada, estimado por classe (mesma faixa do 8270R eixo curto)
+  'Trator Agrícola 250 a 270 CV':               3.01,  // JD 8270R — Fonte: deere.com.br (eixo traseiro longo, config. mais larga: 2,438–3,010m)
+  'Trator Agrícola 140 a 159 CV':               2.65,  // JD 6150J — Fonte: deere.com.br (bitola traseira máxima, usada como proxy de largura total)
 }
 
 // Largura SEM a lâmina montada — alternativa mais estreita para tratores de esteira
@@ -275,25 +306,41 @@ const COMPRIMENTO_GRUPO = {
   'Compactador de Pneus 26 a 28 t / 9 Pneus': 5.35,  // Fonte: mills.com.br (Cat CW34, peso máx. com lastro 27t)
   'Mini Compactador Tandem 2 a 3 t / Liso':    3.00,  // estimado
   'Mini Compactador 1,5 t':                    2.80,  // estimado, Cat CB1.8
-  'Caminhão Basculante Toco (2 eixos)':        7.50,  // estimado
-  'Caminhão Basculante Truçado (3 eixos)':     7.78,  // Fonte: mills.com.br — média Volvo VM-330 (8,00m) + Mercedes AXOR-4144 (7,56m)
-  'Caminhão Basculante Bitruck (4+ eixos)':    11.00, // estimado
-  'Caminhão Comboio':                          9.95,  // Fonte: mills.com.br (Volvo VM-270/VM-290, ambos 9,95m)
-  'Caminhão Pipa/Irrigadeira':                 9.89,  // Fonte: mills.com.br (Volvo VM-270 Pipa 9,89m; Mercedes Atego 2730 9,89m — idêntico)
-  'Caminhão Plataforma':                       8.00,  // estimado = mesmo chassi do Basculante (Volvo VM-330)
+  'Caminhão Basculante 6x4 / 14 m³':           7.50,  // estimado — Volvo VM-330 (menor âncora)
+  'Caminhão Basculante 6x4 / 16 m³':           7.78,  // Fonte: mills.com.br — média Volvo VM-330 (8,00m) + Mercedes AXOR-4144 (7,56m)
+  'Caminhão Basculante 6x4 / 20 m³':           7.56,  // Fonte: mills.com.br (Mercedes AXOR-4144)
+  'Caminhão Basculante 8x4 / 22 m³':           11.00, // estimado — eixo extra alonga o chassi
+  'Caminhão Comboio 4x2 / 6 m³':               8.50,  // estimado
+  'Caminhão Comboio 6x4 / 10 m³':              9.95,  // Fonte: mills.com.br (Volvo VM-270/VM-290, ambos 9,95m)
+  'Caminhão Pipa 6X4 / 20 m³':                 9.89,  // Fonte: mills.com.br (Volvo VM-270 Pipa 9,89m; Mercedes Atego 2730 9,89m — idêntico)
+  'Caminhão Plataforma 6x4 / 11mt':            8.00,  // estimado = mesmo chassi do Basculante (Volvo VM-330)
+  'Trator Agrícola 220 a 230 CV':               5.824, // JD 7M 230 — Fonte: deere.com.br (comprimento total)
+  'Trator Agrícola 250 a 270 CV':               6.043, // JD 8270R — Fonte: deere.com.br (comprimento total)
+  'Trator Agrícola 140 a 159 CV':               4.969, // JD 6150J — Fonte: deere.com.br (comprimento máximo com pesos/contrapesos frontais)
 }
 
 // Grupos que SEMPRE embarcam em prancha, independente do que peso/largura/
 // comprimento isoladamente sugerissem — caminhão basculante é um veículo
 // completo (eixos, cabine) e não se embarca em outro caminhão de porte
 // similar; sempre vai de prancha (3 ou 4 eixos, conforme peso/quantidade).
+// Categorias sempre rebocadas por cavalo mecânico — nunca embarcadas em cima
+// de outro veículo. Ex: Conjunto Canavieiro (é o próprio semirreboque).
+// TODO: quando a Mills/Hengel tiver uma tarifa de reboque cadastrada, criar
+// um veículo 'cavalo_mecanico' em VEICULOS + coluna na TABELA_HENGEL e
+// calcular o frete de verdade em vez de sinalizar "requer cotação manual".
+const CATEGORIAS_REBOCADAS = new Set([
+  'Conjunto Canavieiro',
+])
+
 const FORCA_PRANCHA = new Set([
-  'Caminhão Basculante Toco (2 eixos)',
-  'Caminhão Basculante Truçado (3 eixos)',
-  'Caminhão Basculante Bitruck (4+ eixos)',
-  'Caminhão Comboio',
-  'Caminhão Pipa/Irrigadeira',
-  'Caminhão Plataforma',
+  'Caminhão Basculante 6x4 / 14 m³',
+  'Caminhão Basculante 6x4 / 16 m³',
+  'Caminhão Basculante 6x4 / 20 m³',
+  'Caminhão Basculante 8x4 / 22 m³',
+  'Caminhão Comboio 4x2 / 6 m³',
+  'Caminhão Comboio 6x4 / 10 m³',
+  'Caminhão Pipa 6X4 / 20 m³',
+  'Caminhão Plataforma 6x4 / 11mt',
 ])
 
 // ── BUSCA GRUPO DE MODELO NO CSV SIM ─────────────────────────
@@ -312,8 +359,36 @@ function normalizaModelo(s) {
 // 16 t" → "Motoniveladora". Usado pelo fallback de "modelo similar dentro da
 // categoria" quando o CSV traz uma faixa de peso que ainda não catalogamos.
 function categoriaDoGrupo(grupo) {
-  const m = String(grupo || '').match(/^([A-Za-zÀ-ÿ ]+?)\s*\d/)
+  // Bug corrigido em 2026-07: a classe de caracteres [A-Za-zÀ-ÿ ] não incluía
+  // parênteses/vírgulas/barras — qualquer texto com "(", "/" etc. ANTES do
+  // primeiro dígito fazia o regex falhar e devolver a string INTEIRA como
+  // "categoria" (ex: "Caminhão Basculante Toco (2 eixos)" nunca reduzia a
+  // "Caminhão Basculante"), quebrando o match com outras faixas da mesma
+  // categoria. Agora aceita qualquer caractere não-dígito antes do primeiro
+  // número, e para exatamente no primeiro dígito.
+  const m = String(grupo || '').match(/^([^\d]+?)\s*\d/)
   return (m ? m[1] : String(grupo || '')).trim()
+}
+
+// Empilhadeiras trazem o peso de embarque DIRETO no texto do "Grupo de
+// modelo" — ex: "Empilhadeira Diesel 3,5 t / 3,7 m Elev." → 3,5t. Em vez de
+// catalogar cada uma das ~21 variantes manualmente (Diesel/Elétrica/GLP ×
+// várias capacidades × várias alturas de elevação), extrai o peso direto da
+// string — funciona automaticamente pra qualquer variante nova que apareça.
+// Largura/comprimento são estimados por classe de peso (padrão de mercado
+// pra empilhadeiras contrabalançadas — não é ficha exata da Mills por modelo).
+function dimensaoEmpilhadeira(grupo) {
+  if (!/^Empilhadeira/i.test(grupo)) return null
+  const m = grupo.match(/(\d+(?:,\d+)?)\s*t/i)
+  if (!m) return null
+  const peso = parseFloat(m[1].replace(',', '.'))
+  let largura, comprimento
+  if      (peso <= 2)    { largura = 1.15; comprimento = 3.60 }
+  else if (peso <= 3)    { largura = 1.20; comprimento = 4.00 }
+  else if (peso <= 4)    { largura = 1.30; comprimento = 4.30 }
+  else if (peso <= 9)    { largura = 2.10; comprimento = 5.80 }
+  else                   { largura = 2.60; comprimento = 7.50 } // 16-18t (container/pesada)
+  return { peso, largura, comprimento }
 }
 
 // Dado um grupoModelo não catalogado em PESO_GRUPO (ex: uma faixa nova que a
@@ -535,6 +610,28 @@ export function resolverVeiculoTransporte(
   simClients     = [],
   requiresEspecial = false,
 ) {
+  // Categoria sempre rebocada (ex: Conjunto Canavieiro) — não é um problema
+  // de peso/dimensão pra decidir QUAL veículo carrega; é um modo de
+  // transporte inteiramente diferente (reboque direto, sem veículo "de cima").
+  // Sinaliza como não-sugerido em vez de arriscar Prancha/Truck errado.
+  const todosNInternos = [...nInternosIda, ...nInternosVolta]
+  const grupoRebocado = todosNInternos
+    .map(n => buscarGrupoModelo([n], simClients))
+    .find(g => g && CATEGORIAS_REBOCADAS.has(categoriaDoGrupo(g)))
+  if (grupoRebocado) {
+    return {
+      veiculoId: null,
+      pesoIda: 0, pesoVolta: 0, pesoMax: 0,
+      sentidoPesado: null,
+      milsSuporta: null,
+      temItemNaoIdentificado: false,
+      especial: true,
+      rebocado: true,
+      label: `⚠️ ${grupoRebocado} — rebocado por cavalo mecânico, cote manualmente`,
+      veiculo: null,
+    }
+  }
+
   // Equipamento especial (VM330): força bi-truck com cabo reboque
   if (requiresEspecial) {
     return {
@@ -585,6 +682,15 @@ export function resolverVeiculoTransporte(
       // dentro da MESMA categoria (ex: outra Motoniveladora) como substituta.
       let grupoResolvido = grupo
       if (PESO_GRUPO[grupo] === undefined) {
+        // Empilhadeiras: o peso já vem escrito no próprio texto do grupo —
+        // extrai direto em vez de exigir uma entrada manual em PESO_GRUPO.
+        const emp = dimensaoEmpilhadeira(grupo)
+        if (emp) {
+          acc.peso        += emp.peso
+          acc.comprimento += emp.comprimento
+          acc.larguras.push({ grupo, largura: emp.largura, fonte:'empilhadeira' })
+          return acc
+        }
         const similar = faixaSimilar(grupo)
         if (similar) {
           console.warn(`[freteCalc] grupo "${grupo}" não catalogado — usando faixa similar da categoria: "${similar}"`)
@@ -607,6 +713,12 @@ export function resolverVeiculoTransporte(
   const idaCalc   = calcDimensoes(nInternosIda)
   const voltaCalc = calcDimensoes(nInternosVolta)
   const todasLarguras = [...idaCalc.larguras, ...voltaCalc.larguras]
+  // true quando pelo menos 1 máquina não foi reconhecida (nem modelo exato,
+  // nem grupo/faixa de peso) — o peso usado pra ela foi "chutado" (10,5t
+  // conservador). Nesses casos a sugestão de veículo não é confiável e
+  // categorias especiais (ex: caminhão sempre força prancha) podem ter
+  // passado batido, porque o sistema nem sabe que tipo de equipamento é.
+  const temItemNaoIdentificado = todasLarguras.some(x => x.fonte === 'fallback')
 
   const pesoIda   = Math.round(idaCalc.peso   * 10) / 10
   const pesoVolta = Math.round(voltaCalc.peso * 10) / 10
@@ -695,7 +807,12 @@ export function resolverVeiculoTransporte(
   const milsSuporta   = pesoMax <= 32   // prancha4 → somente Hengel
 
   return {
-    veiculoId,
+    // Quando pelo menos 1 item não foi reconhecido (nem modelo, nem grupo,
+    // nem categoria similar), o peso usado foi um "chute" conservador — não
+    // faz sentido sugerir NENHUM veículo com base nele. Devolve null pra
+    // forçar o fluxo de "informar frete manualmente" na tela, em vez de
+    // arriscar Prancha/Truck errado silenciosamente.
+    veiculoId: temItemNaoIdentificado ? null : veiculoId,
     pesoIda,
     pesoVolta,
     pesoMax:  Math.round(pesoMax * 10) / 10,
@@ -711,6 +828,7 @@ export function resolverVeiculoTransporte(
     sugestaoDesmontagem,   // {veiculoId, veiculo, resolveAET, maisBarato}
     sentidoPesado,
     milsSuporta,
+    temItemNaoIdentificado,
     especial: false,
     label: null,
     veiculo: VEICULOS.find(v => v.id === veiculoId),
