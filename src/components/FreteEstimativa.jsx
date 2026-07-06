@@ -38,6 +38,12 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
   const [resultado,    setResultado]    = useState(null)
   const [outroEstado,  setOutroEstado]  = useState(false)
   const [retornoAoPatio, setRetornoAoPatio] = useState(true)
+  // Quando o sistema não reconhece a(s) máquina(s) — nem modelo exato, nem
+  // grupo de peso, nem categoria similar — ou quando é uma categoria sempre
+  // rebocada (sem tarifa cadastrada), força o modo manual em vez de arriscar
+  // sugerir Prancha/Truck errado ou ficar preso num aviso sem saída.
+  const [modoManual,  setModoManual]  = useState(false)
+  const [valorManual, setValorManual] = useState('')
 
   const isGuindauto = request?.type === 'guindauto'
   const subtype     = request?.subtype || ''
@@ -68,6 +74,19 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
         nIda, nVolta, simClients, request?.podeEmbarcar === 'nao'
       )
 
+      if (res.rebocado) {
+        // Conjunto Canavieiro (ou outra categoria sempre rebocada) — não
+        // existe tarifa Hengel nem veículo cadastrado pra esse modo de
+        // transporte ainda. Não adivinha: sinaliza claramente que precisa
+        // de cotação manual, sem marcar "✓ sugerido automaticamente".
+        setVeiculoId('')
+        setGrupoLabel(res.label)
+        setPesoInfo(null)
+        setSugerido(false)
+        setModoManual(true)
+        return
+      }
+
       if (res.especial) {
         setVeiculoId('bitruck')
         setGrupoLabel('Bi-truck · cabo reboque')
@@ -76,17 +95,30 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
         return
       }
 
+      if (res.temItemNaoIdentificado) {
+        // Nem modelo exato, nem grupo de peso, nem categoria similar — o
+        // sistema genuinamente não sabe que máquina é essa. Em vez de
+        // arriscar uma sugestão errada (já causou 3 incidentes reais:
+        // motoniveladora, escavadeira/retro, caminhão basculante), força
+        // o modo manual direto — pede pro analista informar o frete.
+        const nSentido = nIda.length > 0 ? nIda.length : nVolta.length
+        setVeiculoId('')
+        setGrupoLabel(`⚠️ ${nSentido} máquina(s) não reconhecida(s) na base — informe o frete manualmente`)
+        setPesoInfo(null)
+        setSugerido(false)
+        setModoManual(true)
+        return
+      }
+
       if (res.veiculoId) {
         const nSentido = res.sentidoPesado === 'ida' ? nIda.length : nVolta.length
         const pesoSentido = res.sentidoPesado === 'ida' ? res.pesoIda : res.pesoVolta
-        const detalhe = pesoSentido > 0
-          ? `${nSentido} máq. · ${pesoSentido}t`
-          : ''
+        const detalhe = pesoSentido > 0 ? `${nSentido} máq. · ${pesoSentido}t` : ''
 
         setVeiculoId(res.veiculoId)
+        setSugerido(true)
         setGrupoLabel(detalhe ? `${res.veiculo?.label} · ${detalhe}` : res.veiculo?.label || '')
         setPesoInfo(res)
-        setSugerido(true)
         return
       }
     }
@@ -165,11 +197,13 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
       veiculoId: vid,
       veiculoLabel: VEICULOS.find(v => v.id === vid)?.label || '',
       km: parseFloat(km) || null,
-      valorEstimado: resultado?.total ?? null,
-      sugerido,
+      // Modo manual (máquina não reconhecida / categoria rebocada / o analista
+      // preferiu digitar): o valor informado por ele substitui o calculado.
+      valorEstimado: modoManual ? (parseFloat(valorManual) || null) : (resultado?.total ?? null),
+      sugerido: modoManual ? false : sugerido,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [veiculoId, km, resultado, sugerido])
+  }, [veiculoId, km, resultado, sugerido, modoManual, valorManual])
 
   return (
     <div style={{ background:T.surfaceAlt, borderRadius:T.rLg, padding:16, border:`1px solid ${T.border}`, marginTop:12, marginBottom:12 }}>
@@ -333,6 +367,36 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
         </div>
       )}
 
+      {/* Modo manual — sempre disponível como opção; forçado automaticamente
+          quando a máquina não é reconhecida ou é uma categoria sempre
+          rebocada (sem tarifa cadastrada, ex: Conjunto Canavieiro) */}
+      <div style={{ marginBottom:12 }}>
+        <button onClick={()=>setModoManual(m=>!m)}
+          style={{ background:'none', border:'none', color:T.laranja, fontFamily:FONT, fontWeight:700, fontSize:11, cursor:'pointer', padding:0 }}>
+          {modoManual ? '← Voltar para cálculo automático' : '✏️ Prefere informar o frete manualmente?'}
+        </button>
+      </div>
+
+      {modoManual ? (
+        <div style={{ background:T.laranjaXLight || '#FFF5EE', border:`1px solid ${T.laranja}40`, borderRadius:T.r, padding:14, marginBottom:12 }}>
+          {grupoLabel && (
+            <div style={{ color:T.perigo, fontFamily:FONT, fontWeight:700, fontSize:11, marginBottom:10 }}>
+              {grupoLabel}
+            </div>
+          )}
+          <label style={LS}>Valor do frete (R$) <span style={{ color:T.perigo }}>*</span></label>
+          <input type="number" step="0.01" min="0" value={valorManual}
+            onChange={e=>setValorManual(e.target.value)}
+            placeholder="Peça uma cotação e informe o valor aqui..."
+            style={IS}/>
+          <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT, marginTop:6, lineHeight:1.4 }}>
+            Este valor substitui o cálculo automático. Use quando a máquina não
+            for reconhecida pelo sistema ou quando o transporte exigir cotação
+            específica (ex: reboque, frete combinado, condição fora do padrão).
+          </div>
+        </div>
+      ) : (
+      <>
       {/* Loading */}
       {kmLoading && !resultado && (
         <div style={{ textAlign:'center', padding:'12px 0', color:T.textMuted, fontFamily:FONT, fontSize:11 }}>
@@ -408,6 +472,8 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
               : ''}
           </div>
         )
+      )}
+      </>
       )}
     </div>
   )
