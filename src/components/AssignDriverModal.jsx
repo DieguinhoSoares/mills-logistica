@@ -16,6 +16,10 @@ export function AssignDriverModal({ req, drivers, simClients, cards, onConfirm, 
   const [transpCnpj,setTranspCnpj]=useState('')
   const [date,setDate]=useState(req?.desiredDate||todayStr())
   const [note,setNote]=useState('')
+  // Captura o que o FreteEstimativa está mostrando de fato — inclusive quando
+  // o analista troca o veículo manualmente. Sem isso, a escolha feita ali
+  // nunca chegava a este componente e era descartada ao confirmar.
+  const [frete,setFrete]=useState(null)
   const selectedDriver=drivers.find(d=>d.id===driverId)
   const dateEnd = req?.desiredDateEnd || date
   // Verifica se o motorista selecionado já tem outro serviço ativo em data sobreposta
@@ -27,8 +31,9 @@ export function AssignDriverModal({ req, drivers, simClients, cards, onConfirm, 
     date <= c.endDate && dateEnd >= c.startDate
   )
   const handleConfirm=()=>{
-    if(execType==='transportadora'){onConfirm({driverId:'',driverName:'',transportadoraNome:transpNome,transportadoraCnpj:transpCnpj,date,note})}
-    else{onConfirm({driverId,driverName:selectedDriver?.name||'',transportadoraNome:'',transportadoraCnpj:'',date,note})}
+    const freteInfo = { veiculoId:frete?.veiculoId||'', veiculoLabel:frete?.veiculoLabel||'', freteEstimado:frete?.valorEstimado??null, freteSugerido:!!frete?.sugerido }
+    if(execType==='transportadora'){onConfirm({driverId:'',driverName:'',transportadoraNome:transpNome,transportadoraCnpj:transpCnpj,date,note,...freteInfo})}
+    else{onConfirm({driverId,driverName:selectedDriver?.name||'',transportadoraNome:'',transportadoraCnpj:'',date,note,...freteInfo})}
   }
   const canConfirm=execType==='transportadora'?transpNome.trim():driverId
   return (
@@ -37,7 +42,7 @@ export function AssignDriverModal({ req, drivers, simClients, cards, onConfirm, 
         style={{ background:T.surface, borderRadius:T.rLg, padding:28, width:540, maxHeight:'92vh', overflowY:'auto', boxShadow:T.shadowLg, border:`2px solid ${T.verde}` }}>
         <h2 style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:20, margin:'0 0 6px' }}>✅ Aceitar Solicitação</h2>
         <p style={{ color:T.textMuted, fontFamily:FONT, fontSize:12, margin:'0 0 4px' }}>Defina a execução para <strong style={{ color:T.laranja }}>{req?.clientName||req?.requesterName}</strong>.</p>
-        <FreteEstimativa request={req} simClients={simClients}/>
+        <FreteEstimativa request={req} simClients={simClients} onChange={setFrete}/>
         <div style={{ display:'flex', gap:8, marginBottom:16, marginTop:16 }}>
           {[['motorista','👤 Motorista Mills'],['transportadora','🚚 Transportadora Externa']].map(([v,l])=>(
             <div key={v} onClick={()=>setExecType(v)} style={{ flex:1, border:`2px solid ${execType===v?T.laranja:T.border}`, borderRadius:T.r, padding:'9px 12px', cursor:'pointer', textAlign:'center', background:execType===v?T.laranjaLight:T.surfaceAlt }}>

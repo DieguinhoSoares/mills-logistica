@@ -10,6 +10,12 @@
 //   simClients — array do CSV SIM (busca grupoModelo/peso)
 //   readOnly   — true para gestores (sem edição de campos)
 //   isFrotas   — true para Noelio (exibe peso/sentido extra)
+//   onChange({ veiculoId, veiculoLabel, km, valorEstimado, sugerido }) — chamado
+//     sempre que o veículo/km/valor mudam (inclusive por override manual do
+//     analista). Sem isso, a escolha do analista ficava presa ao estado
+//     interno deste componente e nunca chegava a ser salva em lugar nenhum —
+//     o botão "Confirmar" ignorava completamente o que estava selecionado
+//     aqui (bug: "não deixa selecionar a melhor opção manualmente").
 // ============================================================
 import { useState, useEffect } from 'react'
 import {
@@ -19,7 +25,7 @@ import {
 } from '../lib/freteCalc'
 import { T, FONT, IS, LS } from '../lib/constants'
 
-export function FreteEstimativa({ request, simClients = [], readOnly = false, isFrotas = false }) {
+export function FreteEstimativa({ request, simClients = [], readOnly = false, isFrotas = false, onChange }) {
   const [km,           setKm]           = useState('')
   const [kmAuto,       setKmAuto]       = useState(null)
   const [kmLoading,    setKmLoading]    = useState(false)
@@ -148,6 +154,22 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
     })
     setResultado(res)
   }, [km, veiculoId, subtype, outroEstado, comEscolta, diarias, readOnly, retornoAoPatio])
+
+  // Reporta a seleção atual pro componente pai — inclusive quando o analista
+  // troca o veículo manualmente (setSugerido(false) no onChange do <select>
+  // já sinaliza isso; aqui é só repassar pra fora).
+  useEffect(() => {
+    if (!onChange) return
+    const vid = veiculoId || (readOnly ? 'prancha3' : '')
+    onChange({
+      veiculoId: vid,
+      veiculoLabel: VEICULOS.find(v => v.id === vid)?.label || '',
+      km: parseFloat(km) || null,
+      valorEstimado: resultado?.total ?? null,
+      sugerido,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [veiculoId, km, resultado, sugerido])
 
   return (
     <div style={{ background:T.surfaceAlt, borderRadius:T.rLg, padding:16, border:`1px solid ${T.border}`, marginTop:12, marginBottom:12 }}>
