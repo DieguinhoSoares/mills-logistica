@@ -21,7 +21,7 @@ import { useState, useEffect } from 'react'
 import {
   calcularFrete, calcularDistancia, sugerirVeiculo,
   buscarGrupoModelo, selecionarVeiculoPorPeso,
-  resolverVeiculoTransporte, VEICULOS, DIARIAS, formatBRL
+  resolverVeiculoTransporte, analisarRotaComParadas, VEICULOS, DIARIAS, formatBRL
 } from '../lib/freteCalc'
 import { T, FONT, IS, LS } from '../lib/constants'
 
@@ -44,6 +44,12 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
   // sugerir Prancha/Truck errado ou ficar preso num aviso sem saída.
   const [modoManual,  setModoManual]  = useState(false)
   const [valorManual, setValorManual] = useState('')
+  // Frete combinado (2+ paradas na mesma solicitação) — resultado completo
+  // da análise de rota (trechos, km real vs direto, %desvio, sugestão de
+  // cobrança) e o override manual "usar sugestão / cobrar separado".
+  const [rotaInfo,       setRotaInfo]       = useState(null)
+  const [rotaLoading,    setRotaLoading]    = useState(false)
+  const [cobrarSeparado, setCobrarSeparado] = useState(null) // null = usar sugestão do sistema
 
   const isGuindauto = request?.type === 'guindauto'
   const subtype     = request?.subtype || ''
@@ -52,6 +58,26 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
   useEffect(() => {
     setOutroEstado((request?.origin || '') !== 'SP' || (request?.destination || '') !== 'SP')
   }, [request])
+
+  // ── Frete combinado (2+ paradas) — roda a análise de rota completa e para
+  // por aqui: não passa pelo fluxo normal de ida/volta abaixo, que assume
+  // sempre 2 pontos só. ──────────────────────────────────────────────────
+  useEffect(() => {
+    const paradas = request?.paradas
+    if (!paradas || paradas.length < 2 || !simClients?.length) { setRotaInfo(null); return }
+    setRotaLoading(true)
+    setCobrarSeparado(null)
+    analisarRotaComParadas({
+      origemCidade: 'Sumaré', origemUf: 'SP', // base fixa da Mills
+      paradas: paradas.map(p => ({ tipo:p.tipo, cidade:p.cidade, uf:p.uf, nInternos:p.nInternos||[] })),
+      simClients,
+    }).then(res => {
+      setRotaInfo(res)
+      setVeiculoId(res?.veiculoId || '')
+      setSugerido(!res?.temItemNaoIdentificado)
+      if (!res?.veiculoId) setModoManual(true)
+    }).finally(() => setRotaLoading(false))
+  }, [request?.paradas, simClients])
 
   // ── Seleção de veículo por peso ──────────────────────────────
   // Sempre baseada no peso real das máquinas (lookup SIM).
@@ -193,17 +219,19 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
   useEffect(() => {
     if (!onChange) return
     const vid = veiculoId || (readOnly ? 'prancha3' : '')
+    const usarSeparado = cobrarSeparado ?? rotaInfo?.ehDesvio
     onChange({
       veiculoId: vid,
       veiculoLabel: VEICULOS.find(v => v.id === vid)?.label || '',
-      km: parseFloat(km) || null,
-      // Modo manual (máquina não reconhecida / categoria rebocada / o analista
-      // preferiu digitar): o valor informado por ele substitui o calculado.
-      valorEstimado: modoManual ? (parseFloat(valorManual) || null) : (resultado?.total ?? null),
-      sugerido: modoManual ? false : sugerido,
+      km: rotaInfo ? (usarSeparado ? rotaInfo.kmReal : rotaInfo.kmDireto) : (parseFloat(km) || null),
+      // Prioridade: rota com paradas > modo manual > cálculo normal ida/volta.
+      valorEstimado: rotaInfo
+        ? (usarSeparado ? rotaInfo.valorSeparado : rotaInfo.valorCombinado)
+        : modoManual ? (parseFloat(valorManual) || null) : (resultado?.total ?? null),
+      sugerido: rotaInfo ? !rotaInfo.temItemNaoIdentificado : (modoManual ? false : sugerido),
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [veiculoId, km, resultado, sugerido, modoManual, valorManual])
+  }, [veiculoId, km, resultado, sugerido, modoManual, valorManual, rotaInfo, cobrarSeparado])
 
   return (
     <div style={{ background:T.surfaceAlt, borderRadius:T.rLg, padding:16, border:`1px solid ${T.border}`, marginTop:12, marginBottom:12 }}>
@@ -225,8 +253,63 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
         </div>
       </div>
 
+      {/* Frete combinado — resumo de rota com paradas */}
+      {rotaLoading && (
+        <div style={{ textAlign:'center', padding:'12px 0', color:T.textMuted, fontFamily:FONT, fontSize:11 }}>
+          ⏳ Calculando rota com {request?.paradas?.length} paradas...
+        </div>
+      )}
+      {rotaInfo && !rotaLoading && (
+        <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.r, padding:14, marginBottom:12 }}>
+          <div style={{ color:T.text, fontFamily:FONT, fontWeight:800, fontSize:12, marginBottom:8 }}>
+            🗺️ Rota calculada — {request.paradas.length} paradas
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10, fontSize:11, fontFamily:FONT }}>
+            <div>
+              <div style={{ color:T.textMuted, fontSize:9, textTransform:'uppercase' }}>Distância direta</div>
+              <div style={{ color:T.text, fontWeight:700 }}>{rotaInfo.kmDireto} km</div>
+            </div>
+            <div>
+              <div style={{ color:T.textMuted, fontSize:9, textTransform:'uppercase' }}>Distância real (rota)</div>
+              <div style={{ color:T.text, fontWeight:700 }}>{rotaInfo.kmReal} km</div>
+            </div>
+          </div>
+          <div style={{ padding:'8px 10px', borderRadius:T.rSm, marginBottom:10,
+            background: rotaInfo.ehDesvio ? '#FFF3E0' : T.verdeLight,
+            color: rotaInfo.ehDesvio ? '#E65100' : T.verde, fontSize:11, fontFamily:FONT, fontWeight:700 }}>
+            Diferença: {rotaInfo.desvioPct > 0 ? '+' : ''}{rotaInfo.desvioPct}%
+            {rotaInfo.ehDesvio ? ' → desvio de rota significativo' : ' → dentro da rota, sem desvio significativo'}
+          </div>
+
+          <div style={{ fontSize:11, fontFamily:FONT, color:T.textSec, marginBottom:8 }}>
+            💰 Cobrança sugerida: {rotaInfo.ehDesvio
+              ? <>{rotaInfo.pernas.length} trechos separados ({rotaInfo.pernas.join('km + ')}km) — {formatBRL(rotaInfo.valorSeparado)}</>
+              : <>1 trecho de {rotaInfo.kmDireto}km (tabela) — {formatBRL(rotaInfo.valorCombinado)}</>}
+          </div>
+
+          <div style={{ display:'flex', gap:8 }}>
+            <button onClick={()=>setCobrarSeparado(null)}
+              style={{ ...IS, width:'auto', padding:'6px 12px', fontSize:10, fontWeight:700, cursor:'pointer',
+                background:(cobrarSeparado===null)?T.laranja:T.surfaceAlt, color:(cobrarSeparado===null)?'white':T.textSec, border:`1px solid ${T.border}` }}>
+              ✓ Usar sugestão
+            </button>
+            <button onClick={()=>setCobrarSeparado(!rotaInfo.ehDesvio)}
+              style={{ ...IS, width:'auto', padding:'6px 12px', fontSize:10, fontWeight:700, cursor:'pointer',
+                background:(cobrarSeparado!==null)?T.laranja:T.surfaceAlt, color:(cobrarSeparado!==null)?'white':T.textSec, border:`1px solid ${T.border}` }}>
+              ✏️ {rotaInfo.ehDesvio ? 'Cobrar como 1 trecho direto' : 'Cobrar por trecho separado'}
+            </button>
+          </div>
+
+          {rotaInfo.temItemNaoIdentificado && (
+            <div style={{ marginTop:8, color:T.perigo, fontSize:10, fontFamily:FONT, fontWeight:700 }}>
+              ⚠ Uma ou mais máquinas não foram reconhecidas — confira o veículo sugerido manualmente.
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Veículo detectado pelo peso */}
-      {grupoLabel && (
+      {!rotaInfo && grupoLabel && (
         <div style={{ marginBottom:10, padding:'6px 10px', background:T.verdeLight, borderRadius:T.rSm,
           color:T.verde, fontSize:10, fontFamily:FONT, fontWeight:700 }}>
           🔧 {grupoLabel} {sugerido ? '✓ sugerido automaticamente' : ''}
@@ -369,7 +452,12 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
 
       {/* Modo manual — sempre disponível como opção; forçado automaticamente
           quando a máquina não é reconhecida ou é uma categoria sempre
-          rebocada (sem tarifa cadastrada, ex: Conjunto Canavieiro) */}
+          rebocada (sem tarifa cadastrada, ex: Conjunto Canavieiro).
+          Não aparece em rota com paradas — ali a cobrança já vem pronta
+          no bloco acima, com seu próprio override (Usar sugestão / Cobrar
+          separado), que cobre o mesmo papel sem duplicar UI. */}
+      {!rotaInfo && (
+      <>
       <div style={{ marginBottom:12 }}>
         <button onClick={()=>setModoManual(m=>!m)}
           style={{ background:'none', border:'none', color:T.laranja, fontFamily:FONT, fontWeight:700, fontSize:11, cursor:'pointer', padding:0 }}>
@@ -472,6 +560,8 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
               : ''}
           </div>
         )
+      )}
+      </>
       )}
       </>
       )}
