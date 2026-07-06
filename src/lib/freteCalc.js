@@ -604,6 +604,43 @@ function cabeNoVeiculo(veiculoId, peso, largura, comprimento) {
   return peso <= v.carga && largura <= v.larg && comprimento <= v.comp
 }
 
+// Resolve peso/largura/comprimento de UMA máquina (mesma cascata de sempre:
+// modelo exato → grupo exato → empilhadeira parseada → categoria similar →
+// fallback conservador). Função de nível de módulo — reaproveitada tanto
+// pelo cálculo ida/volta (resolverVeiculoTransporte) quanto pelo cálculo de
+// rota com paradas (analisarRotaComParadas, mais abaixo).
+function resolverDimensaoUnica(n, simClients) {
+  const exata = buscarDimensaoModelo([n], simClients)
+  if (exata) {
+    return { peso:exata.peso||0, comprimento:exata.comprimento||0, largura:exata.largura||0,
+      larguraSemLamina:exata.larguraSemLamina, forcaPrancha:!!exata.forcaPrancha, fonte:'modelo', grupo:null }
+  }
+  const grupo = buscarGrupoModelo([n], simClients)
+  if (!grupo) {
+    console.warn(`[freteCalc] nInterno ${n} sem grupo de modelo — usando fallback conservador (truck)`)
+    return { peso:10.5, comprimento:7.0, largura:2.55, fonte:'fallback', grupo:'_fallback' }
+  }
+  let grupoResolvido = grupo
+  if (PESO_GRUPO[grupo] === undefined) {
+    const emp = dimensaoEmpilhadeira(grupo)
+    if (emp) return { peso:emp.peso, comprimento:emp.comprimento, largura:emp.largura, fonte:'empilhadeira', grupo }
+    const similar = faixaSimilar(grupo)
+    if (similar) {
+      console.warn(`[freteCalc] grupo "${grupo}" não catalogado — usando faixa similar da categoria: "${similar}"`)
+      grupoResolvido = similar
+    } else {
+      console.warn(`[freteCalc] grupo "${grupo}" não catalogado e sem faixa similar na categoria — usando fallback conservador (truck)`)
+      return { peso:10.5, comprimento:7.0, largura:2.55, fonte:'fallback', grupo:'_fallback' }
+    }
+  }
+  return {
+    peso: PESO_GRUPO[grupoResolvido] || 0,
+    comprimento: COMPRIMENTO_GRUPO[grupoResolvido] || 0,
+    largura: LARGURA_GRUPO[grupoResolvido] || 0,
+    fonte:'grupo', grupo:grupoResolvido,
+  }
+}
+
 export function resolverVeiculoTransporte(
   nInternosIda   = [],
   nInternosVolta = [],
@@ -654,59 +691,10 @@ export function resolverVeiculoTransporte(
   // mesmo quando a carga combina equipamentos de tipos diferentes.
   const calcDimensoes = (lista) =>
     lista.reduce((acc, n) => {
-      const exata = buscarDimensaoModelo([n], simClients)
-      if (exata) {
-        // Dimensão exata do fabricante+modelo — mais precisa que a faixa de peso
-        acc.peso        += exata.peso || 0
-        acc.comprimento += exata.comprimento || 0
-        acc.larguras.push({ grupo: null, largura: exata.largura || 0, larguraSemLamina: exata.larguraSemLamina, forcaPrancha: !!exata.forcaPrancha, fonte:'modelo' })
-        return acc
-      }
-      // Fallback: não achou Fabricante+Modelo catalogado — usa a faixa de peso (Grupo de Modelo)
-      const grupo = buscarGrupoModelo([n], simClients)
-      if (!grupo) {
-        // Máquina sem grupo identificado — usa peso/largura/comprimento conservadores
-        // pra nunca sugerir um veículo menor que o necessário por falta de dados.
-        // Padrão: equivalente a uma Carregadeira de Pneus 10-11t (truck), que é o
-        // menor veículo razoável pra qualquer equipamento pesado não identificado.
-        console.warn(`[freteCalc] nInterno ${n} sem grupo de modelo — usando fallback conservador (truck)`)
-        acc.peso        += 10.5
-        acc.comprimento += 7.0
-        acc.larguras.push({ grupo:'_fallback', largura:2.55, fonte:'fallback' })
-        return acc
-      }
-      // O grupoModelo existe (veio do CSV), mas essa faixa exata pode ainda não
-      // estar catalogada em PESO_GRUPO/LARGURA_GRUPO/COMPRIMENTO_GRUPO (ex: a
-      // Mills passou a usar uma faixa nova). Antes de assumir peso 0 (bug
-      // anterior — CAT 120 caía exatamente aqui), busca a faixa MAIS PRÓXIMA
-      // dentro da MESMA categoria (ex: outra Motoniveladora) como substituta.
-      let grupoResolvido = grupo
-      if (PESO_GRUPO[grupo] === undefined) {
-        // Empilhadeiras: o peso já vem escrito no próprio texto do grupo —
-        // extrai direto em vez de exigir uma entrada manual em PESO_GRUPO.
-        const emp = dimensaoEmpilhadeira(grupo)
-        if (emp) {
-          acc.peso        += emp.peso
-          acc.comprimento += emp.comprimento
-          acc.larguras.push({ grupo, largura: emp.largura, fonte:'empilhadeira' })
-          return acc
-        }
-        const similar = faixaSimilar(grupo)
-        if (similar) {
-          console.warn(`[freteCalc] grupo "${grupo}" não catalogado — usando faixa similar da categoria: "${similar}"`)
-          grupoResolvido = similar
-        } else {
-          console.warn(`[freteCalc] grupo "${grupo}" não catalogado e sem faixa similar na categoria — usando fallback conservador (truck)`)
-          acc.peso        += 10.5
-          acc.comprimento += 7.0
-          acc.larguras.push({ grupo:'_fallback', largura:2.55, fonte:'fallback' })
-          return acc
-        }
-      }
-      const largura = LARGURA_GRUPO[grupoResolvido] || 0
-      acc.peso        += PESO_GRUPO[grupoResolvido] || 0
-      acc.comprimento += COMPRIMENTO_GRUPO[grupoResolvido] || 0
-      acc.larguras.push({ grupo:grupoResolvido, largura, fonte:'grupo' })
+      const d = resolverDimensaoUnica(n, simClients)
+      acc.peso        += d.peso
+      acc.comprimento += d.comprimento
+      acc.larguras.push({ grupo:d.grupo, largura:d.largura, larguraSemLamina:d.larguraSemLamina, forcaPrancha:d.forcaPrancha, fonte:d.fonte })
       return acc
     }, { peso:0, comprimento:0, larguras:[] })
 
@@ -882,8 +870,147 @@ export async function calcularDistancia(cidadeOrigem, ufOrigem, cidadeDestino, u
   return { km, coordO, coordD }
 }
 
+function haversineKm(a, b) {
+  const R    = 6371
+  const dLat = (b.lat - a.lat) * Math.PI / 180
+  const dLon = (b.lon - a.lon) * Math.PI / 180
+  const x    = Math.sin(dLat/2)**2 + Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLon/2)**2
+  return Math.round(R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x)) * 1.3)
+}
+
+// Distância de uma rota com N pontos (origem + paradas, na ordem em que o
+// veículo passa por elas) — usa o suporte nativo do OSRM a múltiplos
+// waypoints numa única chamada, devolvendo a distância de CADA TRECHO
+// individualmente (data.routes[0].legs[i]), não só o total.
+export async function calcularDistanciaMultiPonto(pontos) {
+  const coords = await Promise.all(pontos.map(p => buscarCoordenadas(p.cidade, p.uf)))
+  if (coords.some(c => !c)) return { pernas: null, total: null, coords }
+  try {
+    const path = coords.map(c => `${c.lon},${c.lat}`).join(';')
+    const url  = `https://router.project-osrm.org/route/v1/driving/${path}?overview=false`
+    const res  = await fetch(url)
+    const data = await res.json()
+    if (data?.routes?.[0]?.legs) {
+      const pernas = data.routes[0].legs.map(l => Math.round(l.distance / 1000))
+      return { pernas, total: pernas.reduce((a,b)=>a+b,0), coords }
+    }
+  } catch { /* fallback */ }
+  // Fallback Haversine × 1.3 perna a perna (mesmo fator do calcularDistancia)
+  const pernas = []
+  for (let i = 0; i < coords.length - 1; i++) pernas.push(haversineKm(coords[i], coords[i+1]))
+  return { pernas, total: pernas.reduce((a,b)=>a+b,0), coords }
+}
+
+// ── ROTA COM PARADAS (frete combinado / múltiplos clientes) ──────────────
+// paradas: [{ tipo:'entrega'|'coleta'|'preparacao', cidade, uf, nInternos:[] }]
+// em ordem — o veículo sai de (origemCidade,origemUf) e passa por cada
+// parada nessa sequência. NÃO adiciona automaticamente uma volta à base: se
+// o motorista precisa voltar pra Mills ao final, isso é só mais uma parada
+// na lista (ex: última parada = coleta, cidade = a própria base).
+//
+// Regra de cobrança (definida com a operação, 2026-07):
+//   - Compara a rota REAL (soma de todos os trechos) com a rota DIRETA
+//     (origem → última parada, ignorando as intermediárias).
+//   - Desvio ≤ limiteDesvioPct (10% por padrão): as paradas intermediárias
+//     "estão no caminho" — cobra 1 trecho único pela distância DIRETA.
+//   - Desvio > limiteDesvioPct: é desvio de rota de verdade — cobra cada
+//     trecho separadamente pela tabela Hengel, sem desconto (soma simples).
+export async function analisarRotaComParadas({ origemCidade, origemUf, paradas, simClients, limiteDesvioPct = 0.10 }) {
+  if (!paradas?.length) return null
+
+  // ── 1. Peso/dimensão de cada máquina mencionada em qualquer parada ──────
+  const todosNInternos = [...new Set(paradas.flatMap(p => p.nInternos || []))]
+  const dimensaoPorMaquina = new Map(todosNInternos.map(n => [n, resolverDimensaoUnica(n, simClients)]))
+  const temItemNaoIdentificado = [...dimensaoPorMaquina.values()].some(d => d.fonte === 'fallback')
+
+  // ── 2. Simula o que está "a bordo" em cada trecho ───────────────────────
+  // Máquinas cuja PRIMEIRA menção é 'entrega' ou 'preparacao' já embarcam na
+  // origem (vieram de Mills). Máquinas de 'coleta' só embarcam a partir da
+  // parada onde são coletadas.
+  const onboard = new Set()
+  const jaVista = new Set()
+  for (const p of paradas) {
+    for (const n of (p.nInternos || [])) {
+      if (!jaVista.has(n) && (p.tipo === 'entrega' || p.tipo === 'preparacao')) onboard.add(n)
+      jaVista.add(n)
+    }
+  }
+  const cargaAtual = () => {
+    const itens = [...onboard].map(n => dimensaoPorMaquina.get(n))
+    const peso = itens.reduce((a,d)=>a+d.peso, 0)
+    const largura = Math.max(0, ...itens.map(d=>d.largura))
+    const comprimento = itens.reduce((a,d)=>a+d.comprimento, 0) // somam — viajam uma atrás da outra
+    const temBasculante = itens.some(d => d.fonte==='modelo' ? d.forcaPrancha : FORCA_PRANCHA.has(d.grupo))
+    return { peso, largura, comprimento, temBasculante }
+  }
+
+  const trechos = [cargaAtual()] // trecho 0 = origem → parada[0], com a carga inicial
+  for (const p of paradas) {
+    if (p.tipo === 'entrega') for (const n of (p.nInternos||[])) onboard.delete(n)
+    if (p.tipo === 'coleta')  for (const n of (p.nInternos||[])) onboard.add(n)
+    // 'preparacao' não altera o que está a bordo
+    trechos.push(cargaAtual())
+  }
+  trechos.pop() // o último "cargaAtual" é depois da última parada — não existe trecho seguinte
+
+  // ── 3. Veículo necessário = PIOR CASO entre os trechos, nunca a soma ────
+  const pesoMax        = Math.max(0, ...trechos.map(t=>t.peso))
+  const larguraMax      = Math.max(0, ...trechos.map(t=>t.largura))
+  const comprimentoMax  = Math.max(0, ...trechos.map(t=>t.comprimento))
+  const temBasculante   = trechos.some(t=>t.temBasculante)
+  let veiculoId
+  if (temBasculante) {
+    const prancha3 = VEICULOS.find(v=>v.id==='prancha3')
+    veiculoId = (pesoMax <= prancha3.carga && comprimentoMax <= prancha3.comp) ? 'prancha3' : 'prancha4'
+  } else {
+    veiculoId = ORDEM_VEICULOS.find(id => cabeNoVeiculo(id, pesoMax, larguraMax, comprimentoMax)) || 'prancha4'
+  }
+
+  // ── 4. Distâncias: rota real (todas as pernas) vs rota direta (origem→última) ──
+  const pontos = [{ cidade:origemCidade, uf:origemUf }, ...paradas.map(p=>({cidade:p.cidade,uf:p.uf}))]
+  const rotaReal   = await calcularDistanciaMultiPonto(pontos)
+  const ultimaParada = paradas[paradas.length - 1]
+  const rotaDireta = await calcularDistancia(origemCidade, origemUf, ultimaParada.cidade, ultimaParada.uf)
+
+  if (rotaReal.total == null || rotaDireta.km == null) {
+    return { veiculoId, pesoMax, larguraMax, comprimentoMax, temItemNaoIdentificado, trechos,
+      kmReal:null, kmDireto:null, desvioPct:null, ehDesvio:null, pernas:null }
+  }
+
+  const desvioKm  = rotaReal.total - rotaDireta.km
+  const desvioPct = rotaDireta.km > 0 ? desvioKm / rotaDireta.km : 0
+  const ehDesvio  = desvioPct > limiteDesvioPct
+
+  // Precificação: regra combinada com a operação (2026-07) — sem desvio real,
+  // cobra 1 trecho pela distância DIRETA; com desvio, soma cada perna pela
+  // tabela Hengel individualmente, sem nenhum desconto entre elas. Devolve os
+  // 2 valores possíveis (não só o sugerido) pra UI permitir override manual
+  // do analista sem precisar recalcular nada.
+  const valorCombinado = getValorIda(rotaDireta.km, veiculoId)
+  const valorSeparado  = rotaReal.pernas.reduce((soma, km) => soma + getValorIda(km, veiculoId), 0)
+  const valorSugerido  = ehDesvio ? valorSeparado : valorCombinado
+
+  return {
+    veiculoId,
+    pesoMax: Math.round(pesoMax*10)/10,
+    larguraMax: Math.round(larguraMax*100)/100,
+    comprimentoMax: Math.round(comprimentoMax*100)/100,
+    temItemNaoIdentificado,
+    trechos,
+    kmReal: rotaReal.total,
+    kmDireto: rotaDireta.km,
+    pernas: rotaReal.pernas,     // km de cada trecho individual, na mesma ordem de `trechos`
+    desvioKm,
+    desvioPct: Math.round(desvioPct*1000)/10, // em %, 1 casa decimal
+    ehDesvio,   // true = cobrar trechos separados; false = cobrar 1 trecho direto
+    valorSugerido: Math.round(valorSugerido*100)/100,
+    valorCombinado: Math.round(valorCombinado*100)/100,
+    valorSeparado: Math.round(valorSeparado*100)/100,
+  }
+}
+
 // ── CÁLCULO DE FRETE ─────────────────────────────────────────
-function getValorIda(km, veiculoId) {
+export function getValorIda(km, veiculoId) {
   const faixa = TABELA.find(f => km >= f.min && km <= f.max)
   if (!faixa) return 0
   return faixa.fixo ? faixa[veiculoId] : Math.round(faixa[veiculoId] * km * 100) / 100

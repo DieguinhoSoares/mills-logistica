@@ -3,8 +3,8 @@
 // (item 17 da revisão — é o código onde erro custa R$)
 // Rodar: npm test
 // ============================================================
-import { describe, it, expect } from 'vitest'
-import { calcularFrete, selecionarVeiculoPorPeso, resolverVeiculoTransporte, DIARIAS, VEICULOS, formatBRL } from './freteCalc'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { calcularFrete, selecionarVeiculoPorPeso, resolverVeiculoTransporte, analisarRotaComParadas, DIARIAS, VEICULOS, formatBRL } from './freteCalc'
 
 describe('calcularFrete — entradas inválidas', () => {
   it('retorna null sem km', () => {
@@ -242,5 +242,126 @@ describe('resolverVeiculoTransporte — item não identificado NÃO sugere veíc
     const res = resolverVeiculoTransporte(['MNA09999'], [], semDados)
     expect(res.veiculoId).toBeNull()
     expect(res.temItemNaoIdentificado).toBe(true)
+  })
+})
+
+// ── analisarRotaComParadas — mocka rede (Nominatim + OSRM) p/ testes determinísticos ──
+const MOCK_COORDS = {
+  'Sumaré':          { lat:-22.82, lon:-47.27 },
+  'São Paulo':       { lat:-23.55, lon:-46.63 },
+  'Rio de Janeiro':  { lat:-22.90, lon:-43.17 },
+  'Franca':          { lat:-20.53, lon:-47.40 },
+  'Assis':           { lat:-22.66, lon:-50.41 },
+  'Bauru':           { lat:-22.31, lon:-49.06 },
+}
+// km "reais" fictícios entre cada par usado nos testes (mesmo valor nos 2 sentidos)
+const MOCK_KM = {
+  'Sumaré|Rio de Janeiro': 430,
+  'Sumaré|São Paulo': 100, 'São Paulo|Rio de Janeiro': 340,   // via SP: 100+340=440 (desvio ~2,3%)
+  'Sumaré|Franca': 300,    'Franca|Rio de Janeiro': 430,       // via Franca: 300+430=730 (desvio ~69,8%)
+  'Sumaré|Assis': 300,     'Assis|Bauru': 150,
+}
+function kmEntre(a, b) { return MOCK_KM[`${a}|${b}`] ?? MOCK_KM[`${b}|${a}`] ?? 999 }
+function cidadeDoCoord(lon, lat) {
+  return Object.entries(MOCK_COORDS).find(([,c]) => Math.abs(c.lon-lon)<0.001 && Math.abs(c.lat-lat)<0.001)?.[0]
+}
+
+function mockFetch(url) {
+  if (url.includes('nominatim.openstreetmap.org')) {
+    const m = decodeURIComponent(url).match(/city=([^&]+)/)
+    const cidade = m?.[1]
+    const c = MOCK_COORDS[cidade]
+    return Promise.resolve({ json: async () => c ? [{ lat:String(c.lat), lon:String(c.lon) }] : [] })
+  }
+  if (url.includes('router.project-osrm.org')) {
+    const path = url.split('/driving/')[1].split('?')[0]
+    const pontos = path.split(';').map(p => p.split(',').map(Number)) // [lon,lat]
+    const cidades = pontos.map(([lon,lat]) => cidadeDoCoord(lon,lat))
+    const legs = []
+    for (let i=0;i<cidades.length-1;i++) legs.push({ distance: kmEntre(cidades[i], cidades[i+1]) * 1000 })
+    return Promise.resolve({ json: async () => ({ routes:[{ legs, distance: legs.reduce((a,l)=>a+l.distance,0) }] }) })
+  }
+  return Promise.resolve({ json: async () => ({}) })
+}
+
+describe('analisarRotaComParadas — peso por TRECHO (não soma tudo)', () => {
+  beforeEach(() => { vi.stubGlobal('fetch', vi.fn(mockFetch)) })
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  it('2 entregas: trecho 1 carrega as 2 juntas, trecho 2 só a que sobrou', async () => {
+    const sim = [{ machineModelos: {
+      'MNA0001': { fabricante:'CATERPILLAR', modelo:'320GC' }, // 20,5t
+      'MNA0002': { fabricante:'CATERPILLAR', modelo:'416F'  }, // 7,2t
+    } }]
+    const paradas = [
+      { tipo:'entrega', cidade:'Assis', uf:'SP', nInternos:['MNA0001'] },
+      { tipo:'entrega', cidade:'Bauru', uf:'SP', nInternos:['MNA0002'] },
+    ]
+    const res = await analisarRotaComParadas({ origemCidade:'Sumaré', origemUf:'SP', paradas, simClients:sim })
+    // trecho 0 (Sumaré->Assis): as 2 juntas = 27,7t. trecho 1 (Assis->Bauru): só a 416F = 7,2t
+    expect(res.trechos[0].peso).toBeCloseTo(27.7, 1)
+    expect(res.trechos[1].peso).toBeCloseTo(7.2, 1)
+    // pesoMax é o PIOR trecho (27,7t), não a soma de tudo (que também seria 27,7 aqui,
+    // mas o ponto é que NÃO soma peso de trechos diferentes — ver teste de coleta abaixo)
+    expect(res.pesoMax).toBeCloseTo(27.7, 1)
+  })
+
+  it('entrega + coleta: peso muda entre trechos sem somar o que já foi entregue', async () => {
+    const sim = [{ machineModelos: {
+      'MNA0001': { fabricante:'CATERPILLAR', modelo:'320GC' }, // 20,5t — vai (entrega)
+      'MNA0002': { fabricante:'CATERPILLAR', modelo:'416F'  }, // 7,2t — volta (coleta)
+    } }]
+    const paradas = [
+      { tipo:'entrega', cidade:'Assis', uf:'SP', nInternos:['MNA0001'] },
+      { tipo:'coleta',  cidade:'Bauru', uf:'SP', nInternos:['MNA0002'] },
+    ]
+    const res = await analisarRotaComParadas({ origemCidade:'Sumaré', origemUf:'SP', paradas, simClients:sim })
+    // trecho 0 (Sumaré->Assis): carrega a 320GC (indo entregar) = 20,5t
+    expect(res.trechos[0].peso).toBeCloseTo(20.5, 1)
+    // trecho 1 (Assis->Bauru): já entregou a 320GC em Assis, ainda não coletou a 416F = 0t
+    expect(res.trechos[1].peso).toBeCloseTo(0, 1)
+    // pesoMax = 20,5t (pior trecho) — se somasse tudo, daria 27,7t e sugeriria veículo maior que o necessário
+    expect(res.pesoMax).toBeCloseTo(20.5, 1)
+  })
+})
+
+describe('analisarRotaComParadas — regra dos 10% de desvio', () => {
+  beforeEach(() => { vi.stubGlobal('fetch', vi.fn(mockFetch)) })
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  it('parada "no caminho" (via São Paulo, ~2,3% de desvio) → cobra 1 trecho direto', async () => {
+    const sim = [{ machineModelos: { 'MNA0001': { fabricante:'CATERPILLAR', modelo:'320GC' } } }]
+    const paradas = [
+      { tipo:'preparacao', cidade:'São Paulo',      uf:'SP', nInternos:['MNA0001'] },
+      { tipo:'entrega',    cidade:'Rio de Janeiro',  uf:'RJ', nInternos:['MNA0001'] },
+    ]
+    const res = await analisarRotaComParadas({ origemCidade:'Sumaré', origemUf:'SP', paradas, simClients:sim })
+    expect(res.kmDireto).toBe(430)
+    expect(res.kmReal).toBe(440)
+    expect(res.ehDesvio).toBe(false)
+    // Sem desvio: cobra 1 trecho pela distância DIRETA (430km), não pela
+    // rota real (440km) nem pela soma de 2 trechos separados.
+    const { calcularFrete } = await import('./freteCalc')
+    const direto = calcularFrete({ km:430, veiculoId:res.veiculoId })
+    expect(res.valorSugerido).toBeCloseTo(direto.valorIda, 2)
+  })
+
+  it('parada fora do caminho (via Franca, ~69,8% de desvio) → cobra trechos separados', async () => {
+    const sim = [{ machineModelos: { 'MNA0001': { fabricante:'CATERPILLAR', modelo:'320GC' } } }]
+    const paradas = [
+      { tipo:'preparacao', cidade:'Franca',        uf:'SP', nInternos:['MNA0001'] },
+      { tipo:'entrega',    cidade:'Rio de Janeiro', uf:'RJ', nInternos:['MNA0001'] },
+    ]
+    const res = await analisarRotaComParadas({ origemCidade:'Sumaré', origemUf:'SP', paradas, simClients:sim })
+    expect(res.kmDireto).toBe(430)
+    expect(res.kmReal).toBe(730)
+    expect(res.ehDesvio).toBe(true)
+    expect(res.pernas).toEqual([300, 430])
+    // Com desvio: soma cada perna separadamente pela tabela, sem desconto —
+    // regra combinada com a operação: "soma os 1000+250 da tabela".
+    const { calcularFrete } = await import('./freteCalc')
+    const perna1 = calcularFrete({ km:300, veiculoId:res.veiculoId })
+    const perna2 = calcularFrete({ km:430, veiculoId:res.veiculoId })
+    expect(res.valorSugerido).toBeCloseTo(perna1.valorIda + perna2.valorIda, 2)
   })
 })
