@@ -37,7 +37,7 @@ export function FrotasView() {
   const [busca,        setBusca]        = useState('')
   const buscaResultados = useMemo(() => {
     if (!busca.trim()) return []
-    const normQ = busca.trim().toLowerCase().normalize('NFD').replace(/[\u00-\u036f]/g,'')
+    const normQ = busca.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
     const normS = s => String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
     return cards.filter(c =>
       String(c.seqId||'').includes(normQ) ||
@@ -113,7 +113,7 @@ export function FrotasView() {
     }
   }
 
-  const handleCardDriverConfirm = async ({ driverId, driverName, transportadoraNome, transportadoraCnpj, date, note }) => {
+  const handleCardDriverConfirm = async ({ driverId, driverName, transportadoraNome, transportadoraCnpj, date, note, veiculoId, veiculoLabel, freteEstimado, freteSugerido }) => {
     const motorista = driverName || transportadoraNome || ''
     // Preserva a duração (em dias) já definida no serviço — se Frotas mudar a data de início
     // ao atribuir o motorista, a data fim acompanha mantendo o mesmo número de dias.
@@ -134,6 +134,8 @@ export function FrotasView() {
       endDate:             newEnd,
       status:              'confirmado',
       notes:               [pendingCardForm.description, note].filter(Boolean).join(' — '),
+      veiculoId:veiculoId||'', veiculoLabel:veiculoLabel||'',
+      freteEstimado:freteEstimado??null, freteSugerido:!!freteSugerido,
     }
     try {
       await saveCard(finalCard)
@@ -290,7 +292,7 @@ export function FrotasView() {
     }
   }
 
-  const handleAssignConfirm = async ({ driverId, driverName, transportadoraNome, transportadoraCnpj, date, note }) => {
+  const handleAssignConfirm = async ({ driverId, driverName, transportadoraNome, transportadoraCnpj, date, note, veiculoId, veiculoLabel, freteEstimado, freteSugerido }) => {
     const { req, id, webhook } = assignModal
     const motorista = driverName || transportadoraNome || ''
     try {
@@ -304,6 +306,10 @@ export function FrotasView() {
         transportadoraNome:transportadoraNome||'', transportadoraCnpj:transportadoraCnpj||'',
         unit:req.unit||profile?.unit||'', notes:req.description||'', description:req.description||'',
         requestId:id, requesterId:req.requesterId||'', status:'confirmado',
+        // Veículo/frete definidos na tela de aceite (FreteEstimativa), incluindo
+        // eventual override manual do analista — antes isso nunca era salvo.
+        veiculoId:veiculoId||'', veiculoLabel:veiculoLabel||'',
+        freteEstimado:freteEstimado??null, freteSugerido:!!freteSugerido,
       })
       setAssignModal(null)
       addToast(`✅ Serviço aceito e atribuído a ${motorista||'motorista'}!`,'accepted')
@@ -315,7 +321,7 @@ export function FrotasView() {
 
   // Alterna a cada 30s entre a timeline de hoje e os KPIs rápidos no espaço liberado pelo mapa
   useEffect(() => {
-    const iv = setInterval(() => setRodapeSlide(s => s === 0 ? 1 : 0), 10000)
+    const iv = setInterval(() => setRodapeSlide(s => s === 0 ? 1 : 0), 30000)
     return () => clearInterval(iv)
   }, [])
 
