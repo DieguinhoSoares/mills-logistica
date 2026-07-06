@@ -308,9 +308,40 @@ function normalizaModelo(s) {
   return String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'')
 }
 
+// Extrai a categoria de uma string de grupoModelo — ex: "Motoniveladora 14 a
+// 16 t" → "Motoniveladora". Usado pelo fallback de "modelo similar dentro da
+// categoria" quando o CSV traz uma faixa de peso que ainda não catalogamos.
+function categoriaDoGrupo(grupo) {
+  const m = String(grupo || '').match(/^([A-Za-zÀ-ÿ ]+?)\s*\d/)
+  return (m ? m[1] : String(grupo || '')).trim()
+}
+
+// Dado um grupoModelo não catalogado em PESO_GRUPO (ex: uma faixa nova que a
+// Mills passou a usar e ainda não colocamos aqui), acha a faixa MAIS PRÓXIMA
+// dentro da MESMA categoria — melhor do que assumir peso zero ou usar o
+// fallback genérico de "qualquer equipamento não identificado".
+function faixaSimilar(grupo) {
+  const categoria = categoriaDoGrupo(grupo)
+  if (!categoria) return null
+  const candidatos = Object.keys(PESO_GRUPO).filter(k => categoriaDoGrupo(k) === categoria)
+  if (!candidatos.length) return null
+  const alvoNum = parseFloat(String(grupo).match(/(\d+(?:[.,]\d+)?)/)?.[1]?.replace(',','.') ?? 'NaN')
+  let melhor = candidatos[0], melhorDist = Infinity
+  for (const c of candidatos) {
+    const cNum = parseFloat(String(c).match(/(\d+(?:[.,]\d+)?)/)?.[1]?.replace(',','.') ?? 'NaN')
+    const dist = (isNaN(alvoNum) || isNaN(cNum)) ? 0 : Math.abs(alvoNum - cNum)
+    if (dist < melhorDist) { melhor = c; melhorDist = dist }
+  }
+  return melhor
+}
+
 const DIMENSOES_MODELO = {
   // ── Motoniveladora ──
   'CATERPILLAR|140K':        { peso:18.4, largura:2.48, comprimento:10.01 },
+  // Fonte: mills.com.br (ficha técnica oficial, consultada em 2026-07) —
+  // Peso Operacional 15,7t · Comprimento 9,8m · Largura 2,49m. Specs
+  // idênticas às da 120LVR no catálogo da Mills (mesma máquina-base).
+  'CATERPILLAR|120':         { peso:15.7, largura:2.49, comprimento:9.80  },
   'CATERPILLAR|120LVR':      { peso:15.7, largura:2.49, comprimento:9.80  },
   // ── Pá Carregadeira / Carregadeira de Pneus ──
   'CATERPILLAR|924K':        { peso:11.5, largura:2.55, comprimento:7.61  }, // Cat 924K — cross-check Cat 930K (13,1t/2,55m/7,61m)
@@ -547,10 +578,29 @@ export function resolverVeiculoTransporte(
         acc.larguras.push({ grupo:'_fallback', largura:2.55, fonte:'fallback' })
         return acc
       }
-      const largura = LARGURA_GRUPO[grupo] || 0
-      acc.peso        += PESO_GRUPO[grupo] || 0
-      acc.comprimento += COMPRIMENTO_GRUPO[grupo] || 0
-      acc.larguras.push({ grupo, largura, fonte:'grupo' })
+      // O grupoModelo existe (veio do CSV), mas essa faixa exata pode ainda não
+      // estar catalogada em PESO_GRUPO/LARGURA_GRUPO/COMPRIMENTO_GRUPO (ex: a
+      // Mills passou a usar uma faixa nova). Antes de assumir peso 0 (bug
+      // anterior — CAT 120 caía exatamente aqui), busca a faixa MAIS PRÓXIMA
+      // dentro da MESMA categoria (ex: outra Motoniveladora) como substituta.
+      let grupoResolvido = grupo
+      if (PESO_GRUPO[grupo] === undefined) {
+        const similar = faixaSimilar(grupo)
+        if (similar) {
+          console.warn(`[freteCalc] grupo "${grupo}" não catalogado — usando faixa similar da categoria: "${similar}"`)
+          grupoResolvido = similar
+        } else {
+          console.warn(`[freteCalc] grupo "${grupo}" não catalogado e sem faixa similar na categoria — usando fallback conservador (truck)`)
+          acc.peso        += 10.5
+          acc.comprimento += 7.0
+          acc.larguras.push({ grupo:'_fallback', largura:2.55, fonte:'fallback' })
+          return acc
+        }
+      }
+      const largura = LARGURA_GRUPO[grupoResolvido] || 0
+      acc.peso        += PESO_GRUPO[grupoResolvido] || 0
+      acc.comprimento += COMPRIMENTO_GRUPO[grupoResolvido] || 0
+      acc.larguras.push({ grupo:grupoResolvido, largura, fonte:'grupo' })
       return acc
     }, { peso:0, comprimento:0, larguras:[] })
 

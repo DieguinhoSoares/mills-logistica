@@ -4,7 +4,7 @@
 // Rodar: npm test
 // ============================================================
 import { describe, it, expect } from 'vitest'
-import { calcularFrete, selecionarVeiculoPorPeso, DIARIAS, VEICULOS, formatBRL } from './freteCalc'
+import { calcularFrete, selecionarVeiculoPorPeso, resolverVeiculoTransporte, DIARIAS, VEICULOS, formatBRL } from './freteCalc'
 
 describe('calcularFrete — entradas inválidas', () => {
   it('retorna null sem km', () => {
@@ -114,5 +114,38 @@ describe('formatBRL', () => {
   it('formata em pt-BR e tolera null', () => {
     expect(formatBRL(1234.5)).toMatch(/1\.234,50/)
     expect(formatBRL(null)).toMatch(/0,00/)
+  })
+})
+
+// ── resolverVeiculoTransporte — reconhecimento de modelo (bug real: CAT 120) ──
+describe('resolverVeiculoTransporte — reconhecimento de Fabricante+Modelo', () => {
+  // Fixture mínima no formato que useSimClients monta a partir do CSV do SIM.
+  const simClients = [{
+    machineModelos: {
+      'MNA00001': { fabricante: 'CATERPILLAR', modelo: '120' },
+      'MNA00002': { fabricante: 'CATERPILLAR', modelo: '120' },
+    },
+  }]
+
+  it('2x CAT 120 reconhece o modelo exato e usa peso real (15,7t cada), não o fallback de 10,5t', () => {
+    const res = resolverVeiculoTransporte(['MNA00001', 'MNA00002'], [], simClients)
+    // Antes do fix: modelo "120" não batia com a chave catalogada "120LVR",
+    // cada unidade caía no fallback conservador de 10,5t (metade do peso real).
+    expect(res.pesoIda).toBeCloseTo(15.7 * 2, 1)
+    expect(res.veiculoId).not.toBe('truck') // 31,4t não cabe em truck (limite 13t)
+  })
+
+  it('máquina sem grupoModelo E sem modelo catalogado usa o fallback conservador (10,5t)', () => {
+    const semDados = [{ machineModelos: { 'MNA09999': { fabricante: 'MARCA_DESCONHECIDA', modelo: 'X1' } } }]
+    const res = resolverVeiculoTransporte(['MNA09999'], [], semDados)
+    expect(res.pesoIda).toBeCloseTo(10.5, 1)
+  })
+
+  it('grupoModelo com faixa não catalogada cai na faixa mais próxima da MESMA categoria', () => {
+    // "Motoniveladora 12 a 13 t" não existe em PESO_GRUPO (só 14-16/17-18/19-20) —
+    // deve escolher "Motoniveladora 14 a 16 t" (15,0t, a mais próxima), nunca 0.
+    const grupoNaoCatalogado = [{ machineGroups: { 'MNA05000': 'Motoniveladora 12 a 13 t' } }]
+    const res = resolverVeiculoTransporte(['MNA05000'], [], grupoNaoCatalogado)
+    expect(res.pesoIda).toBeCloseTo(15.0, 1) // faixa "14 a 16 t", não 0
   })
 })
