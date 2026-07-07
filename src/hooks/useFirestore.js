@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc,
-  query, orderBy, where, serverTimestamp, setDoc, getDoc, getDocs, limit,
+  query, orderBy, where, serverTimestamp, setDoc, getDoc, getDocs, limit, runTransaction,
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { useAuth } from '../contexts/AuthContext'
@@ -22,11 +22,29 @@ export function useCards() {
     )
     return unsub
   }, [])
+  // Contador persistente em system/cardSeqCounter — nunca reseta. Substitui o
+  // botão de migração manual (que reiniciava do 1 toda vez que rodava,
+  // colidindo números já usados — a causa real dos "números não sequenciais").
+  const proximoSeqId = async () => {
+    const ref = doc(db, 'system', 'cardSeqCounter')
+    return runTransaction(db, async tx => {
+      const snap = await tx.get(ref)
+      const atual = snap.exists() ? (snap.data().value || 0) : 0
+      const proximo = atual + 1
+      tx.set(ref, { value: proximo }, { merge: true })
+      return proximo
+    })
+  }
+
   const saveCard = async card => {
     const { id, ...data } = card
     data.updatedAt = serverTimestamp()
     if (id && id.length > 10) await updateDoc(doc(db,'cards',id), data)
-    else { data.createdAt = serverTimestamp(); await addDoc(collection(db,'cards'), data) }
+    else {
+      data.createdAt = serverTimestamp()
+      data.seqId = await proximoSeqId() // atribuído aqui, uma vez, nunca mais muda
+      await addDoc(collection(db,'cards'), data)
+    }
   }
   const deleteCard = id => deleteDoc(doc(db,'cards',id))
   const moveCard   = async (id, startDate, endDate, reason) => {
@@ -600,16 +618,26 @@ export function useBackupStatus() {
   return status
 }
 
-// Utilitário de migração — preenche seqId sequencial em cards que não têm esse campo.
-// Chamado uma única vez pelo Master via botão "Executar migração" no MasterView.
+// Utilitário de migração — preenche seqId em cards antigos que não têm esse
+// campo (de antes deste fix). NÃO precisa mais ser rodado periodicamente:
+// cards novos já recebem seqId automaticamente na criação (ver saveCard).
+// Corrigido para continuar do contador atual em vez de reiniciar do 1 —
+// essa era a causa real dos números não-sequenciais/"reiniciando": cada
+// execução anterior começava do zero e colidia com números já usados.
 export async function backfillSeqIds() {
   const { getDocs } = await import('firebase/firestore')
   const snap = await getDocs(collection(db,'cards'))
   const semSeq = snap.docs.filter(d => !d.data().seqId).map(d => ({ id:d.id, ...d.data() }))
   semSeq.sort((a,b) => (a.createdAt?.seconds||0) - (b.createdAt?.seconds||0))
-  let seq = 1
+
+  const counterRef = doc(db, 'system', 'cardSeqCounter')
+  const counterSnap = await getDoc(counterRef)
+  let seq = counterSnap.exists() ? (counterSnap.data().value || 0) : 0
+
   for (const c of semSeq) {
-    await updateDoc(doc(db,'cards',c.id), { seqId: seq++ })
+    seq += 1
+    await updateDoc(doc(db,'cards',c.id), { seqId: seq })
   }
+  await setDoc(counterRef, { value: seq }, { merge: true }) // sincroniza pro próximo card criado continuar daqui
   return semSeq.length
 }
