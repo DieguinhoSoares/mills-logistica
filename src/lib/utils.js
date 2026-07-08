@@ -31,14 +31,9 @@ export const getMonthWeeks = (y, m) => {
 }
 
 export const cardsForDay = (cards, day) =>
-  cards.filter(c => {
-    // Serviços sem endDate desapareciam silenciosamente da agenda semanal/mensal
-    // (mas continuavam aparecendo em "Serviços de Hoje" e no rotograma, que não
-    // exigem esse campo) — trata como serviço de 1 dia só quando endDate falta.
-    if (!c.startDate) return false
-    const fim = c.endDate || c.startDate
-    return new Date(day) >= new Date(c.startDate) && new Date(day) <= new Date(fim)
-  })
+  cards.filter(c => c.startDate && c.endDate &&
+    new Date(day) >= new Date(c.startDate) &&
+    new Date(day) <= new Date(c.endDate))
 
 export const detectConflicts = cards => {
   // Só considera serviços ainda ativos — concluídos/cancelados não geram sugestão de consolidação
