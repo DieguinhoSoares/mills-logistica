@@ -45,6 +45,13 @@ export const VEICULOS = [
   { id:'bitruck',  label:'Caminhão Bi-truck',       carga:17,   comp:10, larg:3.20, eixos:4 },
   { id:'prancha3', label:'Carreta Prancha 3 eixos', carga:32,   comp:15, larg:3.20, eixos:6 },
   { id:'prancha4', label:'Carreta Prancha 4 eixos', carga:40.5, comp:17, larg:3.20, eixos:7 },
+  // Frete Rodando: a máquina roda pela estrada por conta própria (autopropelida),
+  // sem nenhum veículo carregando — não tem peso/dimensão de carga porque não
+  // é carga embarcada. Sempre escolhido manualmente pelo analista (nunca
+  // sugerido automaticamente — não entra em ORDEM_VEICULOS) e sempre com
+  // valor informado à mão (não existe tarifa Hengel pra isso, é combustível +
+  // condução do próprio operador, não frete rodoviário tabelado).
+  { id:'frete_rodando', label:'🛣️ Frete Rodando (sem embarque)', carga:null, comp:null, larg:null, eixos:null },
 ]
 
 // Motoristas Mills e seus veículos / descontos sobre Hengel
@@ -1011,6 +1018,8 @@ export async function analisarRotaComParadas({ origemCidade, origemUf, paradas, 
 
 // ── CÁLCULO DE FRETE ─────────────────────────────────────────
 export function getValorIda(km, veiculoId) {
+  // Frete Rodando não tem coluna na tabela — sempre valor manual.
+  if (veiculoId === 'frete_rodando') return 0
   const faixa = TABELA.find(f => km >= f.min && km <= f.max)
   if (!faixa) return 0
   return faixa.fixo ? faixa[veiculoId] : Math.round(faixa[veiculoId] * km * 100) / 100
@@ -1045,6 +1054,10 @@ export function calcularFrete({
 }) {
   if (!km || km <= 0) return null
   if (!veiculoId) return null
+  // Frete Rodando não tem tarifa Hengel (não é veículo carregando algo, é a
+  // própria máquina rodando) — o valor é sempre informado manualmente pelo
+  // analista, nunca calculado. Retorna null em vez de arriscar um NaN.
+  if (veiculoId === 'frete_rodando') return null
 
   const ajuste = outroEstado ? 1.12 : 1
   let valorIda, valorRetorno, valorEscolta = 0, valorDiaria = 0

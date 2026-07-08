@@ -4,7 +4,7 @@
 // Rodar: npm test
 // ============================================================
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { calcularFrete, selecionarVeiculoPorPeso, resolverVeiculoTransporte, analisarRotaComParadas, DIARIAS, VEICULOS, formatBRL } from './freteCalc'
+import { calcularFrete, selecionarVeiculoPorPeso, resolverVeiculoTransporte, analisarRotaComParadas, getValorIda, DIARIAS, VEICULOS, formatBRL } from './freteCalc'
 
 describe('calcularFrete — entradas inválidas', () => {
   it('retorna null sem km', () => {
@@ -363,5 +363,23 @@ describe('analisarRotaComParadas — regra dos 10% de desvio', () => {
     const perna1 = calcularFrete({ km:300, veiculoId:res.veiculoId })
     const perna2 = calcularFrete({ km:430, veiculoId:res.veiculoId })
     expect(res.valorSugerido).toBeCloseTo(perna1.valorIda + perna2.valorIda, 2)
+  })
+})
+
+describe('Frete Rodando — opção manual, nunca calculada automaticamente', () => {
+  it('calcularFrete devolve null pra frete_rodando (nunca calcula sozinho)', () => {
+    expect(calcularFrete({ km: 300, veiculoId: 'frete_rodando' })).toBeNull()
+  })
+  it('getValorIda devolve 0 pra frete_rodando (sem tabela Hengel pra isso)', () => {
+    expect(getValorIda(300, 'frete_rodando')).toBe(0)
+  })
+  it('Frete Rodando nunca é sugerido automaticamente (não está em ORDEM_VEICULOS)', () => {
+    // Qualquer peso, mesmo 0, nunca resolve pra frete_rodando sozinho
+    const escavadeira = [{ machineModelos: { 'MNA00001': { fabricante: 'CATERPILLAR', modelo: '320GC' } } }]
+    const res = resolverVeiculoTransporte(['MNA00001'], [], escavadeira)
+    expect(res.veiculoId).not.toBe('frete_rodando')
+  })
+  it('Frete Rodando existe como opção selecionável em VEICULOS', () => {
+    expect(VEICULOS.some(v => v.id === 'frete_rodando')).toBe(true)
   })
 })
