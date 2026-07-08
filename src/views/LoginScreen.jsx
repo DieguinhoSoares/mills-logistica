@@ -9,7 +9,7 @@ function MillsLogoFull() {
 }
 
 export function LoginScreen() {
-  const { login, register } = useAuth()
+  const { login, register, resetPassword } = useAuth()
   const [mode,     setMode]     = useState('login')
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
@@ -18,6 +18,24 @@ export function LoginScreen() {
   const [unit,     setUnit]     = useState('')
   const [error,    setError]    = useState('')
   const [loading,  setLoading]  = useState(false)
+  const [resetSent, setResetSent] = useState(false)
+
+  const handleReset = async () => {
+    setError(''); setResetSent(false)
+    if (!email) { setError('Digite seu e-mail no campo acima primeiro.'); return }
+    setLoading(true)
+    try {
+      await resetPassword(email)
+      setResetSent(true)
+    } catch (e) {
+      const msgs = {
+        'auth/invalid-email':  'E-mail inválido.',
+        'auth/user-not-found': 'Não existe conta com esse e-mail.',
+      }
+      setError(msgs[e.code] || 'Não foi possível enviar o e-mail. Tente novamente.')
+    }
+    setLoading(false)
+  }
 
   const handle = async () => {
     setError(''); setLoading(true)
@@ -64,7 +82,7 @@ export function LoginScreen() {
 
           <div style={{ display:'flex', gap:0, marginBottom:22, background:T.surfaceLow, borderRadius:T.rLg, padding:4 }}>
             {[['login','Entrar'],['register','Criar conta']].map(([m,l]) => (
-              <button key={m} onClick={() => setMode(m)}
+              <button key={m} onClick={() => {setMode(m);setResetSent(false);setError('')}}
                 style={{ flex:1, padding:'9px 0', borderRadius:T.r, border:'none', cursor:'pointer', fontFamily:FONT, fontWeight:800, fontSize:12, transition:'all .15s',
                   background: mode===m ? T.laranja : 'transparent',
                   color:      mode===m ? 'white'   : T.textSec,
@@ -118,8 +136,21 @@ export function LoginScreen() {
             <label style={LS}>Senha</label>
             <input type="password" value={password} onChange={e=>setPassword(e.target.value)} style={IS}
               placeholder="••••••••" onKeyDown={e=>e.key==='Enter'&&handle()}/>
+            {mode==='login' && (
+              <div style={{ textAlign:'right', marginTop:6 }}>
+                <button onClick={handleReset} disabled={loading}
+                  style={{ background:'none', border:'none', color:T.textMuted, fontSize:11, fontFamily:FONT, cursor:'pointer', padding:0, textDecoration:'underline' }}>
+                  Esqueci minha senha
+                </button>
+              </div>
+            )}
           </div>
 
+          {resetSent && (
+            <div style={{ background:T.verdeLight, color:T.verde, borderRadius:T.rSm, padding:'9px 12px', fontSize:12, marginBottom:14, fontFamily:FONT, fontWeight:700 }}>
+              ✅ Link enviado! Confira seu e-mail (inclusive spam) pra criar uma senha nova.
+            </div>
+          )}
           {error && <div style={{ background:T.perigoLight, color:T.perigo, borderRadius:T.rSm, padding:'9px 12px', fontSize:12, marginBottom:14, fontFamily:FONT, fontWeight:700 }}>⚠️ {error}</div>}
 
           <button onClick={handle} disabled={loading}
