@@ -29,12 +29,16 @@ const SUBTYPES_MAQUINA_RESERVA = ['troca_tecnica','sinistro','garantia']
 export function SolicitanteView({ simClients }) {
   const { profile, logout }         = useAuth()
   const { requests, submitRequest } = useRequests('solicitante')
-  const { notifications, unreadCount, markAllRead, markRead } = useNotifications()
+  const { notifications, unreadCount, markAllRead, markRead, deleteNotification } = useNotifications()
   const { toasts, add:addToast, dismiss } = useToasts()
   const [showForm,   setShowForm]   = useState(false)
   const [reopenData, setReopenData] = useState(null)
   const [messaging,  setMessaging]  = useState(null)
   const [search,     setSearch]     = useState('')
+  // Guia dinâmico — botão liga/desliga dicas contextuais pra quem tá
+  // começando a usar o portal. Não salva preferência: cada sessão nova
+  // começa desligado, e o solicitante liga quando quiser um lembrete.
+  const [guiaAtivo,  setGuiaAtivo]  = useState(false)
 
   const handleSubmit = async form => {
     const grupo = buscarGrupoModelo(form.nInternos || (form.nInterno ? [form.nInterno] : []), simClients)
@@ -81,10 +85,23 @@ export function SolicitanteView({ simClients }) {
           </div>
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <NotificationBell notifications={notifications} unreadCount={unreadCount} onMarkAllRead={markAllRead} onMarkRead={markRead}/>
+          <button onClick={()=>setGuiaAtivo(g=>!g)}
+            title="Mostrar/esconder dicas de uso"
+            style={{ ...BS, background:guiaAtivo?T.laranja:T.surfaceAlt, color:guiaAtivo?'white':T.textSec, border:`1px solid ${guiaAtivo?T.laranja:T.border}`, fontSize:11, fontWeight:700 }}>
+            🎓 {guiaAtivo ? 'Guia ativado' : 'Guia'}
+          </button>
+          <NotificationBell notifications={notifications} unreadCount={unreadCount} onMarkAllRead={markAllRead} onMarkRead={markRead} onDelete={deleteNotification}/>
           <button onClick={logout} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}`, fontSize:11 }}>Sair</button>
         </div>
       </div>
+
+      {guiaAtivo && (
+        <div style={{ background:'#FFF8E1', borderBottom:`1px solid ${T.amarelo}60`, padding:'8px 12px', textAlign:'center' }}>
+          <span style={{ color:'#8A6D00', fontFamily:FONT, fontSize:11, fontWeight:700 }}>
+            🎓 Guia ativado — as dicas aparecem ao lado de cada parte da tela. Clique em "Guia ativado" de novo pra desligar.
+          </span>
+        </div>
+      )}
 
       <div style={{ maxWidth:860, margin:'0 auto', padding:'24px 12px' }}>
         <motion.div initial={{ opacity:0, y:14 }} animate={{ opacity:1, y:0 }}
@@ -102,6 +119,12 @@ export function SolicitanteView({ simClients }) {
           </button>
         </motion.div>
 
+        {guiaAtivo && (
+          <div style={{ marginBottom:14, padding:'10px 14px', background:T.laranjaXLight, borderRadius:T.r, border:`1px solid ${T.laranja}40`, fontFamily:FONT, fontSize:11, color:T.textSec }}>
+            💡 <strong>1º passo:</strong> clique em "+ Nova Solicitação" sempre que precisar de um frete, guindauto ou movimentação de máquina. O time de Frotas recebe na hora.
+          </div>
+        )}
+
         <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:16 }}>
           {[
             { label:'Total',     value:requests.length,                                  color:T.laranja, bg:T.laranjaLight },
@@ -116,6 +139,11 @@ export function SolicitanteView({ simClients }) {
         </div>
 
         {/* Campo de pesquisa */}
+        {guiaAtivo && (
+          <div style={{ marginBottom:8, padding:'10px 14px', background:T.laranjaXLight, borderRadius:T.r, border:`1px solid ${T.laranja}40`, fontFamily:FONT, fontSize:11, color:T.textSec }}>
+            💡 Use a busca pra achar rapidinho um pedido antigo — funciona por cliente, equipamento, rota ou N° interno da máquina.
+          </div>
+        )}
         <div style={{ marginBottom:14, position:'relative' }}>
           <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', fontSize:14, color:T.textMuted }}>🔍</span>
           <input value={search} onChange={e=>setSearch(e.target.value)}
@@ -139,6 +167,11 @@ export function SolicitanteView({ simClients }) {
         )}
 
         {/* Vista em colunas por estágio — escondida durante busca */}
+        {!search && guiaAtivo && (
+          <div style={{ marginBottom:8, padding:'10px 14px', background:T.laranjaXLight, borderRadius:T.r, border:`1px solid ${T.laranja}40`, fontFamily:FONT, fontSize:11, color:T.textSec, lineHeight:1.5 }}>
+            💡 Suas solicitações se movem sozinhas entre as colunas: <strong>Em análise</strong> = ainda aguardando aprovação (Supervisor/Gerência) · <strong>Aceitas</strong> = já aprovada e a Frotas está organizando a execução · <strong>Histórico</strong> = concluída, recusada ou cancelada.
+          </div>
+        )}
         {!search && (
           <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:8, alignItems:'start' }}>
             {[

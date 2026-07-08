@@ -52,7 +52,7 @@ export function MasterView({ simClients = [] }) {
   const { cards, deleteCard }                       = useCards()
   const { requests, respondRequest }                = useRequests('master')
   const { requests: mgrReqs }                       = useManagerialRequests()
-  const { notifications, unreadCount, markAllRead } = useNotifications()
+  const { notifications, unreadCount, markAllRead, markRead, deleteNotification } = useNotifications()
   const { config, saveConfig }                      = useConfig()
   const { toasts, add:addToast, dismiss }           = useToasts()
   const { pendingUsers, approveUser, refuseUser }   = usePendingUsers()
@@ -150,6 +150,7 @@ export function MasterView({ simClients = [] }) {
     { id:'map',       label:'🗺 Mapa',          badge: null },
     { id:'requests',  label:'📥 Solicitações', badge: pending || null },
     { id:'aprovacao', label:'📋 Aprovações',   badge: pendingAprov || null },
+    { id:'servicos',  label:'🚫 Serviços',     badge: acceptedCards?.length || null },
     { id:'usuarios',  label:'👥 Usuários',     badge: pendingUsers.length || null },
   ]
 
@@ -268,7 +269,7 @@ export function MasterView({ simClients = [] }) {
               {t.badge > 0 && <span style={{ position:'absolute', top:-4, right:-4, background:T.perigo, color:'white', borderRadius:20, fontSize:9, fontWeight:700, padding:'0 5px', fontFamily:FONT }}>{t.badge}</span>}
             </button>
           ))}
-          <NotificationBell notifications={notifications} unreadCount={unreadCount} onMarkAllRead={markAllRead}/>
+          <NotificationBell notifications={notifications} unreadCount={unreadCount} onMarkAllRead={markAllRead} onMarkRead={markRead} onDelete={deleteNotification}/>
           <button onClick={()=>setExportModal(true)} style={{ ...BS, background:T.verdeLight, color:T.verde, border:`1px solid ${T.verde}40`, fontSize:11, fontWeight:700 }}>📊 Relatório</button>
           <button onClick={logout} style={{ ...BS, background:'rgba(255,255,255,0.15)', color:'white', border:'1px solid rgba(255,255,255,0.2)', fontSize:11 }}>Sair</button>
         </div>
@@ -555,31 +556,41 @@ export function MasterView({ simClients = [] }) {
               </div>
             </div>
 
-            {acceptedCards.length > 0 && (
-              <div style={{ marginTop:28 }}>
-                <h3 style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:T.text, margin:'0 0 12px' }}>🚫 Cancelar Serviço Aceito <span style={{ color:T.textMuted, fontWeight:500, fontSize:12 }}>exclusivo Master</span></h3>
-                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                  {acceptedCards.map(c => {
-                    const ct = CARD_TYPES[c.type]
-                    return (
-                      <div key={c.id} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.rLg, padding:'12px 16px', boxShadow:T.shadow, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                        <div>
-                          <div style={{ display:'flex', gap:6, alignItems:'center', marginBottom:4 }}>
-                            <span style={{ background:ct?.bg, color:ct?.color, borderRadius:20, padding:'2px 8px', fontSize:9, fontWeight:700, fontFamily:FONT }}>{ct?.icon} {ct?.short}</span>
-                            <span style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:T.text }}>{c.client||'—'}</span>
-                          </div>
-                          <div style={{ fontFamily:FONT, fontSize:10, color:T.textMuted }}>📅 {fmt(c.startDate)} · 👤 {c.driver||'—'} · {c.originCity||c.origin||'—'} → {c.destCity||c.destination||'—'}</div>
+          </div>
+        )}
+
+        {tab==='servicos' && (
+          <div style={{ flex:1, overflow:'auto', padding:'16px 20px' }}>
+            <h3 style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:T.text, margin:'0 0 4px' }}>
+              🚫 Cancelar Serviço Aceito <span style={{ color:T.textMuted, fontWeight:500, fontSize:12 }}>exclusivo Master</span>
+            </h3>
+            <p style={{ color:T.textMuted, fontFamily:FONT, fontSize:11, margin:'0 0 16px' }}>
+              Serviços já aceitos/confirmados pela Frotas — cancele ou exclua aqui se necessário.
+            </p>
+            {acceptedCards.length > 0 ? (
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                {acceptedCards.map(c => {
+                  const ct = CARD_TYPES[c.type]
+                  return (
+                    <div key={c.id} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.rLg, padding:'12px 16px', boxShadow:T.shadow, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                      <div>
+                        <div style={{ display:'flex', gap:6, alignItems:'center', marginBottom:4 }}>
+                          <span style={{ background:ct?.bg, color:ct?.color, borderRadius:20, padding:'2px 8px', fontSize:9, fontWeight:700, fontFamily:FONT }}>{ct?.icon} {ct?.short}</span>
+                          <span style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:T.text }}>{c.client||'—'}</span>
                         </div>
-                        <div style={{ display:'flex', gap:6 }}>
-                        <button onClick={() => setDeleteTarget(c)}
-                          style={{ ...BS, background:T.surfaceAlt, color:T.perigo, border:`1px solid ${T.perigo}40`, fontSize:11, fontWeight:700, flexShrink:0 }}>🗑 Excluir</button>
-                        <button onClick={() => setCancelModal(c)} style={{ ...BS, background:T.perigoLight, color:T.perigo, border:`1px solid ${T.perigo}40`, fontSize:11, fontWeight:700, flexShrink:0 }}>🚫 Cancelar</button>
+                        <div style={{ fontFamily:FONT, fontSize:10, color:T.textMuted }}>📅 {fmt(c.startDate)} · 👤 {c.driver||'—'} · {c.originCity||c.origin||'—'} → {c.destCity||c.destination||'—'}</div>
                       </div>
-                      </div>
-                    )
-                  })}
-                </div>
+                      <div style={{ display:'flex', gap:6 }}>
+                      <button onClick={() => setDeleteTarget(c)}
+                        style={{ ...BS, background:T.surfaceAlt, color:T.perigo, border:`1px solid ${T.perigo}40`, fontSize:11, fontWeight:700, flexShrink:0 }}>🗑 Excluir</button>
+                      <button onClick={() => setCancelModal(c)} style={{ ...BS, background:T.perigoLight, color:T.perigo, border:`1px solid ${T.perigo}40`, fontSize:11, fontWeight:700, flexShrink:0 }}>🚫 Cancelar</button>
+                    </div>
+                    </div>
+                  )
+                })}
               </div>
+            ) : (
+              <div style={{ textAlign:'center', padding:'30px 0', color:T.textMuted, fontFamily:FONT, fontSize:12 }}>Nenhum serviço aceito no momento.</div>
             )}
           </div>
         )}

@@ -314,7 +314,7 @@ export function GerenteView({ simClients = [] }) {
   // funções standalone importadas direto — não criam mais um listener duplicado
   // e sem uso da coleção 'requests' (ver notas em useFirestore.js).
   const { requests: mgrReqs } = useManagerialRequests()
-  const { notifications, unreadCount, markAllRead, markRead } = useNotifications()
+  const { notifications, unreadCount, markAllRead, markRead, deleteNotification } = useNotifications()
   const { config, saveConfig } = useConfig()
   const { toasts, add:addToast, dismiss } = useToasts()
   const isMobile = useIsMobile()
@@ -412,7 +412,7 @@ export function GerenteView({ simClients = [] }) {
           </div>
         </div>
         <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-          <NotificationBell notifications={notifications} unreadCount={unreadCount} onMarkAllRead={markAllRead} onMarkRead={markRead}/>
+          <NotificationBell notifications={notifications} unreadCount={unreadCount} onMarkAllRead={markAllRead} onMarkRead={markRead} onDelete={deleteNotification}/>
           <button onClick={logout} style={{ background:'rgba(255,255,255,0.15)', border:'1px solid rgba(255,255,255,0.2)', color:'white', borderRadius:T.r, padding:'5px 10px', fontFamily:FONT, fontSize:11, cursor:'pointer' }}>Sair</button>
         </div>
       </div>
@@ -548,7 +548,7 @@ export function GerenteView({ simClients = [] }) {
               {t.badge>0 && <span style={{ position:'absolute', top:-4, right:-4, background:T.perigo, color:'white', borderRadius:20, fontSize:9, fontWeight:700, padding:'0 5px', fontFamily:FONT }}>{t.badge}</span>}
             </button>
           ))}
-          <NotificationBell notifications={notifications} unreadCount={unreadCount} onMarkAllRead={markAllRead} onMarkRead={markRead}/>
+          <NotificationBell notifications={notifications} unreadCount={unreadCount} onMarkAllRead={markAllRead} onMarkRead={markRead} onDelete={deleteNotification}/>
           <button onClick={logout} style={{ ...BS, background:'rgba(255,255,255,0.15)', color:'white', border:'1px solid rgba(255,255,255,0.2)', fontSize:11 }}>Sair</button>
         </div>
       </div>

@@ -8,7 +8,7 @@ export function IndicadoresView() {
   const { profile, logout }          = useAuth()
   const { cards }                    = useCards()
   const { requests }                 = useRequests()
-  const { notifications, markAllRead } = useNotifications()
+  const { notifications, markAllRead, markRead, deleteNotification } = useNotifications()
   const unread = notifications.filter(n => !n.read).length
 
   return (
@@ -32,6 +32,8 @@ export function IndicadoresView() {
             notifications={notifications}
             unreadCount={unread}
             onMarkAllRead={markAllRead}
+            onMarkRead={markRead}
+            onDelete={deleteNotification}
           />
           <button onClick={logout}
             style={{ ...BS, background:'rgba(255,255,255,.15)', color:'#FFFFFF', fontSize:11, padding:'6px 14px', border:'1px solid rgba(255,255,255,.2)' }}>

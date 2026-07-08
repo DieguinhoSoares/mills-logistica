@@ -4,7 +4,7 @@ import { db } from '../lib/firebase'
 import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { T, FONT, CARD_TYPES, URGENCY } from '../lib/constants'
 import { fmt } from '../lib/utils'
-import { notifyRoles, notifyUser } from '../hooks/useFirestore'
+import { notifyUser } from '../hooks/useFirestore'
 import { ConfirmModal } from '../components/UI'
 
 const INTERRUPCAO_MOTIVOS = [
@@ -456,7 +456,15 @@ export function MotoristaView({ token }) {
       if (card) {
         const motivoLabel = extra.interrupcaoDescricao || 'Motivo não informado'
         const msg = `${driver?.name||'Motorista'} interrompeu o serviço de ${card.client||card.machine||'—'} (${card.nInterno||'—'}). Motivo: ${motivoLabel}`
-        await notifyRoles(['frotas'], 'service_interrupted', '⏸ Serviço interrompido em campo', msg, card.requestId||null)
+        // notifyRoles(['frotas'], ...) foi removido daqui: ele faz um list() na
+        // coleção 'users' para achar quem tem role='frotas', e esta tela do
+        // motorista não passa por login (request.auth é null) — abrir 'users'
+        // para leitura anônima só para preservar esse alerta exporia nome/email/
+        // role de toda a equipe publicamente (ver firestore.rules). Frotas
+        // continua vendo a interrupção em tempo real pelo próprio card
+        // (status:'interrompido' já aparece na tela deles); só o solicitante
+        // recebe o alerta in-app diretamente, que é um create simples e seguro
+        // mesmo sem autenticação.
         if (card.requesterId) {
           await notifyUser(card.requesterId, 'service_interrupted', '⏸ Seu serviço foi interrompido', msg, card.requestId||null)
         }
