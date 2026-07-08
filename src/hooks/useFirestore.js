@@ -5,6 +5,12 @@ import {
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { useAuth } from '../contexts/AuthContext'
+// Os 2 imports abaixo eram dinâmicos (await import(...)) sem nenhum ganho —
+// ambos já são importados estaticamente em outros arquivos do projeto, então
+// o bundler não conseguia separá-los em chunk próprio mesmo assim. O único
+// efeito prático era uma etapa assíncrona a mais sem propósito. O próprio
+// Vite já sinalizava isso como [INEFFECTIVE_DYNAMIC_IMPORT] no build.
+import { sendTeamsNotification } from '../lib/utils'
 
 export function useCards() {
   const [cards,   setCards]   = useState([])
@@ -244,7 +250,6 @@ export function useRequests(roleFilter) {
         status==='aceito'?'✅ Solicitação aceita!':'❌ Solicitação recusada',
         note||(status==='aceito'?'Sua solicitação foi aceita.':'Sua solicitação foi recusada.'), id)
       if (teamsWebhookUrl) {
-        const { sendTeamsNotification } = await import('../lib/utils')
         await sendTeamsNotification(teamsWebhookUrl,
           `${status==='aceito'?'✅':'❌'} Solicitação ${status==='aceito'?'Aceita':'Recusada'}`,
           `Solicitante: ${req.requesterName||req.unit}\nServiço: ${req.type}\nData: ${req.desiredDate}\n\n${note||''}`
@@ -362,8 +367,15 @@ export function useNotifications() {
   }, [user])
   const markRead    = id => updateDoc(doc(db,'notifications',id), { read:true })
   const markAllRead = () => notifications.filter(n=>!n.read).forEach(n=>markRead(n.id))
+  // Só permite apagar depois de lida — evita perder um alerta por engano
+  // antes mesmo de vê-lo. As Rules também bloqueiam delete de não-lidas.
+  const deleteNotification = id => {
+    const n = notifications.find(x => x.id === id)
+    if (!n?.read) return
+    return deleteDoc(doc(db,'notifications',id))
+  }
   const unreadCount = notifications.filter(n=>!n.read).length
-  return { notifications, unreadCount, markRead, markAllRead }
+  return { notifications, unreadCount, markRead, markAllRead, deleteNotification }
 }
 
 export function useSimClients() {
@@ -625,7 +637,6 @@ export function useBackupStatus() {
 // essa era a causa real dos números não-sequenciais/"reiniciando": cada
 // execução anterior começava do zero e colidia com números já usados.
 export async function backfillSeqIds() {
-  const { getDocs } = await import('firebase/firestore')
   const snap = await getDocs(collection(db,'cards'))
   const semSeq = snap.docs.filter(d => !d.data().seqId).map(d => ({ id:d.id, ...d.data() }))
   semSeq.sort((a,b) => (a.createdAt?.seconds||0) - (b.createdAt?.seconds||0))
