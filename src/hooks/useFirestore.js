@@ -45,6 +45,11 @@ export function useCards() {
   const saveCard = async card => {
     const { id, ...data } = card
     data.updatedAt = serverTimestamp()
+    // Firestore rejeita addDoc/updateDoc com qualquer campo `undefined`
+    // (lança erro, sem dizer QUAL campo era) — sanitiza antes de gravar,
+    // pra um valor faltando nunca mais virar um "Erro ao criar serviço"
+    // genérico e difícil de rastrear.
+    Object.keys(data).forEach(k => { if (data[k] === undefined) delete data[k] })
     if (id && id.length > 10) await updateDoc(doc(db,'cards',id), data)
     else {
       data.createdAt = serverTimestamp()
