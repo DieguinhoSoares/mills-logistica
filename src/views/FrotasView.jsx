@@ -143,7 +143,7 @@ export function FrotasView() {
       addToast(`✅ Serviço de ${finalCard.client||'novo'} criado${motorista ? ` — atribuído a ${motorista}` : ''}.`, 'accepted')
     } catch (err) {
       console.error('Erro ao criar serviço:', err)
-      addToast('Erro ao criar serviço. Tente novamente.', 'error')
+      addToast(`Erro ao criar serviço: ${err.message || 'tente novamente.'}`, 'error')
     }
   }
 
