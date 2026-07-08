@@ -17,7 +17,7 @@
 //     o botão "Confirmar" ignorava completamente o que estava selecionado
 //     aqui (bug: "não deixa selecionar a melhor opção manualmente").
 // ============================================================
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   calcularFrete, calcularDistancia, sugerirVeiculo,
   buscarGrupoModelo, selecionarVeiculoPorPeso,
@@ -51,6 +51,17 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
   const [rotaLoading,    setRotaLoading]    = useState(false)
   const [cobrarSeparado, setCobrarSeparado] = useState(null) // null = usar sugestão do sistema
 
+  // Rastreia se o analista já mexeu manualmente no veículo/modo manual pra
+  // ESTA solicitação. Sem isso, o efeito de auto-detecção abaixo (que reage
+  // a `simClients`, um listener do Firestore que pode reemitir com uma nova
+  // referência de array mesmo sem mudança real de conteúdo) sobrescrevia a
+  // escolha do analista de volta pro automático "depois de um tempo" — o
+  // usuário selecionava um veículo, ou entrava no modo manual, e o efeito
+  // re-rodava e resetava tudo sem avisar.
+  const userTouched = useRef(false)
+  const requestKey = request?.id || JSON.stringify(request?.nInternos) + JSON.stringify(request?.nInternosReserva)
+  useEffect(() => { userTouched.current = false }, [requestKey])
+
   const isGuindauto = request?.type === 'guindauto'
   const subtype     = request?.subtype || ''
 
@@ -83,6 +94,10 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
   // Sempre baseada no peso real das máquinas (lookup SIM).
   // Não há distinção Mills/Hengel aqui — apenas o veículo necessário.
   useEffect(() => {
+    // Se o analista já escolheu manualmente (veículo ou modo manual) pra
+    // esta solicitação, não sobrescreve — só recalcula quando a solicitação
+    // muda de verdade (ver requestKey acima).
+    if (userTouched.current) return
     if (isGuindauto) {
       setVeiculoId('guindauto')
       setGrupoLabel('')
@@ -220,6 +235,11 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
     if (!onChange) return
     const vid = veiculoId || (readOnly ? 'prancha3' : '')
     const usarSeparado = cobrarSeparado ?? rotaInfo?.ehDesvio
+    // Bug corrigido: `parseFloat(valorManual) || null` tratava 0 como "vazio"
+    // (0 é falsy em JS) — um frete de R$0,00 (ex: transportadora do cliente,
+    // sem custo pra Mills) virava `null` e quebrava a criação do serviço.
+    // Agora só vira null quando o campo realmente está vazio/inválido (NaN).
+    const valorManualNum = parseFloat(valorManual)
     onChange({
       veiculoId: vid,
       veiculoLabel: VEICULOS.find(v => v.id === vid)?.label || '',
@@ -227,7 +247,7 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
       // Prioridade: rota com paradas > modo manual > cálculo normal ida/volta.
       valorEstimado: rotaInfo
         ? (usarSeparado ? rotaInfo.valorSeparado : rotaInfo.valorCombinado)
-        : modoManual ? (parseFloat(valorManual) || null) : (resultado?.total ?? null),
+        : modoManual ? (isNaN(valorManualNum) ? null : valorManualNum) : (resultado?.total ?? null),
       sugerido: rotaInfo ? !rotaInfo.temItemNaoIdentificado : (modoManual ? false : sugerido),
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -396,6 +416,7 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
               </label>
               <select value={veiculoId} onChange={e => {
                   const v = e.target.value
+                  userTouched.current = true
                   setVeiculoId(v); setSugerido(false)
                   // Frete Rodando não tem cálculo automático — abre direto o
                   // modo manual pro analista informar o valor combinado.
@@ -467,7 +488,7 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
       {!rotaInfo && (
       <>
       <div style={{ marginBottom:12 }}>
-        <button onClick={()=>setModoManual(m=>!m)}
+        <button onClick={()=>{userTouched.current=true;setModoManual(m=>!m)}}
           style={{ background:'none', border:'none', color:T.laranja, fontFamily:FONT, fontWeight:700, fontSize:11, cursor:'pointer', padding:0 }}>
           {modoManual ? '← Voltar para cálculo automático' : '✏️ Prefere informar o frete manualmente?'}
         </button>
