@@ -12,11 +12,6 @@ function AppInner() {
   const { user, profile, logout } = useAuth()
   const { simClients }    = useSimClients()
 
-  // Link de motorista — acesso sem login via token na URL
-  const params         = new URLSearchParams(window.location.search)
-  const motoristaToken = params.get('motorista')
-  if (motoristaToken) return <MotoristaView token={motoristaToken} />
-
   if (!user || !profile) return <LoginScreen />
 
   if (profile.status === 'pendente') return (
@@ -62,6 +57,15 @@ function AppInner() {
 }
 
 export default function App() {
+  // Link de motorista — acesso sem login via token na URL. Checado ANTES de
+  // montar o AuthProvider/AppInner: sem isso, todo acesso do motorista no
+  // campo (i) disparava o listener de autenticação do Firebase à toa e
+  // (ii) baixava a base inteira de ~3.375 ativos da Mills via useSimClients
+  // (sequencial, ~68 documentos) — tudo pra uma tela que não usa nada disso.
+  const params         = new URLSearchParams(window.location.search)
+  const motoristaToken = params.get('motorista')
+  if (motoristaToken) return <MotoristaView token={motoristaToken} />
+
   return (
     <AuthProvider>
       <AppInner />
