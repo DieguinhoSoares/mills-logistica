@@ -394,11 +394,19 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
                 Veículo
                 {sugerido && <span style={{ color:T.verde, fontWeight:400, fontSize:10, marginLeft:6 }}>✓ sugerido</span>}
               </label>
-              <select value={veiculoId} onChange={e => { setVeiculoId(e.target.value); setSugerido(false) }}
+              <select value={veiculoId} onChange={e => {
+                  const v = e.target.value
+                  setVeiculoId(v); setSugerido(false)
+                  // Frete Rodando não tem cálculo automático — abre direto o
+                  // modo manual pro analista informar o valor combinado.
+                  if (v === 'frete_rodando') setModoManual(true)
+                }}
                 style={{ ...IS, marginTop:4 }}>
                 <option value="">— selecione —</option>
                 {VEICULOS.map(v => (
-                  <option key={v.id} value={v.id}>{v.label} (até {v.carga}t / {v.comp}m)</option>
+                  <option key={v.id} value={v.id}>
+                    {v.carga ? `${v.label} (até ${v.carga}t / ${v.comp}m)` : v.label}
+                  </option>
                 ))}
               </select>
             </div>
