@@ -57,7 +57,7 @@ export function useToasts() {
   return { toasts, add, dismiss }
 }
 
-export function NotificationBell({ notifications, unreadCount, onMarkAllRead, onMarkRead }) {
+export function NotificationBell({ notifications, unreadCount, onMarkAllRead, onMarkRead, onDelete }) {
   const [open, setOpen] = useState(false)
   const ref = useRef()
 
@@ -122,6 +122,12 @@ export function NotificationBell({ notifications, unreadCount, onMarkAllRead, on
                     <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:T.text }}>{n.title}</div>
                     {!n.read && (
                       <div style={{ width:7, height:7, borderRadius:'50%', background:T.laranja, flexShrink:0, marginTop:3 }}/>
+                    )}
+                    {n.read && onDelete && (
+                      <button onClick={e=>{e.stopPropagation();onDelete(n.id)}} title="Apagar notificação"
+                        style={{ background:'none', border:'none', color:T.textMuted, fontSize:12, cursor:'pointer', padding:'0 2px', flexShrink:0, lineHeight:1 }}>
+                        🗑
+                      </button>
                     )}
                   </div>
                   <div style={{ fontFamily:FONT, fontSize:11, color:T.textSec, marginTop:2 }}>{n.message}</div>

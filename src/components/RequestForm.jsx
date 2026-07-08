@@ -38,7 +38,7 @@ function ChipInput({ label, placeholder, values, onChange, hint, validateFrota =
   // Avisa o formulário quando existe um valor "fora do padrão" esperando
   // confirmação — sem isso, o analista podia digitar uma 2ª/3ª máquina, ver
   // o aviso amarelo, seguir em frente sem clicar em "Sim, está correto", e
-  // aquele número simplesmente NUNCA entrava na lista.
+  // aquele número simplesmente NUNCA entrava na lista — sem erro nenhum.
   useEffect(() => { onPendingChange?.(alertVal !== null) }, [alertVal]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const tryAdd = (raw) => {
@@ -152,6 +152,11 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
     temMaquinaRetorno:null, // null=não perguntado, 'sim'/'nao' — só usado quando o subtipo tem retorno opcional (ex: Rollout)
     movimento:'saida', refOrigem:'',
     driverId:'', driverName:'', transportadoraNome:'', transportadoraCnpj:'',
+    // Frete combinado (múltiplos clientes/paradas na mesma solicitação) — a
+    // "Parada 1" continua sendo os campos de sempre (clientName/nInternos);
+    // isto guarda só as paradas ADICIONAIS, mantendo o formulário idêntico
+    // ao de hoje pra quem só tem 1 destino (a maioria dos casos).
+    paradasExtras: [],
   }
 
   const initial = initialData ? {
@@ -194,6 +199,7 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
     destinoOficina:       initialData.destinoOficina||'',
     movimento:            initialData.movimento||'saida',
     refOrigem:            initialData.refOrigem||'',
+    paradasExtras:        initialData.paradas?.slice(1)?.map(p=>({tipo:p.tipo,cidade:p.cidade,uf:p.uf,clientName:p.clientName||'',nInternos:p.nInternos||[]})) || [],
     cardOrigemId:         initialData.cardOrigemId||'',
     nfsRetorno:           initialData.nfsRetorno||[],
     nfConfirmada:         initialData.nfConfirmada||false,
@@ -224,8 +230,6 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
   const needsMovimento      = SUBTYPES_EMBARQUE.includes(form.subtype)
   const needsMaquinaReserva = SUBTYPES_MAQUINA_RESERVA.includes(form.subtype)
   const retornoOpcional     = SUBTYPES_MAQUINA_RESERVA_OPCIONAL.includes(form.subtype)
-  // Mostra o campo de Equipamento Reserva quando é obrigatório (troca/garantia/
-  // sinistro) OU quando é opcional e o solicitante respondeu "sim" (Rollout).
   const mostraMaquinaReserva = needsMaquinaReserva || (retornoOpcional && form.temMaquinaRetorno === 'sim')
   const frotaOpcional       = SUBTYPES_SEM_FROTA.includes(form.subtype)
   const isCardEdit          = !!drivers && initialData?.driverId !== undefined
@@ -268,6 +272,10 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
         if (form.temMaquinaRetorno===null) e.temMaquinaRetorno = true
         else if (form.temMaquinaRetorno==='sim' && form.nInternosReserva.length===0) e.machine = true
       }
+      // Cada parada extra precisa de cidade + ao menos 1 máquina
+      if (form.paradasExtras.some(p => !p.cidade || p.nInternos.length===0)) e.paradasExtras = true
+      // Trava a saída do passo enquanto sobrar um N° interno "fora do padrão"
+      // esperando confirmação — sem isso, esse número nunca entra na lista.
       if (temChipPendente) e._chipsPendentes = true
     }
     if (n === 3) {
@@ -301,6 +309,17 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
         destination:          form.destCity?.s||'',
         originCityName:       form.originCity?.m||'',
         destCityName:         form.destCity?.m||'',
+        // Frete combinado: só grava o array `paradas` quando há paradas extras
+        // de verdade — sem isso, a solicitação é salva EXATAMENTE como antes
+        // (originCity/destCity/nInternos), sem quebrar nada que já lê esses
+        // campos direto (AssignDriverModal, criação de card, etc.).
+        ...(form.paradasExtras.length > 0 ? {
+          paradas: [
+            { tipo:'entrega', cidade:form.destCity?.m||'', uf:form.destCity?.s||'',
+              clientName: form.semCliente ? form.localLivre : form.clientName, nInternos: form.nInternos },
+            ...form.paradasExtras.map(p => ({ tipo:p.tipo, cidade:p.cidade, uf:p.uf, clientName:'', nInternos:p.nInternos })),
+          ],
+        } : {}),
         // Passa o id da request original pra submitRequest saber que é um reenvio (updateDoc)
         ...(initialData?.id ? { id: initialData.id, reaberturaDe: initialData.id } : {}),
       })
@@ -532,6 +551,47 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
             <div style={{ color:'#E65100', fontFamily:FONT, fontSize:11, fontWeight:700 }}>
               ⚠️ Solicitação contém mais de 1 máquina — será utilizada a Prancha 3 eixos.
             </div>
+          </div>
+        )}
+
+        {/* Frete combinado — paradas extras (múltiplos clientes na mesma solicitação).
+            Não aparece pra troca/garantia/sinistro, que já tem sua própria semântica
+            de ida/volta (Equipamento Reserva acima) — misturar os dois conceitos
+            geraria ambiguidade sobre o que é "reserva" e o que é "próxima parada". */}
+        {!needsMaquinaReserva && (
+          <div style={{ marginBottom:14 }}>
+            {form.paradasExtras.map((p, i) => (
+              <div key={i} style={{ marginBottom:10, padding:'11px 13px', background:T.surfaceAlt, borderRadius:T.r, border:`1px solid ${T.border}` }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                  <span style={{ color:T.textSec, fontFamily:FONT, fontWeight:800, fontSize:11 }}>📍 Parada {i+2}</span>
+                  <button onClick={()=>set('paradasExtras', form.paradasExtras.filter((_,j)=>j!==i))}
+                    style={{ background:'none', border:'none', color:T.perigo, fontSize:11, fontFamily:FONT, fontWeight:700, cursor:'pointer' }}>
+                    🗑 Remover
+                  </button>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'140px 1fr', gap:8, marginBottom:8 }}>
+                  <select value={p.tipo} onChange={e=>{const arr=[...form.paradasExtras];arr[i]={...arr[i],tipo:e.target.value};set('paradasExtras',arr)}} style={IS}>
+                    <option value="entrega">📤 Entregar</option>
+                    <option value="coleta">📥 Coletar</option>
+                    <option value="preparacao">🔧 Preparação</option>
+                  </select>
+                  <MunicipioInput value={p.cidade?{m:p.cidade,s:p.uf}:null}
+                    onChange={v=>{const arr=[...form.paradasExtras];arr[i]={...arr[i],cidade:v?.m||'',uf:v?.s||''};set('paradasExtras',arr)}}
+                    placeholder="Cidade da parada..."/>
+                </div>
+                <ChipInput label="N° Interno da(s) máquina(s) desta parada" placeholder="Digite e pressione Enter..."
+                  values={p.nInternos} onChange={v=>{const arr=[...form.paradasExtras];arr[i]={...arr[i],nInternos:v};set('paradasExtras',arr)}}
+                  validateFrota={true} onPendingChange={pend=>setChipsPendentes(prev=>({...prev,[`parada${i}`]:pend}))}/>
+              </div>
+            ))}
+            {form.paradasExtras.length < 4 ? (
+              <button onClick={()=>set('paradasExtras',[...form.paradasExtras,{tipo:'entrega',cidade:'',uf:'',nInternos:[]}])}
+                style={{ background:'none', border:'none', color:T.laranja, fontFamily:FONT, fontWeight:700, fontSize:12, cursor:'pointer', padding:0 }}>
+                ➕ Adicionar parada
+              </button>
+            ) : (
+              <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT }}>Limite de 5 paradas por solicitação.</div>
+            )}
           </div>
         )}
         </>}
