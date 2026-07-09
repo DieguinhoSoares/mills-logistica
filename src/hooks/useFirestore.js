@@ -3,7 +3,8 @@ import {
   collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc,
   query, orderBy, where, serverTimestamp, setDoc, getDoc, getDocs, limit, runTransaction,
 } from 'firebase/firestore'
-import { db } from '../lib/firebase'
+import { db, getMessagingIfSupported } from '../lib/firebase'
+import { getToken } from 'firebase/messaging'
 import { useAuth } from '../contexts/AuthContext'
 // Os 2 imports abaixo eram dinâmicos (await import(...)) sem nenhum ganho —
 // ambos já são importados estaticamente em outros arquivos do projeto, então
@@ -380,7 +381,57 @@ export function useNotifications() {
     return deleteDoc(doc(db,'notifications',id))
   }
   const unreadCount = notifications.filter(n=>!n.read).length
-  return { notifications, unreadCount, markRead, markAllRead, deleteNotification }
+
+  // ── Push de verdade (item 5) — avisa mesmo com o navegador fechado ──────
+  // Diferente do sino (que só atualiza com a aba aberta), isso usa o Firebase
+  // Cloud Messaging: o navegador recebe um "token" de dispositivo, salvamos
+  // em users/{uid}.fcmTokens, e uma Cloud Function (ver functions/push-notify.js)
+  // dispara a notificação de verdade sempre que um novo doc é criado em
+  // 'notifications' — o sistema operacional mostra a notificação mesmo com
+  // a aba fechada, do jeito que um app nativo mostra.
+  const enablePush = async () => {
+    if (!user) return { ok:false, error:'Faça login primeiro.' }
+    if (typeof Notification === 'undefined') return { ok:false, error:'Este navegador não suporta notificações.' }
+    const messaging = await getMessagingIfSupported()
+    if (!messaging) return { ok:false, error:'Este navegador não suporta notificações push (comum no Safari/iOS mais antigo).' }
+    const permission = await Notification.requestPermission()
+    if (permission !== 'granted') return { ok:false, error:'Permissão negada — ative nas configurações do navegador.' }
+    try {
+      // O Service Worker já foi registrado no boot do app (main.tsx) — só
+      // espera ele estar pronto, sem registrar de novo.
+      const swRegistration = await navigator.serviceWorker.ready
+      const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY
+      const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: swRegistration })
+      if (!token) return { ok:false, error:'Não foi possível gerar o token deste dispositivo.' }
+      const ref  = doc(db,'users',user.uid)
+      const snap = await getDoc(ref)
+      const existentes = snap.exists() ? (snap.data().fcmTokens || []) : []
+      if (!existentes.includes(token)) {
+        await updateDoc(ref, { fcmTokens: [...existentes, token] })
+      }
+      return { ok:true }
+    } catch (e) {
+      return { ok:false, error: e.message || 'Erro ao ativar notificações.' }
+    }
+  }
+
+  // Remove só o token DESTE dispositivo/navegador (outros dispositivos do
+  // mesmo usuário continuam recebendo push normalmente).
+  const disablePush = async () => {
+    if (!user) return
+    const messaging = await getMessagingIfSupported()
+    if (!messaging) return
+    try {
+      const swRegistration = await navigator.serviceWorker.ready
+      const token = await getToken(messaging, { vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY, serviceWorkerRegistration: swRegistration })
+      const ref  = doc(db,'users',user.uid)
+      const snap = await getDoc(ref)
+      const existentes = snap.exists() ? (snap.data().fcmTokens || []) : []
+      await updateDoc(ref, { fcmTokens: existentes.filter(t => t !== token) })
+    } catch { /* melhor esforço — não trava a UI se falhar */ }
+  }
+
+  return { notifications, unreadCount, markRead, markAllRead, deleteNotification, enablePush, disablePush }
 }
 
 export function useSimClients() {

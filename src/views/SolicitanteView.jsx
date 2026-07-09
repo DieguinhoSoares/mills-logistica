@@ -29,7 +29,7 @@ const SUBTYPES_MAQUINA_RESERVA = ['troca_tecnica','sinistro','garantia']
 export function SolicitanteView({ simClients }) {
   const { profile, logout }         = useAuth()
   const { requests, submitRequest } = useRequests('solicitante')
-  const { notifications, unreadCount, markAllRead, markRead, deleteNotification } = useNotifications()
+  const { notifications, unreadCount, markAllRead, markRead, deleteNotification, enablePush, disablePush } = useNotifications()
   const { toasts, add:addToast, dismiss } = useToasts()
   const [showForm,   setShowForm]   = useState(false)
   const [reopenData, setReopenData] = useState(null)
@@ -90,7 +90,7 @@ export function SolicitanteView({ simClients }) {
             style={{ ...BS, background:guiaAtivo?T.laranja:T.surfaceAlt, color:guiaAtivo?'white':T.textSec, border:`1px solid ${guiaAtivo?T.laranja:T.border}`, fontSize:11, fontWeight:700 }}>
             🎓 {guiaAtivo ? 'Guia ativado' : 'Guia'}
           </button>
-          <NotificationBell notifications={notifications} unreadCount={unreadCount} onMarkAllRead={markAllRead} onMarkRead={markRead} onDelete={deleteNotification}/>
+          <NotificationBell notifications={notifications} unreadCount={unreadCount} onMarkAllRead={markAllRead} onMarkRead={markRead} onDelete={deleteNotification} onEnablePush={enablePush} onDisablePush={disablePush}/>
           <button onClick={logout} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}`, fontSize:11 }}>Sair</button>
         </div>
       </div>

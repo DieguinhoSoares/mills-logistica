@@ -4,7 +4,7 @@
 // Rodar: npm test
 // ============================================================
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { calcularFrete, selecionarVeiculoPorPeso, resolverVeiculoTransporte, analisarRotaComParadas, getValorIda, DIARIAS, VEICULOS, formatBRL } from './freteCalc'
+import { calcularFrete, selecionarVeiculoPorPeso, resolverVeiculoTransporte, analisarRotaComParadas, getValorIda, otimizarOrdemParadas, DIARIAS, VEICULOS, formatBRL } from './freteCalc'
 
 describe('calcularFrete — entradas inválidas', () => {
   it('retorna null sem km', () => {
@@ -381,5 +381,37 @@ describe('Frete Rodando — opção manual, nunca calculada automaticamente', ()
   })
   it('Frete Rodando existe como opção selecionável em VEICULOS', () => {
     expect(VEICULOS.some(v => v.id === 'frete_rodando')).toBe(true)
+  })
+})
+
+describe('otimizarOrdemParadas — heurística do vizinho mais próximo', () => {
+  it('reordena pra visitar o mais próximo a cada passo, partindo da origem (índice 0)', () => {
+    // Origem=0, A=1 (longe, 100km), B=2 (perto da origem, 10km), C=3 (perto de B, 15km depois de B)
+    const matriz = [
+      /* origem */ [0,   100, 10,  50],
+      /* A      */ [100, 0,   90,  60],
+      /* B      */ [10,  90,  0,   15],
+      /* C      */ [50,  60,  15,  0],
+    ]
+    const ordem = otimizarOrdemParadas(matriz)
+    // Da origem, o mais perto é B(10km) → de B, o mais perto é C(15km) → de C, sobra A
+    expect(ordem).toEqual([0, 2, 3, 1])
+  })
+
+  it('com 1 parada só, a ordem é trivial (origem + a parada)', () => {
+    const matriz = [[0, 20], [20, 0]]
+    expect(otimizarOrdemParadas(matriz)).toEqual([0, 1])
+  })
+
+  it('nunca visita a origem (índice 0) de novo nem repete parada', () => {
+    const matriz = [
+      [0, 5, 8, 3],
+      [5, 0, 2, 9],
+      [8, 2, 0, 4],
+      [3, 9, 4, 0],
+    ]
+    const ordem = otimizarOrdemParadas(matriz)
+    expect(new Set(ordem).size).toBe(4) // sem repetição
+    expect(ordem[0]).toBe(0) // sempre começa na origem
   })
 })

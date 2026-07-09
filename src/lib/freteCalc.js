@@ -908,8 +908,55 @@ export async function calcularDistanciaMultiPonto(pontos) {
   return { pernas, total: pernas.reduce((a,b)=>a+b,0), coords }
 }
 
-// ── ROTA COM PARADAS (frete combinado / múltiplos clientes) ──────────────
-// paradas: [{ tipo:'entrega'|'coleta'|'preparacao', cidade, uf, nInternos:[] }]
+// ── MATRIZ DE DISTÂNCIAS + OTIMIZAÇÃO DE ORDEM (item 2 — Rotograma) ───────
+// Usa o endpoint /table/ do OSRM, que devolve a distância entre TODOS os
+// pares de pontos numa chamada só (diferente de /route/, que só calcula uma
+// ordem específica) — é o que permite testar "qual ordem é mais curta" sem
+// fazer uma chamada de rede por combinação possível.
+export async function calcularMatrizDistancias(pontos) {
+  const coords = await Promise.all(pontos.map(p => buscarCoordenadas(p.cidade, p.uf)))
+  if (coords.some(c => !c)) return null
+  try {
+    const path = coords.map(c => `${c.lon},${c.lat}`).join(';')
+    const url  = `https://router.project-osrm.org/table/v1/driving/${path}?annotations=distance`
+    const res  = await fetch(url)
+    const data = await res.json()
+    if (data?.distances) {
+      // data.distances vem em metros — converte pra km
+      return data.distances.map(row => row.map(m => m == null ? Infinity : Math.round(m/1000)))
+    }
+  } catch { /* fallback */ }
+  // Fallback: monta a matriz via Haversine par a par (mesmo fator ×1.3)
+  return coords.map((a) => coords.map((b) => haversineKm(a, b)))
+}
+
+// Otimiza a ORDEM das paradas a partir de uma matriz de distâncias, usando a
+// heurística do "vizinho mais próximo" (nearest neighbor) partindo sempre da
+// origem (índice 0 da matriz). Não é o ótimo matemático absoluto (isso seria
+// um problema NP-difícil pra N grande), mas na prática fica bem perto e
+// funciona pra qualquer quantidade de paradas sem explodir o tempo de
+// cálculo — diferente de testar todas as permutações possíveis.
+export function otimizarOrdemParadas(matriz) {
+  const n = matriz.length
+  const visitado = new Array(n).fill(false)
+  visitado[0] = true // índice 0 = origem, já "visitada" (ponto de partida)
+  const ordem = [0]
+  let atual = 0
+  for (let passo = 1; passo < n; passo++) {
+    let melhorProx = -1, melhorDist = Infinity
+    for (let j = 0; j < n; j++) {
+      if (visitado[j]) continue
+      if (matriz[atual][j] < melhorDist) { melhorDist = matriz[atual][j]; melhorProx = j }
+    }
+    if (melhorProx === -1) break
+    visitado[melhorProx] = true
+    ordem.push(melhorProx)
+    atual = melhorProx
+  }
+  return ordem // índices na ordem otimizada, incluindo o 0 (origem) na frente
+}
+
+
 // em ordem — o veículo sai de (origemCidade,origemUf) e passa por cada
 // parada nessa sequência. NÃO adiciona automaticamente uma volta à base: se
 // o motorista precisa voltar pra Mills ao final, isso é só mais uma parada

@@ -3,6 +3,7 @@ import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 import { getFunctions } from 'firebase/functions'
+import { getMessaging, isSupported } from 'firebase/messaging'
 
 const firebaseConfig = {
   apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
@@ -21,5 +22,17 @@ export const db        = getFirestore(app)
 // segredos direto do Firestore; só chama a function.
 export const functions = getFunctions(app, 'southamerica-east1')
 
-// NOTE: Firebase Messaging removido — era exportado como Promise (bug).
-// Para reativar notificações push, implemente um Service Worker separado.
+// Firebase Messaging (push de verdade — item 5) — uma tentativa anterior
+// exportava a Promise de isSupported() como se já fosse a instância pronta
+// (bug: `messaging` virava um objeto Promise, não o Messaging de verdade).
+// Corrigido: uma função async que só resolve pra uma instância real quando
+// o navegador de fato suporta (Safari/iOS antigo não suporta, por exemplo —
+// devolve null nesses casos, e quem chama trata isso normalmente).
+let _messagingInstance = null
+export async function getMessagingIfSupported() {
+  if (_messagingInstance) return _messagingInstance
+  const supported = await isSupported().catch(() => false)
+  if (!supported) return null
+  _messagingInstance = getMessaging(app)
+  return _messagingInstance
+}

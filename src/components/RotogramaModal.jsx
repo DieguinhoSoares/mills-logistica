@@ -8,16 +8,41 @@ import { T, FONT, CARD_TYPES, BS } from '../lib/constants'
 import { db } from '../lib/firebase'
 import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore'
 import { ensureDriverToken } from '../hooks/useFirestore'
+import { calcularMatrizDistancias, otimizarOrdemParadas } from '../lib/freteCalc'
 
 // ── RotogramaModal ────────────────────────────────────────────────────────────
 export function RotogramaModal({ driver, cards, profile, rotogramaAtivo, onClose, addToast }) {
   const [paradas,setParadas]=useState(rotogramaAtivo?.paradas||[])
   const [saving,setSaving]=useState(false)
   const [linkGerado,setLinkGerado]=useState(null)
+  const [otimizando,setOtimizando]=useState(false)
   const cardsDisponiveis=cards.filter(c=>c.driverId===driver.id&&['confirmado','em_execucao'].includes(c.status)).sort((a,b)=>a.startDate?.localeCompare(b.startDate))
   const addParada=card=>{if(paradas.find(p=>p.cardId===card.id))return;setParadas(prev=>[...prev,{cardId:card.id,cliente:card.client,destino:card.destCity||card.destination||'',destinoUF:card.destination||'',origem:card.originCity||card.origin||'',origemUF:card.origin||'',startDate:card.startDate}])}
   const removeParada=cardId=>setParadas(prev=>prev.filter(p=>p.cardId!==cardId))
   const moverParada=(i,dir)=>{const n=[...paradas];const t=i+dir;if(t<0||t>=n.length)return;[n[i],n[t]]=[n[t],n[i]];setParadas(n)}
+  // Otimização de ordem (item 2) — usa o OSRM (mesmo motor já usado no frete
+  // combinado) pra calcular a distância entre TODAS as paradas de uma vez
+  // (endpoint /table/) e reordena pela heurística do vizinho mais próximo,
+  // partindo da base Mills. Não precisa de rede extra por combinação
+  // possível — é uma chamada só, não importa quantas paradas existam.
+  const handleOtimizar = async () => {
+    if (paradas.length < 2) return
+    setOtimizando(true)
+    try {
+      const pontos = [{ cidade:'Sumaré', uf:'SP' }, ...paradas.map(p => ({ cidade:p.destino, uf:p.destinoUF }))]
+      const matriz = await calcularMatrizDistancias(pontos)
+      if (!matriz) { addToast('Não foi possível calcular a rota (cidade não encontrada).', 'error'); return }
+      const ordem = otimizarOrdemParadas(matriz) // ex: [0, 3, 1, 2] — índice 0 é a origem
+      const novaOrdem = ordem.slice(1).map(i => paradas[i - 1])
+      setParadas(novaOrdem)
+      addToast('🧭 Ordem otimizada pela distância entre as paradas!', 'success')
+    } catch (err) {
+      console.error('Erro ao otimizar rota:', err)
+      addToast('Erro ao otimizar rota. A ordem manual continua válida.', 'error')
+    } finally {
+      setOtimizando(false)
+    }
+  }
   const gerarUrl=()=>{if(!paradas.length)return null;return `https://www.google.com/maps/dir/${paradas.map(p=>encodeURIComponent(`${p.destino} ${p.destinoUF}`)).join('/')}`}
   const handleSalvar=async()=>{
     setSaving(true)
@@ -76,8 +101,15 @@ export function RotogramaModal({ driver, cards, profile, rotogramaAtivo, onClose
             </div>
           </div>
           <div style={{ display:'flex', flexDirection:'column', overflow:'hidden' }}>
-            <div style={{ padding:'12px 14px', borderBottom:`1px solid ${T.border}`, flexShrink:0 }}>
+            <div style={{ padding:'12px 14px', borderBottom:`1px solid ${T.border}`, flexShrink:0, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
               <div style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:11, textTransform:'uppercase', letterSpacing:'0.07em' }}>Sequência da rota</div>
+              {paradas.length >= 2 && (
+                <button onClick={handleOtimizar} disabled={otimizando}
+                  title="Reordena as paradas pela distância mais curta entre elas"
+                  style={{ background:'none', border:'none', color:T.laranja, fontFamily:FONT, fontWeight:700, fontSize:10, cursor:otimizando?'default':'pointer', padding:0 }}>
+                  {otimizando ? '⏳ Calculando...' : '🧭 Otimizar ordem'}
+                </button>
+              )}
             </div>
             <div style={{ overflowY:'auto', flex:1, padding:'8px' }}>
               {paradas.length===0&&<div style={{ textAlign:'center', color:T.textMuted, fontFamily:FONT, fontSize:11, padding:'20px 0' }}>Adicione paradas da lista.</div>}

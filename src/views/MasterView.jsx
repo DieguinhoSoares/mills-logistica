@@ -52,7 +52,7 @@ export function MasterView({ simClients = [] }) {
   const { cards, deleteCard }                       = useCards()
   const { requests, respondRequest }                = useRequests('master')
   const { requests: mgrReqs }                       = useManagerialRequests()
-  const { notifications, unreadCount, markAllRead, markRead, deleteNotification } = useNotifications()
+  const { notifications, unreadCount, markAllRead, markRead, deleteNotification, enablePush, disablePush } = useNotifications()
   const { config, saveConfig }                      = useConfig()
   const { toasts, add:addToast, dismiss }           = useToasts()
   const { pendingUsers, approveUser, refuseUser }   = usePendingUsers()
@@ -269,7 +269,7 @@ export function MasterView({ simClients = [] }) {
               {t.badge > 0 && <span style={{ position:'absolute', top:-4, right:-4, background:T.perigo, color:'white', borderRadius:20, fontSize:9, fontWeight:700, padding:'0 5px', fontFamily:FONT }}>{t.badge}</span>}
             </button>
           ))}
-          <NotificationBell notifications={notifications} unreadCount={unreadCount} onMarkAllRead={markAllRead} onMarkRead={markRead} onDelete={deleteNotification}/>
+          <NotificationBell notifications={notifications} unreadCount={unreadCount} onMarkAllRead={markAllRead} onMarkRead={markRead} onDelete={deleteNotification} onEnablePush={enablePush} onDisablePush={disablePush}/>
           <button onClick={()=>setExportModal(true)} style={{ ...BS, background:T.verdeLight, color:T.verde, border:`1px solid ${T.verde}40`, fontSize:11, fontWeight:700 }}>📊 Relatório</button>
           <button onClick={logout} style={{ ...BS, background:'rgba(255,255,255,0.15)', color:'white', border:'1px solid rgba(255,255,255,0.2)', fontSize:11 }}>Sair</button>
         </div>

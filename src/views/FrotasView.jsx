@@ -27,7 +27,7 @@ export function FrotasView() {
   const { requests, respondRequest }     = useRequests('frotas')
   const { simClients, uploadClients }    = useSimClients()
   const { config, saveConfig }           = useConfig()
-  const { notifications, unreadCount, markAllRead, markRead, deleteNotification } = useNotifications()
+  const { notifications, unreadCount, markAllRead, markRead, deleteNotification, enablePush, disablePush } = useNotifications()
   const { toasts, add: addToast, dismiss } = useToasts()
   const { drivers, saveDriver, deleteDriver } = useDrivers()
   const { rotogramas } = useAllRotogramas()
@@ -367,7 +367,7 @@ export function FrotasView() {
             <button onClick={()=>setExportModal(true)} style={{ ...BS, background:T.verdeLight, color:T.verde, border:`1px solid ${T.verde}40`, fontSize:11, fontWeight:700 }}>📤 Relatório</button>
             <button onClick={()=>{setEditCard(null);setDefaultDate(baseDate);setModal('card');}} style={{ ...BS, background:T.laranja, color:'white', fontWeight:700, fontSize:11 }}>+ Novo Serviço</button>
           </>}
-          <NotificationBell notifications={notifications} unreadCount={unreadCount} onMarkAllRead={markAllRead} onMarkRead={markRead} onDelete={deleteNotification}/>
+          <NotificationBell notifications={notifications} unreadCount={unreadCount} onMarkAllRead={markAllRead} onMarkRead={markRead} onDelete={deleteNotification} onEnablePush={enablePush} onDisablePush={disablePush}/>
           {/* Menu "Mais" */}
           <div style={{ position:'relative' }}>
             <button onClick={()=>setMaisOpen(v=>!v)}

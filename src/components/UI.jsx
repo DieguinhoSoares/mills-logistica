@@ -57,9 +57,30 @@ export function useToasts() {
   return { toasts, add, dismiss }
 }
 
-export function NotificationBell({ notifications, unreadCount, onMarkAllRead, onMarkRead, onDelete }) {
+export function NotificationBell({ notifications, unreadCount, onMarkAllRead, onMarkRead, onDelete, onEnablePush, onDisablePush }) {
   const [open, setOpen] = useState(false)
   const ref = useRef()
+  // Estado do push É o próprio Notification.permission do navegador — não
+  // precisa guardar em state do React, só reagir a ele quando muda.
+  const [pushStatus, setPushStatus] = useState(
+    typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
+  )
+  const [pushBusy, setPushBusy] = useState(false)
+  const [pushMsg,  setPushMsg]  = useState('')
+
+  const handleTogglePush = async () => {
+    setPushBusy(true); setPushMsg('')
+    if (pushStatus === 'granted') {
+      await onDisablePush?.()
+      setPushMsg('Notificações push desativadas neste dispositivo.')
+    } else {
+      const res = await onEnablePush?.()
+      if (res?.ok) setPushMsg('✅ Notificações push ativadas!')
+      else setPushMsg(res?.error || 'Não foi possível ativar.')
+    }
+    setPushStatus(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported')
+    setPushBusy(false)
+  }
 
   // Fecha ao clicar fora
   useEffect(() => {
@@ -139,6 +160,21 @@ export function NotificationBell({ notifications, unreadCount, onMarkAllRead, on
                 </div>
               ))}
             </div>
+            {(onEnablePush || onDisablePush) && (
+              <div style={{ padding:'10px 14px', borderTop:`1px solid ${T.border}` }}>
+                {pushStatus === 'denied' ? (
+                  <div style={{ fontFamily:FONT, fontSize:10, color:T.textMuted, lineHeight:1.4 }}>
+                    🔕 Notificações bloqueadas neste navegador — pra reativar, mude a permissão nas configurações do site (ícone de cadeado na barra de endereço).
+                  </div>
+                ) : (
+                  <button onClick={handleTogglePush} disabled={pushBusy}
+                    style={{ background:'none', border:'none', cursor:pushBusy?'default':'pointer', color:pushStatus==='granted'?T.textMuted:T.laranja, fontSize:11, fontFamily:FONT, fontWeight:700, padding:0 }}>
+                    {pushBusy ? '⏳ ...' : pushStatus === 'granted' ? '🔕 Desativar notificações push' : '🔔 Ativar notificações push'}
+                  </button>
+                )}
+                {pushMsg && <div style={{ fontFamily:FONT, fontSize:10, color:T.textSec, marginTop:5 }}>{pushMsg}</div>}
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
