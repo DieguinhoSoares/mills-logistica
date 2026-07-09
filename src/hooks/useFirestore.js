@@ -6,6 +6,7 @@ import {
 import { db, getMessagingIfSupported } from '../lib/firebase'
 import { getToken } from 'firebase/messaging'
 import { useAuth } from '../contexts/AuthContext'
+import { enviarWhatsApp, enviarPush } from '../lib/vercelApi'
 // Os 2 imports abaixo eram dinâmicos (await import(...)) sem nenhum ganho —
 // ambos já são importados estaticamente em outros arquivos do projeto, então
 // o bundler não conseguia separá-los em chunk próprio mesmo assim. O único
@@ -100,11 +101,15 @@ export async function notifyRoles(roles, type, title, message, requestId = null)
 // Helper único para criar notificações in-app (item 12 da revisão).
 // Evita repetir o mesmo addDoc em 9 lugares com riscos de divergência de shape.
 export async function notifyUser(userId, type, title, message, requestId = null) {
-  await addDoc(collection(db,'notifications'), {
+  const doc_ = await addDoc(collection(db,'notifications'), {
     userId, type, title, message,
     ...(requestId ? { requestId } : {}),
     read: false, createdAt: serverTimestamp(),
   })
+  // Push de verdade (funciona com o navegador fechado) — chamado explicitamente
+  // aqui porque não temos Cloud Functions (Firestore trigger automático)
+  // rodando de graça; o próprio app dispara logo depois de criar o registro.
+  enviarPush({ userId, title, message, notificationId: doc_.id, requestId: requestId || '' })
 }
 
 // Mensagem padrão de "nova solicitação pronta para atribuição" — reaproveitada
@@ -117,13 +122,11 @@ function fleetReadyMessage(req) {
   return `${req.requesterName||'—'} · ${tipo}${sub} · ${req.clientName||req.client||'—'} · ${req.originCityName||req.origin||'—'} → ${req.destCityName||req.destination||'—'}`
 }
 
-async function notifyWhatsApp(phone, apikey, msg) {
-  try {
-    // mode:'no-cors' — o CallMeBot não envia headers CORS; sem isso o fetch é
-    // bloqueado pelo browser e a notificação nunca sai (falha silenciosa).
-    await fetch(`https://api.callmebot.com/whatsapp.php?phone=${phone}&text=${encodeURIComponent(msg)}&apikey=${apikey}`, { mode:'no-cors' })
-  } catch(e) { console.warn('WhatsApp:', e) }
-}
+// notifyWhatsApp foi REMOVIDO daqui — antes lia whatsappPhone/whatsappApikey
+// direto de config/settings e chamava o CallMeBot do navegador, o que
+// deixava a API key legível por qualquer usuário logado (item 1 da revisão
+// de segurança). Agora usa enviarWhatsApp() de vercelApi.js, que chama um
+// endpoint no servidor (Vercel) — a key só existe lá, nunca no client.
 
 export function useRequests(roleFilter) {
   const { user, profile } = useAuth()
@@ -230,15 +233,11 @@ export function useRequests(roleFilter) {
       updatedAt:            serverTimestamp(),
     })
     if (status === 'pendente_supervisor') {
-      const cfg = await getDoc(doc(db,'config','settings'))
-      const s   = cfg.exists() ? cfg.data() : {}
-      if (s.whatsappPhone && s.whatsappApikey) {
-        const tipo = { freteMillsInterno:'Frete Mills', freteCliente:'Frete Cliente', guindauto:'Guindauto' }[data.type] || data.type
-        const sub  = data.subtype ? ' · ' + data.subtype.replace(/_/g,' ') : ''
-        const urg  = { critico:'🔴 Crítico', alto:'🟠 Alto', medio:'🟡 Médio', baixo:'🟢 Baixo' }[data.urgency] || ''
-        const msg  = `📋 Nova solicitação aguardando aprovação\nTipo: ${tipo}${sub} · Cliente: ${data.clientName||'—'} · Solicitante: ${data.requesterName||profile?.name||'—'} · Rota: ${data.originCityName||data.origin||'—'} → ${data.destCityName||data.destination||'—'}\nUrgência: ${urg}\n👉 Abrir e aprovar: https://dieguinhosoares.github.io/mills-logistica/`
-        await notifyWhatsApp(s.whatsappPhone, s.whatsappApikey, msg)
-      }
+      const tipo = { freteMillsInterno:'Frete Mills', freteCliente:'Frete Cliente', guindauto:'Guindauto' }[data.type] || data.type
+      const sub  = data.subtype ? ' · ' + data.subtype.replace(/_/g,' ') : ''
+      const urg  = { critico:'🔴 Crítico', alto:'🟠 Alto', medio:'🟡 Médio', baixo:'🟢 Baixo' }[data.urgency] || ''
+      const msg  = `📋 Nova solicitação aguardando aprovação\nTipo: ${tipo}${sub} · Cliente: ${data.clientName||'—'} · Solicitante: ${data.requesterName||profile?.name||'—'} · Rota: ${data.originCityName||data.origin||'—'} → ${data.destCityName||data.destination||'—'}\nUrgência: ${urg}\n👉 Abrir e aprovar: https://dieguinhosoares.github.io/mills-logistica/`
+      enviarWhatsApp(msg) // fire-and-forget — não bloqueia a criação se o WhatsApp falhar
     } else if (status === 'pendente') {
       await notifyRoles(['frotas'], 'request_ready_for_fleet', '📥 Solicitação pronta para atribuição',
         fleetReadyMessage(data), null)
@@ -292,12 +291,8 @@ export async function approveAsSupervisor(id, note, approverName, approverRole) 
   if (req.needsGerenteApproval) {
     await notifyRoles(['gerente','master'], 'pending_gerente_approval', '📋 Solicitação aguarda sua aprovação',
       `${req.requesterName} · ${req.machine||''} · ${req.originCityName||''} → ${req.destCityName||''}`, id)
-    const cfg = await getDoc(doc(db,'config','settings'))
-    const s   = cfg.exists() ? cfg.data() : {}
-    if (s.whatsappPhone && s.whatsappApikey) {
-      const msg = `📋 Solicitação aprovada pelo Supervisor — aguarda sua aprovação\nSolicitante: ${req.requesterName||'—'} · ${req.machine||'—'}\nRota: ${req.originCityName||req.origin||'—'} → ${req.destCityName||req.destination||'—'}\n👉 Abrir e aprovar: https://dieguinhosoares.github.io/mills-logistica/`
-      await notifyWhatsApp(s.whatsappPhone, s.whatsappApikey, msg)
-    }
+    const msg = `📋 Solicitação aprovada pelo Supervisor — aguarda sua aprovação\nSolicitante: ${req.requesterName||'—'} · ${req.machine||'—'}\nRota: ${req.originCityName||req.origin||'—'} → ${req.destCityName||req.destination||'—'}\n👉 Abrir e aprovar: https://dieguinhosoares.github.io/mills-logistica/`
+    enviarWhatsApp(msg)
   }
 }
 
@@ -382,13 +377,11 @@ export function useNotifications() {
   }
   const unreadCount = notifications.filter(n=>!n.read).length
 
-  // ── Push de verdade (item 5) — avisa mesmo com o navegador fechado ──────
+  // ── Push de verdade — avisa mesmo com o navegador fechado ───────────────
   // Diferente do sino (que só atualiza com a aba aberta), isso usa o Firebase
   // Cloud Messaging: o navegador recebe um "token" de dispositivo, salvamos
-  // em users/{uid}.fcmTokens, e uma Cloud Function (ver functions/push-notify.js)
-  // dispara a notificação de verdade sempre que um novo doc é criado em
-  // 'notifications' — o sistema operacional mostra a notificação mesmo com
-  // a aba fechada, do jeito que um app nativo mostra.
+  // em users/{uid}.fcmTokens, e o endpoint /api/send-push (Vercel) dispara a
+  // notificação de verdade sempre que notifyUser/notifyRoles são chamados.
   const enablePush = async () => {
     if (!user) return { ok:false, error:'Faça login primeiro.' }
     if (typeof Notification === 'undefined') return { ok:false, error:'Este navegador não suporta notificações.' }
@@ -397,8 +390,6 @@ export function useNotifications() {
     const permission = await Notification.requestPermission()
     if (permission !== 'granted') return { ok:false, error:'Permissão negada — ative nas configurações do navegador.' }
     try {
-      // O Service Worker já foi registrado no boot do app (main.tsx) — só
-      // espera ele estar pronto, sem registrar de novo.
       const swRegistration = await navigator.serviceWorker.ready
       const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY
       const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: swRegistration })
@@ -415,8 +406,6 @@ export function useNotifications() {
     }
   }
 
-  // Remove só o token DESTE dispositivo/navegador (outros dispositivos do
-  // mesmo usuário continuam recebendo push normalmente).
   const disablePush = async () => {
     if (!user) return
     const messaging = await getMessagingIfSupported()
@@ -428,7 +417,7 @@ export function useNotifications() {
       const snap = await getDoc(ref)
       const existentes = snap.exists() ? (snap.data().fcmTokens || []) : []
       await updateDoc(ref, { fcmTokens: existentes.filter(t => t !== token) })
-    } catch { /* melhor esforço — não trava a UI se falhar */ }
+    } catch { /* melhor esforço */ }
   }
 
   return { notifications, unreadCount, markRead, markAllRead, deleteNotification, enablePush, disablePush }

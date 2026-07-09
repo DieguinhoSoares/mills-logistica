@@ -6,6 +6,7 @@ import { MillsLogo, NotificationBell, ToastContainer, useToasts } from '../compo
 import { T, FONT, CARD_TYPES, URGENCY, URGENCY_SLA_MS, BS, IS, LS } from '../lib/constants'
 import { fmt, getSubtypeLabel, sortByUrgency } from '../lib/utils'
 import { db } from '../lib/firebase'
+import { salvarWhatsAppConfig } from '../lib/vercelApi'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
 import { FreteEstimativa } from '../components/FreteEstimativa'
 
@@ -309,13 +310,13 @@ function DesktopRequestCard({ req, profile, onView }) {
 }
 
 export function GerenteView({ simClients = [] }) {
-  const { profile, logout }   = useAuth()
+  const { profile, logout, user } = useAuth()
   // approveAsSupervisor/refuseAsSupervisor/approveAsGerente/refuseAsGerente agora são
   // funções standalone importadas direto — não criam mais um listener duplicado
   // e sem uso da coleção 'requests' (ver notas em useFirestore.js).
   const { requests: mgrReqs } = useManagerialRequests()
   const { notifications, unreadCount, markAllRead, markRead, deleteNotification, enablePush, disablePush } = useNotifications()
-  const { config, saveConfig } = useConfig()
+  const { config } = useConfig()
   const { toasts, add:addToast, dismiss } = useToasts()
   const isMobile = useIsMobile()
 
@@ -366,14 +367,19 @@ export function GerenteView({ simClients = [] }) {
     }
   }
 
+  // Antes gravava direto em config/settings — documento legível por
+  // QUALQUER usuário logado (item 1 da revisão de segurança). Agora chama
+  // um endpoint no servidor (Vercel) que checa o role de quem está pedindo
+  // e grava num lugar que o client nunca lê de volta.
   const handleSaveWhatsapp = async () => {
     try {
-      await saveConfig({ whatsappPhone: waPhone, whatsappApikey: waApikey })
+      const idToken = await user.getIdToken()
+      await salvarWhatsAppConfig(waPhone, waApikey, idToken)
       setSavedWa(true); setTimeout(()=>setSavedWa(false), 2000)
       addToast('WhatsApp configurado!', 'success')
     } catch (err) {
       console.error('Erro ao salvar configuração do WhatsApp:', err)
-      addToast('Erro ao salvar. Tente novamente.', 'error')
+      addToast(err.message || 'Erro ao salvar. Tente novamente.', 'error')
     }
   }
 

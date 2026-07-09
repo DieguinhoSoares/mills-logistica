@@ -7,6 +7,7 @@ import { T, FONT, CARD_TYPES, BS, IS, LS } from '../lib/constants'
 import { detectConflicts, fmt, getSubtypeLabel, sortByUrgency } from '../lib/utils'
 import { doc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore'
 import { db } from '../lib/firebase'
+import { salvarWhatsAppConfig } from '../lib/vercelApi'
 import { useCards, useRequests, useNotifications, useConfig, usePendingUsers, useManagerialRequests, runDailyBackup, useMessages, useAllUsers, useBackupStatus, notifyUser, backfillSeqIds, approveAsSupervisor, refuseAsSupervisor, approveAsGerente, refuseAsGerente } from '../hooks/useFirestore'
 import { FreteEstimativa } from '../components/FreteEstimativa'
 import { MessageThread }    from '../components/MessageThread'
@@ -48,7 +49,7 @@ function CancelCardModal({ card, onConfirm, onClose }) {
 }
 
 export function MasterView({ simClients = [] }) {
-  const { profile, logout }                         = useAuth()
+  const { profile, logout, user }                   = useAuth()
   const { cards, deleteCard }                       = useCards()
   const { requests, respondRequest }                = useRequests('master')
   const { requests: mgrReqs }                       = useManagerialRequests()
@@ -186,10 +187,19 @@ export function MasterView({ simClients = [] }) {
     addToast('Usuário aprovado!', 'success')
   }
 
+  // Antes gravava direto em config/settings — documento legível por
+  // QUALQUER usuário logado (item 1 da revisão de segurança). Agora chama
+  // um endpoint no servidor (Vercel) que checa o role de quem está pedindo.
   const handleSaveWhatsapp = async () => {
-    await saveConfig({ whatsappPhone: waPhone, whatsappApikey: waApikey })
-    setSavedWa(true); setTimeout(()=>setSavedWa(false), 2000)
-    addToast('WhatsApp configurado!', 'success')
+    try {
+      const idToken = await user.getIdToken()
+      await salvarWhatsAppConfig(waPhone, waApikey, idToken)
+      setSavedWa(true); setTimeout(()=>setSavedWa(false), 2000)
+      addToast('WhatsApp configurado!', 'success')
+    } catch (err) {
+      console.error('Erro ao salvar configuração do WhatsApp:', err)
+      addToast(err.message || 'Erro ao salvar. Tente novamente.', 'error')
+    }
   }
 
   const handleMigration = async () => {
