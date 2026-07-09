@@ -1,0 +1,25 @@
+{
+  "name": "Mills Logística — Gestão de Frotas",
+  "short_name": "Mills Logística",
+  "description": "Solicitação, aprovação e agendamento de fretes e movimentação de máquinas — Mills Pesados",
+  "start_url": "/mills-logistica/",
+  "scope": "/mills-logistica/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F9F6F1",
+  "theme_color": "#004042",
+  "icons": [
+    {
+      "src": "/mills-logistica/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/mills-logistica/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
