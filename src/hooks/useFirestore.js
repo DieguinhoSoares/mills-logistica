@@ -253,7 +253,20 @@ export function useRequests(roleFilter) {
     await updateDoc(doc(db,'requests',id), {
       status, responseNote:note, respondedAt:serverTimestamp(), updatedAt:serverTimestamp(),
     })
-    const req = requests.find(r=>r.id===id)
+    // Antes usava requests.find(r=>r.id===id) — dependia da lista local já
+    // ter carregado aquele item no momento exato do clique. Se por qualquer
+    // motivo (race condition, lista ainda carregando, filtro aplicado antes)
+    // o item não estivesse nessa lista, a notificação pro solicitante era
+    // pulada em silêncio, sem erro nenhum — a recusa/aceite acontecia normal,
+    // só o aviso nunca existia. Agora busca o documento direto no Firestore,
+    // igual as funções de aprovação (refuseAsSupervisor, approveAsGerente
+    // etc.) já fazem, que são mais confiáveis por não dependerem de estado
+    // local nenhum.
+    const snap = await getDoc(doc(db,'requests',id))
+    const req  = snap.exists() ? { id, ...snap.data() } : null
+    if (!req) {
+      console.warn(`[respondRequest] Documento requests/${id} não encontrado — notificação ao solicitante não foi enviada.`)
+    }
     if (req) {
       await notifyUser(req.requesterId,
         status==='aceito'?'request_accepted':'request_rejected',
