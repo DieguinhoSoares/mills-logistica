@@ -2,24 +2,17 @@
 // Service Worker do Firebase Cloud Messaging — recebe a notificação push
 // mesmo com a aba do Mills Logística FECHADA (é o que faz esse recurso ser
 // "de verdade", diferente do sino, que só atualiza com a aba aberta).
-//
-// ⚠️ IMPORTANTE: os valores de firebaseConfig abaixo são PLACEHOLDERS.
-// Um Service Worker não consegue ler as variáveis de ambiente do Vite
-// (import.meta.env) em tempo de execução — precisa ser preenchido à mão
-// com os MESMOS valores do seu arquivo .env (VITE_FIREBASE_*). Esses
-// valores do config do Firebase Web NÃO são segredo — são projetados pra
-// ficar públicos (a segurança de verdade está nas Firestore Rules).
 
 importScripts('https://www.gstatic.com/firebasejs/12.14.0/firebase-app-compat.js')
 importScripts('https://www.gstatic.com/firebasejs/12.14.0/firebase-messaging-compat.js')
 
 firebase.initializeApp({
-  apiKey:            'COLE_AQUI_O_MESMO_VALOR_DO_.env_VITE_FIREBASE_API_KEY',
-  authDomain:        'COLE_AQUI_O_MESMO_VALOR_DO_.env_VITE_FIREBASE_AUTH_DOMAIN',
-  projectId:         'COLE_AQUI_O_MESMO_VALOR_DO_.env_VITE_FIREBASE_PROJECT_ID',
-  storageBucket:     'COLE_AQUI_O_MESMO_VALOR_DO_.env_VITE_FIREBASE_STORAGE_BUCKET',
-  messagingSenderId: 'COLE_AQUI_O_MESMO_VALOR_DO_.env_VITE_FIREBASE_MESSAGING_SENDER_ID',
-  appId:             'COLE_AQUI_O_MESMO_VALOR_DO_.env_VITE_FIREBASE_APP_ID',
+  apiKey:            'AIzaSyBnrPOhgsVH_Wx4ikvgHKDC7Fzh9mcRCe0',
+  authDomain:        'mills-logistica.firebaseapp.com',
+  projectId:         'mills-logistica',
+  storageBucket:     'mills-logistica.firebasestorage.app',
+  messagingSenderId: '625840290007',
+  appId:             '1:625840290007:web:3de601972c13ac4469d892',
 })
 
 const messaging = firebase.messaging()
