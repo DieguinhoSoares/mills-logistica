@@ -6,7 +6,7 @@ import {
 import { db, getMessagingIfSupported } from '../lib/firebase'
 import { getToken } from 'firebase/messaging'
 import { useAuth } from '../contexts/AuthContext'
-import { enviarWhatsApp, enviarPush } from '../lib/vercelApi'
+import { enviarWhatsApp, enviarPush, notificarRoles } from '../lib/vercelApi'
 // Os 2 imports abaixo eram dinâmicos (await import(...)) sem nenhum ganho —
 // ambos já são importados estaticamente em outros arquivos do projeto, então
 // o bundler não conseguia separá-los em chunk próprio mesmo assim. O único
@@ -93,9 +93,14 @@ export function needsGerenteApproval(type, subtype) {
 // where('userId','==',user.uid), então essas notificações nunca apareciam para
 // ninguém (alerta fantasma).
 export async function notifyRoles(roles, type, title, message, requestId = null) {
-  const q = query(collection(db,'users'), where('role','in', roles), where('status','==','ativo'))
-  const snap = await getDocs(q)
-  await Promise.all(snap.docs.map(d => notifyUser(d.id, type, title, message, requestId)))
+  // Antes fazia getDocs(query(users, where(role in roles), where(status==ativo)))
+  // direto no navegador — bloqueado pelas Firestore Rules sempre que quem
+  // chamava não era da equipe (ex: Solicitante criando um pedido que vai
+  // direto pra fila da Frotas). Falhava em silêncio: a solicitação era
+  // criada normalmente, só a notificação nunca existia, sem erro visível.
+  // Agora roda no servidor (Vercel + Admin SDK), que ignora as Rules com
+  // segurança porque é código nosso, não o navegador de qualquer usuário.
+  await notificarRoles(roles, type, title, message, requestId)
 }
 
 // Helper único para criar notificações in-app (item 12 da revisão).
