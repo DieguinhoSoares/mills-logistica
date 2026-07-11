@@ -28,3 +28,9 @@ export const enviarWhatsApp   = (mensagem)              => chamar('/api/send-wha
 export const enviarPush       = (payload)                => chamar('/api/send-push', payload).catch(e => console.warn('Push:', e.message))
 export const resetarSenhaApi  = (email)                  => chamar('/api/reset-password', { email })
 export const salvarWhatsAppConfig = (phone, apikey, idToken) => chamar('/api/save-whatsapp-config', { phone, apikey }, idToken)
+// notifyRoles precisa consultar a coleção `users` filtrando por role — as
+// Firestore Rules bloqueiam isso pra quem não é staff (evita expor nome/
+// e-mail de toda a equipe pra qualquer usuário logado). Roda no servidor
+// com Admin SDK, que ignora as Rules, em vez de no navegador do solicitante.
+export const notificarRoles = (roles, type, title, message, requestId) =>
+  chamar('/api/notify-roles', { roles, type, title, message, requestId }).catch(e => console.warn('notifyRoles:', e.message))
