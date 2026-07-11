@@ -357,6 +357,51 @@ export async function approveAsMaster(id, note, approverName) {
 }
 
 
+// ── Push de verdade — avisa mesmo com o navegador fechado ───────────────
+// Diferente do sino (que só atualiza com a aba aberta), isso usa o Firebase
+// Cloud Messaging: o navegador recebe um "token" de dispositivo, salvamos
+// em users/{uid}.fcmTokens, e o endpoint /api/send-push (Vercel) dispara a
+// notificação de verdade sempre que notifyUser/notifyRoles são chamados.
+// Funções de módulo (não hooks) — usadas tanto pelo sino (useNotifications)
+// quanto pelo banner de convite (usePushInvite), sem duplicar listener.
+export async function enablePushFor(user) {
+  if (!user) return { ok:false, error:'Faça login primeiro.' }
+  if (typeof Notification === 'undefined') return { ok:false, error:'Este navegador não suporta notificações.' }
+  const messaging = await getMessagingIfSupported()
+  if (!messaging) return { ok:false, error:'Este navegador não suporta notificações push (comum no Safari/iOS mais antigo).' }
+  const permission = await Notification.requestPermission()
+  if (permission !== 'granted') return { ok:false, error:'Permissão negada — ative nas configurações do navegador.' }
+  try {
+    const swRegistration = await navigator.serviceWorker.ready
+    const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY
+    const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: swRegistration })
+    if (!token) return { ok:false, error:'Não foi possível gerar o token deste dispositivo.' }
+    const ref  = doc(db,'users',user.uid)
+    const snap = await getDoc(ref)
+    const existentes = snap.exists() ? (snap.data().fcmTokens || []) : []
+    if (!existentes.includes(token)) {
+      await updateDoc(ref, { fcmTokens: [...existentes, token] })
+    }
+    return { ok:true }
+  } catch (e) {
+    return { ok:false, error: e.message || 'Erro ao ativar notificações.' }
+  }
+}
+
+export async function disablePushFor(user) {
+  if (!user) return
+  const messaging = await getMessagingIfSupported()
+  if (!messaging) return
+  try {
+    const swRegistration = await navigator.serviceWorker.ready
+    const token = await getToken(messaging, { vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY, serviceWorkerRegistration: swRegistration })
+    const ref  = doc(db,'users',user.uid)
+    const snap = await getDoc(ref)
+    const existentes = snap.exists() ? (snap.data().fcmTokens || []) : []
+    await updateDoc(ref, { fcmTokens: existentes.filter(t => t !== token) })
+  } catch { /* melhor esforço */ }
+}
+
 export function useNotifications() {
   const { user } = useAuth()
   const [notifications, setNotifications] = useState([])
@@ -376,51 +421,33 @@ export function useNotifications() {
     return deleteDoc(doc(db,'notifications',id))
   }
   const unreadCount = notifications.filter(n=>!n.read).length
-
-  // ── Push de verdade — avisa mesmo com o navegador fechado ───────────────
-  // Diferente do sino (que só atualiza com a aba aberta), isso usa o Firebase
-  // Cloud Messaging: o navegador recebe um "token" de dispositivo, salvamos
-  // em users/{uid}.fcmTokens, e o endpoint /api/send-push (Vercel) dispara a
-  // notificação de verdade sempre que notifyUser/notifyRoles são chamados.
-  const enablePush = async () => {
-    if (!user) return { ok:false, error:'Faça login primeiro.' }
-    if (typeof Notification === 'undefined') return { ok:false, error:'Este navegador não suporta notificações.' }
-    const messaging = await getMessagingIfSupported()
-    if (!messaging) return { ok:false, error:'Este navegador não suporta notificações push (comum no Safari/iOS mais antigo).' }
-    const permission = await Notification.requestPermission()
-    if (permission !== 'granted') return { ok:false, error:'Permissão negada — ative nas configurações do navegador.' }
-    try {
-      const swRegistration = await navigator.serviceWorker.ready
-      const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY
-      const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: swRegistration })
-      if (!token) return { ok:false, error:'Não foi possível gerar o token deste dispositivo.' }
-      const ref  = doc(db,'users',user.uid)
-      const snap = await getDoc(ref)
-      const existentes = snap.exists() ? (snap.data().fcmTokens || []) : []
-      if (!existentes.includes(token)) {
-        await updateDoc(ref, { fcmTokens: [...existentes, token] })
-      }
-      return { ok:true }
-    } catch (e) {
-      return { ok:false, error: e.message || 'Erro ao ativar notificações.' }
-    }
-  }
-
-  const disablePush = async () => {
-    if (!user) return
-    const messaging = await getMessagingIfSupported()
-    if (!messaging) return
-    try {
-      const swRegistration = await navigator.serviceWorker.ready
-      const token = await getToken(messaging, { vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY, serviceWorkerRegistration: swRegistration })
-      const ref  = doc(db,'users',user.uid)
-      const snap = await getDoc(ref)
-      const existentes = snap.exists() ? (snap.data().fcmTokens || []) : []
-      await updateDoc(ref, { fcmTokens: existentes.filter(t => t !== token) })
-    } catch { /* melhor esforço */ }
-  }
+  const enablePush  = () => enablePushFor(user)
+  const disablePush = () => disablePushFor(user)
 
   return { notifications, unreadCount, markRead, markAllRead, deleteNotification, enablePush, disablePush }
+}
+
+// ── Banner de convite — pede a permissão sem depender do usuário achar o sino ──
+// Só faz sentido perguntar quando o navegador ainda não decidiu nada
+// (Notification.permission === 'default'): se a pessoa já aceitou, o token
+// já deve existir; se já recusou, perguntar de novo automaticamente seria
+// ignorado pelo navegador mesmo (e incomodaria à toa).
+export function usePushInvite() {
+  const { user } = useAuth()
+  const [mostrar, setMostrar] = useState(false)
+  const [dispensadoNestaSessao, setDispensadoNestaSessao] = useState(false)
+  useEffect(() => {
+    if (!user || dispensadoNestaSessao) { setMostrar(false); return }
+    if (typeof Notification === 'undefined') { setMostrar(false); return }
+    setMostrar(Notification.permission === 'default')
+  }, [user, dispensadoNestaSessao])
+  const ativar = async () => {
+    const res = await enablePushFor(user)
+    if (res.ok) setMostrar(false)
+    return res
+  }
+  const dispensar = () => { setDispensadoNestaSessao(true); setMostrar(false) }
+  return { mostrar, ativar, dispensar }
 }
 
 export function useSimClients() {
