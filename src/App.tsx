@@ -6,11 +6,13 @@ import { GerenteView }     from './views/GerenteView'
 import { SolicitanteView } from './views/SolicitanteView'
 import { MotoristaView }     from './views/MotoristaView'
 import { IndicadoresView }   from './views/IndicadoresView'
-import { useSimClients }   from './hooks/useFirestore'
+import { useSimClients, usePushInvite } from './hooks/useFirestore'
+import { PushInviteBanner } from './components/UI'
 
 function AppInner() {
   const { user, profile, logout } = useAuth()
   const { simClients }    = useSimClients()
+  const pushInvite = usePushInvite()
 
   if (!user || !profile) return <LoginScreen />
 
@@ -46,14 +48,28 @@ function AppInner() {
     </div>
   )
 
-  if (profile.role === 'master')      return <MasterView      simClients={simClients} />
-  if (profile.role === 'frotas')      return <FrotasView      simClients={simClients} />
-  if (profile.role === 'supervisor')  return <GerenteView     simClients={simClients} />
-  if (profile.role === 'gerente')     return <GerenteView     simClients={simClients} />
-  if (profile.role === 'indicadores') return <IndicadoresView />
-  if (profile.role === 'solicitante') return <SolicitanteView simClients={simClients} />
+  const view =
+    profile.role === 'master'      ? <MasterView      simClients={simClients} /> :
+    profile.role === 'frotas'      ? <FrotasView      simClients={simClients} /> :
+    profile.role === 'supervisor'  ? <GerenteView     simClients={simClients} /> :
+    profile.role === 'gerente'     ? <GerenteView     simClients={simClients} /> :
+    profile.role === 'indicadores' ? <IndicadoresView /> :
+    profile.role === 'solicitante' ? <SolicitanteView simClients={simClients} /> :
+    <LoginScreen />
 
-  return <LoginScreen />
+  // Overlay fixo no topo (não empurra o layout): as views já usam height:100vh
+  // internamente, então "empurrar" com flex bagunçaria o rodapé delas. O
+  // banner flutua por cima temporariamente, some sozinho ao ativar/dispensar.
+  return (
+    <>
+      {pushInvite.mostrar && (
+        <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:9999 }}>
+          <PushInviteBanner mostrar={pushInvite.mostrar} onAtivar={pushInvite.ativar} onDispensar={pushInvite.dispensar} />
+        </div>
+      )}
+      {view}
+    </>
+  )
 }
 
 export default function App() {
