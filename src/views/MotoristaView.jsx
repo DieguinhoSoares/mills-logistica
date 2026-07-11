@@ -498,7 +498,7 @@ export function MotoristaView({ token }) {
   )
 
   return (
-    <div style={{ background:T.bg, minHeight:'100vh', fontFamily:FONT, maxWidth:480, margin:'0 auto' }}>
+    <div style={{ background:T.bg, minHeight:'100vh', fontFamily:FONT, maxWidth:1100, margin:'0 auto' }}>
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 
       <div style={{ background:T.verde, padding:'16px', position:'sticky', top:0, zIndex:100, boxShadow:T.shadowMd }}>
@@ -526,17 +526,17 @@ export function MotoristaView({ token }) {
         </div>
       </div>
 
-      <div style={{ padding:'16px' }}>
+      <div style={{ padding:'16px', display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(340px, 1fr))', gap:12, alignItems:'start' }}>
 
         {tab==='hoje' && (
           <>
             {cardsAntigos.length>0 && (
-              <div style={{ background:T.perigoLight, borderRadius:T.r, padding:'10px 14px', marginBottom:14, border:`1px solid ${T.perigo}30` }}>
+              <div style={{ gridColumn:'1 / -1', background:T.perigoLight, borderRadius:T.r, padding:'10px 14px', marginBottom:14, border:`1px solid ${T.perigo}30` }}>
                 <div style={{ color:T.perigo, fontFamily:FONT, fontWeight:700, fontSize:12 }}>⚠️ {cardsAntigos.length} serviço(s) pendente(s) de dias anteriores</div>
               </div>
             )}
             {cardsHoje.length===0&&cardsAntigos.length===0 ? (
-              <div style={{ textAlign:'center', padding:'40px 0', color:T.textMuted, fontFamily:FONT }}>
+              <div style={{ gridColumn:'1 / -1', textAlign:'center', padding:'40px 0', color:T.textMuted, fontFamily:FONT }}>
                 <div style={{ fontSize:44, marginBottom:10 }}>🎉</div>
                 <p style={{ fontWeight:700, fontSize:16 }}>Nenhum serviço para hoje!</p>
               </div>
@@ -552,7 +552,7 @@ export function MotoristaView({ token }) {
         {tab==='semana' && (
           <>
             {cardsSemana.length===0 ? (
-              <div style={{ textAlign:'center', padding:'40px 0', color:T.textMuted, fontFamily:FONT }}>
+              <div style={{ gridColumn:'1 / -1', textAlign:'center', padding:'40px 0', color:T.textMuted, fontFamily:FONT }}>
                 <div style={{ fontSize:44, marginBottom:10 }}>📭</div>
                 <p>Nenhum serviço programado.</p>
               </div>
@@ -563,13 +563,13 @@ export function MotoristaView({ token }) {
         {tab==='rotograma' && (
           <>
             {!rotograma ? (
-              <div style={{ textAlign:'center', padding:'40px 0', color:T.textMuted, fontFamily:FONT }}>
+              <div style={{ gridColumn:'1 / -1', textAlign:'center', padding:'40px 0', color:T.textMuted, fontFamily:FONT }}>
                 <div style={{ fontSize:44, marginBottom:10 }}>🗺</div>
                 <p style={{ fontWeight:700, fontSize:15, marginBottom:6 }}>Nenhum rotograma ativo</p>
                 <p style={{ fontSize:13 }}>O analista ainda não montou seu rotograma.</p>
               </div>
             ) : (
-              <>
+              <div style={{ gridColumn:'1 / -1' }}>
                 <div style={{ background:T.verde, borderRadius:T.rLg, padding:'14px 16px', marginBottom:16, color:'white' }}>
                   <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, marginBottom:4 }}>🗺 Rotograma — {rotograma.paradas?.length} parada(s)</div>
                   <div style={{ fontFamily:FONT, fontSize:11, opacity:0.7 }}>Criado por {rotograma.criadoPor} · {rotograma.criadoEm?.toDate?.()?.toLocaleDateString('pt-BR')||''}</div>
@@ -628,7 +628,7 @@ export function MotoristaView({ token }) {
                     </div>
                   )
                 })}
-              </>
+              </div>
             )}
           </>
         )}
