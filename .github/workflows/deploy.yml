@@ -1,29 +1,22 @@
 name: Deploy to GitHub Pages
-
 on:
   push:
     branches: [main]
-
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
-
       - name: Install dependencies
         run: npm install
-
       - name: Lint (erros bloqueiam o deploy; warnings não)
         run: npm run lint:ci
-
       - name: Testes (freteCalc + ordenação de filas)
         run: npm test
-
       - name: Build
         run: npm run build
         env:
@@ -33,7 +26,8 @@ jobs:
           VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
-
+          VITE_VERCEL_API_URL: ${{ secrets.VITE_VERCEL_API_URL }}
+          VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         with:
