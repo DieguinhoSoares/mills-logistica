@@ -1,6 +1,44 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { T, FONT, CARD_TYPES, URGENCY, BR_STATES } from '../lib/constants'
+
+// ─── PushInviteBanner — convite automático pra ativar push (item 5) ───────
+// Aparece sozinho quando o navegador ainda não decidiu nada sobre permissão
+// de notificação (nunca perguntou, ou a pessoa nunca respondeu) — poupa o
+// usuário de precisar achar o botão escondido dentro do dropdown do sino.
+// "Agora não" esconde só nesta sessão (aba); reabre a página, aparece de novo
+// se a permissão continuar indefinida — não é implorar, é lembrar.
+export function PushInviteBanner({ mostrar, onAtivar, onDispensar }) {
+  const [busy, setBusy] = useState(false)
+  const [erro, setErro] = useState('')
+  if (!mostrar) return null
+
+  const handleAtivar = async () => {
+    setBusy(true); setErro('')
+    const res = await onAtivar()
+    if (!res?.ok) setErro(res?.error || 'Não foi possível ativar.')
+    setBusy(false)
+  }
+
+  return (
+    <div style={{ background:T.verde, padding:'10px 16px', display:'flex', alignItems:'center', justifyContent:'center', gap:14, flexWrap:'wrap' }}>
+      <span style={{ color:'white', fontFamily:FONT, fontSize:12, fontWeight:700 }}>
+        🔔 Quer receber avisos mesmo com o navegador fechado?
+      </span>
+      <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+        <button onClick={handleAtivar} disabled={busy}
+          style={{ background:T.laranja, color:'white', border:'none', borderRadius:8, padding:'6px 14px', fontFamily:FONT, fontWeight:800, fontSize:11, cursor:busy?'default':'pointer' }}>
+          {busy ? '⏳ Ativando...' : 'Ativar notificações'}
+        </button>
+        <button onClick={onDispensar}
+          style={{ background:'none', border:'none', color:'rgba(255,255,255,.75)', fontFamily:FONT, fontSize:11, fontWeight:700, cursor:'pointer', textDecoration:'underline' }}>
+          Agora não
+        </button>
+      </div>
+      {erro && <span style={{ color:'#FFCDD2', fontFamily:FONT, fontSize:10 }}>{erro}</span>}
+    </div>
+  )
+}
 import { fmt } from '../lib/utils'
 
 export function MillsLogo({ height=32 }) {
