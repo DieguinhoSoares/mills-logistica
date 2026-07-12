@@ -7,7 +7,7 @@ import { montarLinhaRelatorio } from '../lib/emissoes'
 // Exportação em Excel do relatório de emissão de carbono — enviado ao time
 // de Meio Ambiente da Mills para divulgação externa ao mercado. Colunas no
 // mesmo formato do modelo já usado hoje pelo time (ver conversa 2026-07).
-export function EmissoesExportModal({ cards, onClose, onRunMigration, migrating, migrateLog, migrateProgress }) {
+export function EmissoesExportModal({ cards, simClients, onClose, onRunMigration, migrating, migrateLog, migrateProgress }) {
   const today = todayStr()
   const [dateFrom, setDateFrom] = useState(getWeekDays(today)[0])
   const [dateTo,   setDateTo]   = useState(getWeekDays(today)[6])
@@ -17,7 +17,7 @@ export function EmissoesExportModal({ cards, onClose, onRunMigration, migrating,
   const concluidos = cards.filter(c =>
     c.status === 'concluido' && c.startDate && c.startDate >= dateFrom && c.startDate <= dateTo
   )
-  const linhas = concluidos.map(montarLinhaRelatorio)
+  const linhas = concluidos.map(c => montarLinhaRelatorio(c, simClients))
   const semDado = linhas.filter(l => l.semDadoSuficiente).length
 
   const handleExport = async () => {
