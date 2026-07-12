@@ -13,6 +13,7 @@ import { enviarWhatsApp, enviarPush, notificarRoles } from '../lib/vercelApi'
 // efeito prático era uma etapa assíncrona a mais sem propósito. O próprio
 // Vite já sinalizava isso como [INEFFECTIVE_DYNAMIC_IMPORT] no build.
 import { sendTeamsNotification } from '../lib/utils'
+import { calcularDistancia } from '../lib/freteCalc'
 
 export function useCards() {
   const [cards,   setCards]   = useState([])
@@ -741,4 +742,42 @@ export async function backfillSeqIds() {
   }
   await setDoc(counterRef, { value: seq }, { merge: true }) // sincroniza pro próximo card criado continuar daqui
   return semSeq.length
+}
+
+// Utilitário de migração — recalcula o km de serviços JÁ CONCLUÍDOS antes da
+// correção que passou a salvar km no card (ver AssignDriverModal/FrotasView,
+// 2026-07). Sem km, esses serviços ficam marcados "sem dado suficiente" no
+// relatório de emissão de carbono — essa migração fecha essa lacuna
+// histórica usando a mesma origem/destino que o card já tinha salvo.
+// Roda uma vez só, chamada pelo Master. Respeita ~1 requisição/segundo pro
+// Nominatim (geocodificação), que é um serviço público gratuito — rodar mais
+// rápido que isso arrisca ser bloqueado.
+export async function backfillKmHistorico(onProgress) {
+  const snap = await getDocs(collection(db,'cards'))
+  const semKm = snap.docs
+    .map(d => ({ id:d.id, ...d.data() }))
+    .filter(c => c.status === 'concluido' && !c.km && c.originCity && c.destCity)
+
+  let atualizados = 0
+  let falharam = 0
+  for (let i = 0; i < semKm.length; i++) {
+    const card = semKm[i]
+    try {
+      const res = await calcularDistancia(card.originCity, card.origin, card.destCity, card.destination)
+      if (res.km) {
+        await updateDoc(doc(db,'cards',card.id), { km: res.km, kmRecalculadoEm: new Date().toISOString() })
+        atualizados++
+      } else {
+        falharam++
+      }
+    } catch {
+      falharam++
+    }
+    onProgress?.(i + 1, semKm.length)
+    // Pausa respeitosa entre chamadas — serviço público gratuito (Nominatim/OSRM),
+    // sem isso um lote grande de cards pode ser bloqueado por excesso de requisições.
+    await new Promise(r => setTimeout(r, 1100))
+  }
+
+  return { total: semKm.length, atualizados, falharam }
 }
