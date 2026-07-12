@@ -31,7 +31,7 @@ export function AssignDriverModal({ req, drivers, simClients, cards, onConfirm, 
     date <= c.endDate && dateEnd >= c.startDate
   )
   const handleConfirm=()=>{
-    const freteInfo = { veiculoId:frete?.veiculoId||'', veiculoLabel:frete?.veiculoLabel||'', freteEstimado:frete?.valorEstimado??null, freteSugerido:!!frete?.sugerido }
+    const freteInfo = { veiculoId:frete?.veiculoId||'', veiculoLabel:frete?.veiculoLabel||'', freteEstimado:frete?.valorEstimado??null, freteSugerido:!!frete?.sugerido, km:frete?.km??null }
     if(execType==='transportadora'){onConfirm({driverId:'',driverName:'',transportadoraNome:transpNome,transportadoraCnpj:transpCnpj,date,note,...freteInfo})}
     else{onConfirm({driverId,driverName:selectedDriver?.name||'',transportadoraNome:'',transportadoraCnpj:'',date,note,...freteInfo})}
   }
