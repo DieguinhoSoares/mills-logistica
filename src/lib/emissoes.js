@@ -21,8 +21,40 @@ export const CONSUMO_MEDIO_KM_POR_LITRO = {
   'bitruck':  3.5,
   'prancha3': 2.2,
   'prancha4': 2.2,
-  // guindauto e frete_rodando não têm consumo definido ainda — o relatório
-  // sinaliza "consumo não cadastrado" em vez de chutar um número.
+  // guindauto e frete_rodando não têm consumo genérico — frete_rodando é
+  // resolvido por MODELO específico da máquina (ver CONSUMO_MODELO abaixo),
+  // já que é a própria máquina rodando, não um caminhão/carreta genérico.
+}
+
+// Consumo médio POR MODELO — usado quando a máquina roda sozinha (Frete
+// Rodando), caso em que o consumo depende de qual caminhão/trator é, não de
+// uma categoria genérica de veículo de transporte. Identificado via
+// Fabricante+Modelo do CSV do SIM (mesma base já usada pra peso/dimensão em
+// freteCalc.js).
+//
+// ⚠️ Cobertura ainda muito parcial — só 1 modelo com dado real até agora.
+// Pra qualquer modelo fora daqui, o relatório sinaliza "consumo não
+// cadastrado" em vez de estimar errado. Precisa de pesquisa contínua
+// (mesmo processo já usado pra peso/dimensão: site do fabricante ou da
+// Mills, modelo por modelo).
+export const CONSUMO_MODELO = {
+  // Fonte: estimativa de terceiros (magodoscarros.com/FIPE), NÃO é ficha
+  // oficial da Volvo — Volvo não publica consumo oficial de caminhões (varia
+  // demais com carga/condição). Usado o meio da faixa de rodovia (3,5-4,5 km/l).
+  'VOLVO|VM330': 4.0,
+  'VOLVO|VM-330': 4.0,
+}
+
+function buscarConsumoModelo(fabricante, modelo) {
+  if (!fabricante && !modelo) return null
+  const fab = String(fabricante||'').toUpperCase().trim()
+  const mod = String(modelo||'').toUpperCase().trim().replace(/\s+/g,'')
+  const chaveExata = `${fab}|${mod}`
+  if (CONSUMO_MODELO[chaveExata]) return CONSUMO_MODELO[chaveExata]
+  // Fallback: tenta achar só pelo modelo, ignorando fabricante (mesma
+  // estratégia de faixaSimilar do freteCalc.js)
+  const porModelo = Object.entries(CONSUMO_MODELO).find(([k]) => k.endsWith(`|${mod}`))
+  return porModelo ? porModelo[1] : null
 }
 
 // CEP "principal" (genérico) de cada município brasileiro — base com os
@@ -52,18 +84,35 @@ export function calcularEscopo(card) {
   return card.transportadoraNome ? 'Escopo 3' : 'Escopo 1'
 }
 
+import { buscarFabricanteModelo } from './freteCalc'
+
 // Calcula consumo (litros) e emissão (kg CO2) de UM card, a partir do km
 // já persistido nele (ver AssignDriverModal/FrotasView — km passou a ser
 // salvo no card justamente pra alimentar este relatório).
-export function calcularEmissaoCard(card) {
+// `simClients` é opcional — só necessário pro Frete Rodando, que precisa
+// identificar QUAL máquina está rodando pra buscar o consumo daquele
+// modelo específico (não existe um consumo genérico de "frete rodando").
+export function calcularEmissaoCard(card, simClients) {
   const km = card.km
-  const consumoMedio = CONSUMO_MEDIO_KM_POR_LITRO[card.veiculoId]
+  let consumoMedio = CONSUMO_MEDIO_KM_POR_LITRO[card.veiculoId]
+  let fonteConsumo = 'categoria'
+
+  if (!consumoMedio && card.veiculoId === 'frete_rodando' && card.nInterno && simClients) {
+    const fm = buscarFabricanteModelo(card.nInterno, simClients)
+    if (fm) {
+      const porModelo = buscarConsumoModelo(fm.fabricante, fm.modelo)
+      if (porModelo) { consumoMedio = porModelo; fonteConsumo = 'modelo' }
+    }
+  }
 
   if (!km || km <= 0) {
     return { km:null, consumoLitros:null, emissaoKg:null, semDadoSuficiente:true, motivo:'Sem km registrado neste serviço.' }
   }
   if (!consumoMedio) {
-    return { km, consumoLitros:null, emissaoKg:null, semDadoSuficiente:true, motivo:`Consumo médio não cadastrado para o veículo "${card.veiculoId || '—'}".` }
+    const motivo = card.veiculoId === 'frete_rodando'
+      ? `Consumo não cadastrado para o modelo desta máquina (Frete Rodando) — N° interno ${card.nInterno||'—'}.`
+      : `Consumo médio não cadastrado para o veículo "${card.veiculoId || '—'}".`
+    return { km, consumoLitros:null, emissaoKg:null, semDadoSuficiente:true, motivo }
   }
 
   const consumoLitros = km / consumoMedio
@@ -74,13 +123,14 @@ export function calcularEmissaoCard(card) {
     consumoLitros: Math.round(consumoLitros * 100) / 100,
     emissaoKg: Math.round(emissaoKg * 100) / 100,
     semDadoSuficiente: false,
+    consumoPorModelo: fonteConsumo === 'modelo',
   }
 }
 
 // Monta a linha completa do relatório pra um card concluído — mesmas
 // colunas do modelo que o time de Meio Ambiente já usa hoje.
-export function montarLinhaRelatorio(card) {
-  const calc = calcularEmissaoCard(card)
+export function montarLinhaRelatorio(card, simClients) {
+  const calc = calcularEmissaoCard(card, simClients)
   const origemCidade  = card.originCity || ''
   const destinoCidade = card.destCity   || ''
   const origemUF  = card.origin      || ''
@@ -107,10 +157,10 @@ export function montarLinhaRelatorio(card) {
 }
 
 // Agrega um conjunto de cards concluídos num resumo — usado no KPIView e MasterView.
-export function resumirEmissoes(cards) {
+export function resumirEmissoes(cards, simClients) {
   const linhas = cards
     .filter(c => c.status === 'concluido')
-    .map(montarLinhaRelatorio)
+    .map(c => montarLinhaRelatorio(c, simClients))
 
   const validas = linhas.filter(l => !l.semDadoSuficiente)
   const totalKm       = validas.reduce((a,l)=>a+(l.distanciaKm||0), 0)

@@ -104,3 +104,28 @@ describe('resumirEmissoes', () => {
     expect(resumo.escopo3Kg).toBeCloseTo(44.67, 1)
   })
 })
+
+describe('calcularEmissaoCard — Frete Rodando, consumo por modelo específico', () => {
+  const simClients = [{ machineModelos: {
+    'MNA09999': { fabricante: 'Volvo', modelo: 'VM330' },
+    'MNA08888': { fabricante: 'Marca Desconhecida', modelo: 'Modelo Nunca Visto' },
+  } }]
+
+  it('resolve o consumo pelo modelo real da máquina quando é Frete Rodando', () => {
+    const r = calcularEmissaoCard({ km:400, veiculoId:'frete_rodando', nInterno:'MNA09999' }, simClients)
+    expect(r.semDadoSuficiente).toBe(false)
+    expect(r.consumoLitros).toBeCloseTo(400/4.0, 1) // Volvo VM330 = 4,0 km/l (estimado)
+    expect(r.consumoPorModelo).toBe(true)
+  })
+
+  it('sinaliza "sem dado suficiente" quando o modelo da máquina não está cadastrado', () => {
+    const r = calcularEmissaoCard({ km:400, veiculoId:'frete_rodando', nInterno:'MNA08888' }, simClients)
+    expect(r.semDadoSuficiente).toBe(true)
+    expect(r.motivo).toMatch(/Frete Rodando/)
+  })
+
+  it('sem simClients, Frete Rodando sempre fica sem dado suficiente (não quebra, só não resolve)', () => {
+    const r = calcularEmissaoCard({ km:400, veiculoId:'frete_rodando', nInterno:'MNA09999' })
+    expect(r.semDadoSuficiente).toBe(true)
+  })
+})

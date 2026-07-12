@@ -489,6 +489,35 @@ const DIMENSOES_MODELO = {
  * Retorna null se o par não estiver catalogado — quem chamar deve cair de
  * volta no GRUPO (faixa de peso) nesse caso.
  */
+// Resolve só o Fabricante+Modelo normalizado de uma máquina (sem exigir que
+// tenha dimensão cadastrada) — usado pelo cálculo de consumo do Frete
+// Rodando (emissoes.js), que precisa saber QUAL máquina está rodando
+// sozinha pra buscar o consumo médio dela especificamente.
+export function buscarFabricanteModelo(nInternos, simClients) {
+  if (!simClients?.length) return null
+  const lista = Array.isArray(nInternos) ? nInternos : [nInternos]
+
+  for (const n of lista) {
+    const nStr = String(n).trim()
+    const nNum = nStr.replace(/\D/g, '').replace(/^0+/, '')
+
+    for (const c of simClients) {
+      if (!c.machineModelos) continue
+      let entry = c.machineModelos[nStr]
+      if (!entry) {
+        const found = Object.entries(c.machineModelos).find(([k]) =>
+          String(k).replace(/\D/g, '').replace(/^0+/, '') === nNum
+        )
+        if (found) entry = found[1]
+      }
+      if (entry && (entry.fabricante || entry.modelo)) {
+        return { fabricante: normalizaModelo(entry.fabricante), modelo: normalizaModelo(entry.modelo) }
+      }
+    }
+  }
+  return null
+}
+
 export function buscarDimensaoModelo(nInternos, simClients) {
   if (!simClients?.length) return null
   const lista = Array.isArray(nInternos) ? nInternos : [nInternos]
