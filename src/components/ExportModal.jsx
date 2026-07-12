@@ -8,12 +8,35 @@ export function ExportModal({ cards, onClose }) {
   const [dateFrom,setDateFrom]=useState(getWeekDays(today)[0])
   const [dateTo,  setDateTo  ]=useState(getWeekDays(today)[6])
   const [driver,  setDriver  ]=useState('todos')
+  const [serviceTypes, setServiceTypes] = useState(['todos'])
+  const [urgencies, setUrgencies] = useState(['todas'])
+  const [unit, setUnit] = useState('todas')
   const [done,    setDone    ]=useState(false)
   const allDrivers=['todos',...Array.from(new Set(cards.map(c=>c.driver||'Sem motorista'))).sort()]
+  const allUnits=['todas',...Array.from(new Set(cards.map(c=>c.unit).filter(Boolean))).sort()]
+
+  // Multi-seleção com "Todos"/"Todas": clicar na opção coringa limpa o resto;
+  // clicar numa opção específica remove o coringa. Nunca deixa a lista vazia
+  // (se remover a última específica, volta pro coringa) — sem isso o filtro
+  // combinado com AND ficaria impossível de satisfazer, escondendo tudo.
+  const toggleChip = (list, setList, value, allValue) => {
+    if (value === allValue) { setList([allValue]); return }
+    const next = list.filter(v => v !== allValue)
+    const result = next.includes(value) ? next.filter(v => v !== value) : [...next, value]
+    setList(result.length ? result : [allValue])
+  }
+
   const filtered=cards.filter(c=>{
     if(!c.startDate) return false
-    return c.startDate>=dateFrom&&c.startDate<=dateTo&&(driver==='todos'||(c.driver||'Sem motorista')===driver)
+    const inRange = c.startDate>=dateFrom&&c.startDate<=dateTo
+    const driverMatch = driver==='todos'||(c.driver||'Sem motorista')===driver
+    const unitMatch = unit==='todas' || c.unit===unit
+    const typeMatch = serviceTypes.includes('todos') || serviceTypes.includes(c.type)
+    const urgencyMatch = urgencies.includes('todas') || urgencies.includes(c.urgency)
+    return inRange && driverMatch && unitMatch && typeMatch && urgencyMatch
   })
+  const unitSlug = unit === 'todas' ? '' : '_' + unit.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,'')
+
   const handleExport=async()=>{
     const XLSX=await import('xlsx')
     const wb=XLSX.utils.book_new()
@@ -75,8 +98,79 @@ export function ExportModal({ cards, onClose }) {
     mR.forEach((_,i)=>{const st=i%2===0?rowEven:rowOdd;mH.forEach((__,j)=>{const ref=XLSX.utils.encode_cell({r:4+i,c:j});if(wsM[ref])wsM[ref].s={...st(j===0),alignment:{vertical:'center',horizontal:j===0?'left':'center'}}})})
     wsM['!cols']=[24,8,12,12,12,10,12].map(w=>({wch:w}));wsM['!rows']=[{hpt:28},{hpt:16},,{hpt:20}]
     XLSX.utils.book_append_sheet(wb,wsM,'Por Motorista')
-    XLSX.writeFile(wb,`mills_frotas_${dateFrom}_a_${dateTo}${driver!=='todos'?'_'+driver.split(' ')[0]:''}.xlsx`)
+    // Nome do arquivo inclui a unidade filtrada (normalizada, sem acento/espaço)
+    // pra facilitar organizar relatórios de filiais diferentes lado a lado.
+    XLSX.writeFile(wb,`mills_frotas${unitSlug}_${dateFrom}_a_${dateTo}${driver!=='todos'?'_'+driver.split(' ')[0]:''}.xlsx`)
     setDone(true)
+  }
+
+  // PDF de 1 página com o resumo executivo (mesmos KPIs/distribuição da aba
+  // "Resumo" do Excel) — pensado pra quem só quer mandar um panorama rápido
+  // por e-mail/WhatsApp, sem abrir uma planilha inteira.
+  const [donePdf, setDonePdf] = useState(false)
+  const handleExportPdf = async () => {
+    const { jsPDF } = await import('jspdf')
+    const { default: autoTable } = await import('jspdf-autotable')
+    const doc = new jsPDF()
+
+    // Cabeçalho com a identidade Mills
+    doc.setFillColor(0, 64, 66) // T.verde
+    doc.rect(0, 0, 210, 22, 'F')
+    doc.setTextColor(255,255,255)
+    doc.setFontSize(14)
+    doc.text('Mills Pesados · Gestão de Frotas — Logística', 105, 13, { align:'center' })
+    doc.setFontSize(9)
+    doc.text(`Relatório de Operações · ${fmt(dateFrom)} a ${fmt(dateTo)}`, 105, 19, { align:'center' })
+
+    // KPIs — mesmos já calculados pra aba Resumo do Excel, não recalcula do zero
+    const kpis = [
+      ['Total de Serviços', filtered.length],
+      ['Dias no Período', Math.round((new Date(dateTo)-new Date(dateFrom))/86400000)+1],
+      ['Motoristas', new Set(filtered.map(c=>c.driver||'—')).size],
+      ['Estados Atendidos', new Set(filtered.map(c=>c.destination||c.origin).filter(Boolean)).size],
+      ['Críticos / Altos', filtered.filter(c=>c.urgency==='critico'||c.urgency==='alto').length],
+      ['Guindauto', filtered.filter(c=>c.type==='guindauto').length],
+    ]
+    doc.setTextColor(74,63,53) // T.text (aprox)
+    doc.setFontSize(10)
+    doc.text('KPIs DO PERÍODO', 14, 32)
+    autoTable(doc, {
+      startY: 35,
+      head: [kpis.map(k=>k[0])],
+      body: [kpis.map(k=>String(k[1]))],
+      theme: 'grid',
+      headStyles: { fillColor:[224,238,238], textColor:[0,64,66], fontStyle:'bold', halign:'center', fontSize:8 },
+      bodyStyles: { halign:'center', fontStyle:'bold', textColor:[243,112,33], fontSize:12 },
+      margin: { left:14, right:14 },
+    })
+
+    // Distribuição por tipo — mesma tabela `tipos` já usada na aba Resumo
+    const tipos = Object.entries(filtered.reduce((acc,c)=>{acc[c.type]=(acc[c.type]||0)+1;return acc},{}))
+    const tipoLabel = {guindauto:'Guindauto', freteMillsInterno:'Frete Mills', freteCliente:'Frete Cliente'}
+    const tiposRows = tipos.map(([tipo,count]) => {
+      const pct = filtered.length ? (count/filtered.length*100).toFixed(1)+'%' : '0%'
+      const mots = new Set(filtered.filter(c=>c.type===tipo).map(c=>c.driver||'—')).size
+      return [tipoLabel[tipo]||tipo, String(count), pct, String(mots)]
+    })
+    const afterKpis = doc.lastAutoTable.finalY + 10
+    doc.text('DISTRIBUIÇÃO POR TIPO DE SERVIÇO', 14, afterKpis)
+    autoTable(doc, {
+      startY: afterKpis + 3,
+      head: [['Tipo de Serviço','Qtd','% do Total','Motoristas']],
+      body: tiposRows,
+      theme: 'striped',
+      headStyles: { fillColor:[243,112,33], textColor:[255,255,255], fontStyle:'bold', fontSize:9 },
+      bodyStyles: { fontSize:9 },
+      margin: { left:14, right:14 },
+    })
+
+    // Rodapé com o slogan da marca
+    doc.setFontSize(8)
+    doc.setTextColor(158,149,144)
+    doc.text('Mills Pesados, Locação Serviços e Logística S.A. · Segurança para sonhar mais alto', 105, 287, { align:'center' })
+
+    doc.save(`mills_frotas${unitSlug}_resumo_${dateFrom}_a_${dateTo}.pdf`)
+    setDonePdf(true)
   }
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.55)', zIndex:2500, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)' }}
@@ -95,7 +189,19 @@ export function ExportModal({ cards, onClose }) {
             <input type="date" value={dateTo} onChange={e=>{setDateTo(e.target.value);setDone(false)}} style={IS}/>
           </div>
           <div style={{ display:'flex', gap:6, marginTop:10, flexWrap:'wrap' }}>
-            {[['Esta semana',getWeekDays(today)[0],getWeekDays(today)[6]],['Este mês',`${today.slice(0,7)}-01`,`${today.slice(0,7)}-${new Date(Number(today.slice(0,4)),Number(today.slice(5,7)),0).getDate().toString().padStart(2,'0')}`],['Últimos 30 dias',new Date(Date.now()-30*86400000).toISOString().split('T')[0],today],['Últimos 90 dias',new Date(Date.now()-90*86400000).toISOString().split('T')[0],today]].map(([lbl,f,t])=>(
+            {(() => {
+              const lastMonthStart = new Date(Number(today.slice(0,4)), Number(today.slice(5,7))-2, 1)
+              const lastMonthEnd   = new Date(Number(today.slice(0,4)), Number(today.slice(5,7))-1, 0)
+              const quarterStart   = new Date(Number(today.slice(0,4)), Math.floor(Number(today.slice(5,7))/3)*3, 1)
+              return [
+                ['Esta semana',getWeekDays(today)[0],getWeekDays(today)[6]],
+                ['Este mês',`${today.slice(0,7)}-01`,`${today.slice(0,7)}-${new Date(Number(today.slice(0,4)),Number(today.slice(5,7)),0).getDate().toString().padStart(2,'0')}`],
+                ['Mês passado', lastMonthStart.toISOString().split('T')[0], lastMonthEnd.toISOString().split('T')[0]],
+                ['Trimestre',   quarterStart.toISOString().split('T')[0], today],
+                ['Últimos 30 dias',new Date(Date.now()-30*86400000).toISOString().split('T')[0],today],
+                ['Últimos 90 dias',new Date(Date.now()-90*86400000).toISOString().split('T')[0],today],
+              ]
+            })().map(([lbl,f,t])=>(
               <button key={lbl} onClick={()=>{setDateFrom(f);setDateTo(t);setDone(false)}}
                 style={{ ...BS, background:dateFrom===f&&dateTo===t?T.laranja:T.surface, color:dateFrom===f&&dateTo===t?'white':T.textSec, border:`1px solid ${dateFrom===f&&dateTo===t?T.laranja:T.border}`, fontSize:10, padding:'4px 10px' }}>{lbl}</button>
             ))}
@@ -107,6 +213,33 @@ export function ExportModal({ cards, onClose }) {
             {allDrivers.map(d=><option key={d} value={d}>{d==='todos'?'Todos os motoristas':d}</option>)}
           </select>
         </div>
+
+        <div style={{ marginBottom:16 }}>
+          <label style={LS}>🏢 Unidade</label>
+          <select value={unit} onChange={e=>{setUnit(e.target.value);setDone(false)}} style={{ ...IS, marginTop:5 }}>
+            {allUnits.map(u=><option key={u} value={u}>{u==='todas'?'Todas as unidades':u}</option>)}
+          </select>
+        </div>
+
+        <div style={{ marginBottom:16 }}>
+          <label style={LS}>🚚 Tipo de serviço</label>
+          <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap' }}>
+            {[['todos','Todos'],['guindauto','Guindauto'],['freteMillsInterno','Frete Mills'],['freteCliente','Frete Cliente']].map(([val,lbl])=>(
+              <button key={val} onClick={()=>{toggleChip(serviceTypes,setServiceTypes,val,'todos');setDone(false)}}
+                style={{ ...BS, background:serviceTypes.includes(val)?T.laranja:T.surface, color:serviceTypes.includes(val)?'white':T.textSec, border:`1px solid ${serviceTypes.includes(val)?T.laranja:T.border}`, fontSize:10, padding:'4px 10px' }}>{lbl}</button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ marginBottom:16 }}>
+          <label style={LS}>⚡ Urgência</label>
+          <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap' }}>
+            {[['todas','Todas'],['critico','Crítico'],['alto','Alto'],['medio','Médio'],['baixo','Baixo']].map(([val,lbl])=>(
+              <button key={val} onClick={()=>{toggleChip(urgencies,setUrgencies,val,'todas');setDone(false)}}
+                style={{ ...BS, background:urgencies.includes(val)?T.laranja:T.surface, color:urgencies.includes(val)?'white':T.textSec, border:`1px solid ${urgencies.includes(val)?T.laranja:T.border}`, fontSize:10, padding:'4px 10px' }}>{lbl}</button>
+            ))}
+          </div>
+        </div>
         <div style={{ background:T.laranjaLight, border:`1px solid ${T.laranja}30`, borderRadius:T.r, padding:'10px 14px', marginBottom:18 }}>
           <div style={{ color:T.laranja, fontFamily:FONT, fontWeight:700, fontSize:11, marginBottom:6 }}>📋 Prévia da exportação</div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
@@ -114,9 +247,28 @@ export function ExportModal({ cards, onClose }) {
               <div key={l}><div style={{ color:T.textMuted, fontSize:9, fontFamily:FONT, textTransform:'uppercase', letterSpacing:'0.07em' }}>{l}</div><div style={{ color:T.text, fontWeight:700, fontSize:11, fontFamily:FONT }}>{v}</div></div>
             ))}
           </div>
+          {filtered.length > 0 && (
+            <div style={{ marginTop:10, paddingTop:10, borderTop:`1px solid ${T.laranja}20` }}>
+              <div style={{ color:T.textMuted, fontSize:9, fontFamily:FONT, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:4 }}>Amostra (3 primeiras linhas)</div>
+              {filtered.slice(0,3).map(c => {
+                const tipoLabel = {guindauto:'Guindauto', freteMillsInterno:'Frete Mills', freteCliente:'Frete Cliente'}[c.type] || c.type
+                return (
+                  <div key={c.id} style={{ display:'grid', gridTemplateColumns:'2fr 1.3fr 1fr', gap:6, padding:'3px 0', fontFamily:FONT, fontSize:10, color:T.textSec }}>
+                    <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{c.client || c.plantaObra || '—'}</span>
+                    <span>{tipoLabel}</span>
+                    <span>{fmt(c.startDate)}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
         <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
           <button onClick={onClose} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>Fechar</button>
+          <button onClick={handleExportPdf} disabled={filtered.length===0}
+            style={{ ...BS, background:filtered.length===0?T.borderMid:donePdf?T.verde:T.surface, color:filtered.length===0?'white':donePdf?'white':T.textSec, border:`1px solid ${T.border}`, fontWeight:700, minWidth:120, opacity:filtered.length===0?0.6:1 }}>
+            {donePdf?'✅ Baixado!':'📄 Resumo PDF'}
+          </button>
           <button onClick={handleExport} disabled={filtered.length===0}
             style={{ ...BS, background:filtered.length===0?T.borderMid:done?T.verde:T.laranja, color:'white', fontWeight:700, minWidth:170, opacity:filtered.length===0?0.6:1 }}>
             {done?'✅ Baixado!':filtered.length===0?'Sem dados no período':'⬇ Exportar .xlsx'}
