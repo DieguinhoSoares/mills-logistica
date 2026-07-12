@@ -114,11 +114,18 @@ export function FrotasView() {
       endDate:     f.desiredDateEnd || f.desiredDate || f.endDate || '',
     }
     setModal(null); setEditCard(null)
-    if (!f.id && editCard === null) {
-      // Novo card → pedir motorista antes de salvar
+    // Antes só passava pela tela de estimativa (AssignDriverModal, que é
+    // onde veiculoId/km são calculados) quando era um card NOVO. Um card
+    // salvo "sem motorista" (Cancelar no modal) e editado meses depois pra
+    // finalmente atribuir um motorista nunca passava por aqui de novo — o
+    // veículo/km ficavam pra sempre vazios, mesmo com motorista definido.
+    // Agora qualquer card SEM veículo cadastrado passa pela estimativa,
+    // seja novo ou uma edição antiga — fecha o gap na origem, não só via
+    // migração retroativa.
+    if (!mapped.veiculoId) {
       setPendingCardForm(mapped)
     } else {
-      // Edição de card existente → salvar direto
+      // Já tem veículo/km calculados — edição normal, sem repetir a estimativa
       try {
         await saveCard(mapped)
         addToast(`Serviço de ${mapped.client||'novo'} atualizado.`, 'success')

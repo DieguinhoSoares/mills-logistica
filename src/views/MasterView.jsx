@@ -271,7 +271,7 @@ export function MasterView({ simClients = [] }) {
       )}
 
       {exportModal && <ExportModal cards={cards} onClose={()=>setExportModal(false)}/>}
-      {emissoesModal && <EmissoesExportModal cards={cards} onClose={()=>setEmissoesModal(false)}
+      {emissoesModal && <EmissoesExportModal cards={cards} simClients={simClients} onClose={()=>setEmissoesModal(false)}
         onRunMigration={handleKmMigration} migrating={kmMigrating} migrateLog={kmMigrateLog} migrateProgress={kmProgress}/>}
       {cancelModal && <CancelCardModal card={cancelModal} onConfirm={r=>handleCancelCard(cancelModal,r)} onClose={()=>setCancelModal(null)}/>}
       <ConfirmModal open={!!deleteTarget} danger title="Excluir serviço"
@@ -321,7 +321,7 @@ export function MasterView({ simClients = [] }) {
       )}
 
       <div style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column' }}>
-        {tab==='kpis' && <KPIView cards={cards} requests={requests}/>}
+        {tab==='kpis' && <KPIView cards={cards} requests={requests} simClients={simClients}/>}
 
         {tab==='map' && (
           <div style={{ flex:1, padding:'16px 20px', overflow:'hidden' }}>

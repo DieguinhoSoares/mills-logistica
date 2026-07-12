@@ -82,11 +82,11 @@ function DonutChart({ title, data }) {
   )
 }
 
-export function KPIView({ cards, requests }) {
+export function KPIView({ cards, requests, simClients }) {
   // Emissão de CO2 (Escopo 1/3) — dado enviado ao time de Meio Ambiente da
   // Mills pra divulgação externa. Ver src/lib/emissoes.js: consumo médio por
   // veículo ainda marcado "a confirmar" com o time de Meio Ambiente.
-  const emissoes = useMemo(() => resumirEmissoes(cards), [cards])
+  const emissoes = useMemo(() => resumirEmissoes(cards, simClients), [cards, simClients])
 
   const stats = useMemo(() => {
     const hoje      = new Date().toISOString().split('T')[0]
