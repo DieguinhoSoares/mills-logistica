@@ -64,6 +64,22 @@ export function FrotasView() {
   const [pendingCardForm, setPendingCardForm] = useState(null)
   const [mapModal,     setMapModal]     = useState(false)
   const [confirmarConclusao, setConfirmarConclusao] = useState(null) // card sem app aguardando confirmação
+  // Número da NF, digitado pelo analista antes de confirmar a emissão —
+  // hoje só existia o booleano nfConfirmada (histórico de auditoria de que
+  // "alguém confirmou"), sem guardar o número em si. Necessário pro
+  // relatório de emissão de carbono, que precisa citar a NF de cada serviço.
+  const [nfInputs, setNfInputs] = useState({})
+  const handleConfirmarNF = async (card) => {
+    const numero = (nfInputs[card.id] || '').trim()
+    if (!numero) { addToast('Digite o número da NF antes de confirmar.', 'error'); return }
+    try {
+      await saveCard({ ...card, numeroNF:numero, nfConfirmada:true, nfConfirmadaPor:profile?.name||'Frotas', nfConfirmadaEm:new Date().toISOString() })
+      addToast('✅ NF confirmada!', 'success')
+    } catch (err) {
+      console.error('Erro ao confirmar NF:', err)
+      addToast('Erro ao confirmar NF. Tente novamente.', 'error')
+    }
+  }
   const [rodapeSlide,  setRodapeSlide]  = useState(0) // 0 = timeline de hoje, 1 = KPIs rápidos
 
   const hoje      = todayStr()
@@ -113,7 +129,7 @@ export function FrotasView() {
     }
   }
 
-  const handleCardDriverConfirm = async ({ driverId, driverName, transportadoraNome, transportadoraCnpj, date, note, veiculoId, veiculoLabel, freteEstimado, freteSugerido }) => {
+  const handleCardDriverConfirm = async ({ driverId, driverName, transportadoraNome, transportadoraCnpj, date, note, veiculoId, veiculoLabel, freteEstimado, freteSugerido, km }) => {
     const motorista = driverName || transportadoraNome || ''
     // Preserva a duração (em dias) já definida no serviço — se Frotas mudar a data de início
     // ao atribuir o motorista, a data fim acompanha mantendo o mesmo número de dias.
@@ -135,7 +151,7 @@ export function FrotasView() {
       status:              'confirmado',
       notes:               [pendingCardForm.description, note].filter(Boolean).join(' — '),
       veiculoId:veiculoId||'', veiculoLabel:veiculoLabel||'',
-      freteEstimado:freteEstimado??null, freteSugerido:!!freteSugerido,
+      freteEstimado:freteEstimado??null, freteSugerido:!!freteSugerido, km:km??null,
     }
     try {
       await saveCard(finalCard)
@@ -292,7 +308,7 @@ export function FrotasView() {
     }
   }
 
-  const handleAssignConfirm = async ({ driverId, driverName, transportadoraNome, transportadoraCnpj, date, note, veiculoId, veiculoLabel, freteEstimado, freteSugerido }) => {
+  const handleAssignConfirm = async ({ driverId, driverName, transportadoraNome, transportadoraCnpj, date, note, veiculoId, veiculoLabel, freteEstimado, freteSugerido, km }) => {
     const { req, id, webhook } = assignModal
     const motorista = driverName || transportadoraNome || ''
     try {
@@ -309,7 +325,7 @@ export function FrotasView() {
         // Veículo/frete definidos na tela de aceite (FreteEstimativa), incluindo
         // eventual override manual do analista — antes isso nunca era salvo.
         veiculoId:veiculoId||'', veiculoLabel:veiculoLabel||'',
-        freteEstimado:freteEstimado??null, freteSugerido:!!freteSugerido,
+        freteEstimado:freteEstimado??null, freteSugerido:!!freteSugerido, km:km??null,
       })
       setAssignModal(null)
       addToast(`✅ Serviço aceito e atribuído a ${motorista||'motorista'}!`,'accepted')
@@ -632,14 +648,31 @@ export function FrotasView() {
                       {validacoes.length>0&&(
                         <div style={{ marginBottom:14 }}>
                           <div style={{ color:T.verde, fontSize:9, fontFamily:FONT, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8 }}>✅ Prontos para validar</div>
-                          {validacoes.map(c=>(
+                          {validacoes.map(c=>{
+                            const precisaNF = SUBTYPES_NF.includes(c.subtype) && !c.nfConfirmada
+                            return (
                             <div key={c.id} style={{ border:`1px solid ${T.verde}30`, borderRadius:T.rSm, padding:'9px 11px', marginBottom:7, background:T.verdeLight }}>
                               <div style={{ color:T.text, fontWeight:700, fontSize:11, fontFamily:FONT, marginBottom:2 }}>{c.client||'—'}</div>
                               <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT, marginBottom:6 }}>👤 {c.driver||'—'} · {fmt(c.startDate)}</div>
                               {c.conclusaoNota&&<div style={{ color:T.textSec, fontSize:10, fontFamily:FONT, fontStyle:'italic', marginBottom:6, padding:'4px 7px', background:'rgba(0,64,66,.08)', borderRadius:T.rSm }}>"{c.conclusaoNota.slice(0,50)}{c.conclusaoNota.length>50?'..':''}"</div>}
-                              <button onClick={()=>handleValidarCard(c)} style={{ ...BS, background:T.verde, color:'white', fontWeight:700, fontSize:10, width:'100%' }}>✅ Validar e encerrar</button>
+                              {precisaNF ? (
+                                <div style={{ marginBottom:7 }}>
+                                  <div style={{ display:'flex', gap:6 }}>
+                                    <input value={nfInputs[c.id]||''} onChange={e=>setNfInputs(prev=>({...prev,[c.id]:e.target.value}))}
+                                      placeholder="Nº da NF..." style={{ ...IS, fontSize:10, padding:'6px 8px' }}/>
+                                    <button onClick={()=>handleConfirmarNF(c)}
+                                      style={{ ...BS, background:T.laranja, color:'white', fontWeight:700, fontSize:10, whiteSpace:'nowrap', padding:'6px 10px' }}>
+                                      Confirmar NF
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (c.numeroNF && (
+                                <div style={{ color:T.verde, fontSize:9, fontFamily:FONT, fontWeight:700, marginBottom:6 }}>📄 NF {c.numeroNF} confirmada</div>
+                              ))}
+                              <button onClick={()=>handleValidarCard(c)} disabled={precisaNF}
+                                style={{ ...BS, background:precisaNF?T.textMuted:T.verde, color:'white', fontWeight:700, fontSize:10, width:'100%', cursor:precisaNF?'not-allowed':'pointer', opacity:precisaNF?0.6:1 }}>✅ Validar e encerrar</button>
                             </div>
-                          ))}
+                          )})}
                         </div>
                       )}
 

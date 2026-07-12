@@ -8,10 +8,11 @@ import { detectConflicts, fmt, getSubtypeLabel, sortByUrgency } from '../lib/uti
 import { doc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { salvarWhatsAppConfig } from '../lib/vercelApi'
-import { useCards, useRequests, useNotifications, useConfig, usePendingUsers, useManagerialRequests, runDailyBackup, useMessages, useAllUsers, useBackupStatus, notifyUser, backfillSeqIds, approveAsSupervisor, refuseAsSupervisor, approveAsGerente, refuseAsGerente } from '../hooks/useFirestore'
+import { useCards, useRequests, useNotifications, useConfig, usePendingUsers, useManagerialRequests, runDailyBackup, useMessages, useAllUsers, useBackupStatus, notifyUser, backfillSeqIds, backfillKmHistorico, approveAsSupervisor, refuseAsSupervisor, approveAsGerente, refuseAsGerente } from '../hooks/useFirestore'
 import { FreteEstimativa } from '../components/FreteEstimativa'
 import { MessageThread }    from '../components/MessageThread'
 import { ExportModal }      from '../components/ExportModal'
+import { EmissoesExportModal } from '../components/EmissoesExportModal'
 
 const PERFIS = [
   ['frotas',      '🚛 Gestão de Frotas'],
@@ -87,8 +88,12 @@ export function MasterView({ simClients = [] }) {
 
   // ── Migração única: corrigir origin/destination vazios nos cards ────────────
   const [exportModal, setExportModal] = useState(false)
+  const [emissoesModal, setEmissoesModal] = useState(false)
   const [migrating, setMigrating] = useState(false)
   const [migrateLog, setMigrateLog] = useState(null)
+  const [kmMigrating, setKmMigrating] = useState(false)
+  const [kmMigrateLog, setKmMigrateLog] = useState(null)
+  const [kmProgress, setKmProgress] = useState(null) // {atual, total}
 
   const STATE_ABBR = {
     'Acre':'AC','Alagoas':'AL','Amapá':'AP','Amazonas':'AM','Bahia':'BA',
@@ -214,6 +219,22 @@ export function MasterView({ simClients = [] }) {
     }
   }
 
+  // Recalcula km de serviços concluídos ANTES da correção que passou a salvar
+  // km no card — sem isso, o relatório de emissão de carbono trata esses
+  // serviços antigos como "sem dado suficiente" pra sempre.
+  const handleKmMigration = async () => {
+    setKmMigrating(true)
+    setKmProgress(null)
+    try {
+      const res = await backfillKmHistorico((atual, total) => setKmProgress({ atual, total }))
+      setKmMigrateLog(`${res.atualizados} de ${res.total} serviços atualizados${res.falharam ? ` · ${res.falharam} não puderam ser calculados (cidade não encontrada)` : ''}.`)
+    } catch (err) {
+      setKmMigrateLog('Erro na migração: ' + err.message)
+    } finally {
+      setKmMigrating(false)
+    }
+  }
+
   const handleSaveTollguru = async () => {
     await saveConfig({ tollguruApikey: tollguruKey })
     setSavedToll(true); setTimeout(()=>setSavedToll(false), 2000)
@@ -250,6 +271,8 @@ export function MasterView({ simClients = [] }) {
       )}
 
       {exportModal && <ExportModal cards={cards} onClose={()=>setExportModal(false)}/>}
+      {emissoesModal && <EmissoesExportModal cards={cards} onClose={()=>setEmissoesModal(false)}
+        onRunMigration={handleKmMigration} migrating={kmMigrating} migrateLog={kmMigrateLog} migrateProgress={kmProgress}/>}
       {cancelModal && <CancelCardModal card={cancelModal} onConfirm={r=>handleCancelCard(cancelModal,r)} onClose={()=>setCancelModal(null)}/>}
       <ConfirmModal open={!!deleteTarget} danger title="Excluir serviço"
         message={`Excluir o serviço de ${deleteTarget?.client||'este card'}? Esta ação não pode ser desfeita.`}
@@ -281,6 +304,7 @@ export function MasterView({ simClients = [] }) {
           ))}
           <NotificationBell notifications={notifications} unreadCount={unreadCount} onMarkAllRead={markAllRead} onMarkRead={markRead} onDelete={deleteNotification} onEnablePush={enablePush} onDisablePush={disablePush}/>
           <button onClick={()=>setExportModal(true)} style={{ ...BS, background:T.verdeLight, color:T.verde, border:`1px solid ${T.verde}40`, fontSize:11, fontWeight:700 }}>📊 Relatório</button>
+          <button onClick={()=>setEmissoesModal(true)} style={{ ...BS, background:T.verdeLight, color:T.verde, border:`1px solid ${T.verde}40`, fontSize:11, fontWeight:700 }}>🌱 Emissão CO2</button>
           <button onClick={logout} style={{ ...BS, background:'rgba(255,255,255,0.15)', color:'white', border:'1px solid rgba(255,255,255,0.2)', fontSize:11 }}>Sair</button>
         </div>
       </div>

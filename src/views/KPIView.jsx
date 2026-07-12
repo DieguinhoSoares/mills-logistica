@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { T, FONT, CARD_TYPES } from '../lib/constants'
+import { resumirEmissoes } from '../lib/emissoes'
 
 function KPICard({ title, value, sub, color, bg, icon, trend }) {
   return (
@@ -82,6 +83,11 @@ function DonutChart({ title, data }) {
 }
 
 export function KPIView({ cards, requests }) {
+  // Emissão de CO2 (Escopo 1/3) — dado enviado ao time de Meio Ambiente da
+  // Mills pra divulgação externa. Ver src/lib/emissoes.js: consumo médio por
+  // veículo ainda marcado "a confirmar" com o time de Meio Ambiente.
+  const emissoes = useMemo(() => resumirEmissoes(cards), [cards])
+
   const stats = useMemo(() => {
     const hoje      = new Date().toISOString().split('T')[0]
     const thisMonth = hoje.slice(0,7)
@@ -195,6 +201,18 @@ export function KPIView({ cards, requests }) {
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
         <BarChart title="Por filial de origem"  data={stats.byFilial}  color={T.info}/>
         <BarChart title="Rotas mais frequentes" data={stats.topRoutes} color={T.laranjaDeep}/>
+      </div>
+
+      <div style={{ marginTop:14 }}>
+        <div style={{ fontFamily:FONT, fontWeight:800, fontSize:11, color:T.text, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8 }}>
+          🌱 Emissão de Carbono <span style={{ color:T.textMuted, fontWeight:500, textTransform:'none', letterSpacing:'normal' }}>— para o time de Meio Ambiente</span>
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10 }}>
+          <KPICard title="Emissão Total"    value={`${emissoes.totalEmissaoKg.toLocaleString('pt-BR')} kg`} icon="🌍" color={T.verde}   bg={T.verdeLight}   sub="CO2 — serviços concluídos"/>
+          <KPICard title="Escopo 1"         value={`${emissoes.escopo1Kg.toLocaleString('pt-BR')} kg`}      icon="🚛" color={T.info}     bg={T.infoLight}    sub="Frota própria (Motorista Mills)"/>
+          <KPICard title="Escopo 3"         value={`${emissoes.escopo3Kg.toLocaleString('pt-BR')} kg`}      icon="📦" color={T.laranja}  bg={T.laranjaLight} sub="Transportadora terceirizada"/>
+          <KPICard title="Sem Dado"         value={emissoes.servicosSemDado}                                icon="⚠️" color={T.perigo}   bg={T.perigoLight}  sub="Serviços sem km ou consumo cadastrado"/>
+        </div>
       </div>
 
       {stats.total===0 && (
