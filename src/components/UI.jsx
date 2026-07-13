@@ -188,6 +188,13 @@ export function ClientInput({ value, onChange, simClients }) {
   const [open, setOpen]     = useState(false)
   const [search, setSearch] = useState(value?.name||'')
 
+  // Sem isso, se o formulário resetar `value` pra null por qualquer motivo
+  // (troca de subtipo, limpeza de campo, etc.), o texto digitado continuava
+  // aparecendo na tela mesmo com o campo real vazio por trás — dando a
+  // impressão de "cliente preenchido" quando na verdade não tinha nada
+  // selecionado, e o formulário barrava com "Campo obrigatório".
+  useEffect(() => { setSearch(value?.name||'') }, [value])
+
   // Normalização tolerante a acentos e maiúsculas/minúsculas —
   // converte "SÃO PAULO" e "SAO PAULO" pra a mesma string de busca.
   const norm = s => s.toLowerCase()
