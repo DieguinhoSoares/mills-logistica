@@ -43,7 +43,7 @@ export function RequestReviewModal({ req, teamsWebhookUrl, onRespond, onClose, p
             {[
               ['Solicitante',   req.requesterName || '—'],
               ['Unidade',       req.unit          || '—'],
-              ['Equipamento',   req.machine       || '—'],
+              ['Equipamento',   (req.nInternos?.length ? req.nInternos.join(', ') : req.machine) || '—'],
               ['Data desejada', fmt(req.desiredDate)    ],
               ['Rota',          `${req.origin} → ${req.destination}`],
               ['Planta/Obra',   req.clientName    || '—'],
