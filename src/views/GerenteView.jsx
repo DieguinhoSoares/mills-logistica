@@ -232,7 +232,7 @@ function MobileRequestCard({ req, profile, onOpen }) {
 
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
         {[
-          ['Equipamento', req.machine||'—'],
+          ['Equipamento', (req.nInternos?.length ? req.nInternos.join(', ') : req.machine) || '—'],
           ['Data', fmt(req.desiredDate)],
           ['Rota', `${req.originCityName||req.origin||'—'} → ${req.destCityName||req.destination||'—'}`],
           ['Urgência', `${ug?.icon} ${ug?.label}`],
@@ -281,7 +281,7 @@ function DesktopRequestCard({ req, profile, onView }) {
         <span style={{ background:sc.bg, border:`1px solid ${sc.color}40`, borderRadius:20, padding:'3px 11px', color:sc.color, fontSize:10, fontWeight:800, fontFamily:FONT, whiteSpace:'nowrap' }}>{sc.label}</span>
       </div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:10 }}>
-        {[['Solicitante',req.requesterName||'—'],['Unidade',req.unit||'—'],['Equipamento',req.machine||'—'],
+        {[['Solicitante',req.requesterName||'—'],['Unidade',req.unit||'—'],['Equipamento',(req.nInternos?.length ? req.nInternos.join(', ') : req.machine)||'—'],
           ['Rota',`${req.originCityName||req.origin||'—'} → ${req.destCityName||req.destination||'—'}`],
           ['Data',fmt(req.desiredDate)],['Planta/Obra',req.clientName||'—']].map(([l,v])=>(
           <div key={l}>

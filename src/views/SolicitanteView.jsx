@@ -65,6 +65,8 @@ export function SolicitanteView({ simClients }) {
       normS(r.originCityName||r.origin).includes(normQ) ||
       normS(r.destCityName||r.destination).includes(normQ) ||
       normS(r.nInterno).includes(normQ) ||
+      (r.nInternos||[]).some(n => normS(n).includes(normQ)) ||
+      (r.nInternosReserva||[]).some(n => normS(n).includes(normQ)) ||
       normS(r.requesterName).includes(normQ) ||
       normS(r.status).includes(normQ)
     ), 'desiredDate')

@@ -410,7 +410,7 @@ export function MasterView({ simClients = [] }) {
                       <span style={{ background:sc.bg, border:`1px solid ${sc.color}40`, borderRadius:20, padding:'3px 11px', color:sc.color, fontSize:10, fontWeight:800, fontFamily:FONT, whiteSpace:'nowrap' }}>{sc.label}</span>
                     </div>
                     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:10 }}>
-                      {[['Solicitante',r.requesterName||'—'],['Unidade',r.unit||'—'],['Equipamento',r.machine||'—'],['Rota',`${r.originCityName||r.origin||'—'} → ${r.destCityName||r.destination||'—'}`],['Data',fmt(r.desiredDate)],['Planta/Obra',r.clientName||'—']].map(([l,v])=>(
+                      {[['Solicitante',r.requesterName||'—'],['Unidade',r.unit||'—'],['Equipamento',(r.nInternos?.length ? r.nInternos.join(', ') : r.machine)||'—'],['Rota',`${r.originCityName||r.origin||'—'} → ${r.destCityName||r.destination||'—'}`],['Data',fmt(r.desiredDate)],['Planta/Obra',r.clientName||'—']].map(([l,v])=>(
                         <div key={l}>
                           <div style={{ color:T.textMuted, fontSize:9, textTransform:'uppercase', letterSpacing:'0.07em', fontFamily:FONT, marginBottom:2 }}>{l}</div>
                           <div style={{ color:T.text, fontWeight:700, fontSize:11, fontFamily:FONT }}>{v}</div>
