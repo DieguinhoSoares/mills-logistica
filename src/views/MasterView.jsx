@@ -8,7 +8,7 @@ import { detectConflicts, fmt, getSubtypeLabel, sortByUrgency } from '../lib/uti
 import { doc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { salvarWhatsAppConfig } from '../lib/vercelApi'
-import { useCards, useRequests, useNotifications, useConfig, usePendingUsers, useManagerialRequests, runDailyBackup, useMessages, useAllUsers, useBackupStatus, notifyUser, backfillSeqIds, backfillKmHistorico, approveAsSupervisor, refuseAsSupervisor, approveAsGerente, refuseAsGerente } from '../hooks/useFirestore'
+import { useCards, useRequests, useNotifications, useConfig, usePendingUsers, useManagerialRequests, runDailyBackup, useMessages, useAllUsers, useBackupStatus, notifyUser, backfillSeqIds, backfillKmHistorico, approveAsSupervisor, refuseAsSupervisor, approveAsGerente, refuseAsGerente, useFalhasSilenciosas } from '../hooks/useFirestore'
 import { FreteEstimativa } from '../components/FreteEstimativa'
 import { MessageThread }    from '../components/MessageThread'
 import { ExportModal }      from '../components/ExportModal'
@@ -149,6 +149,7 @@ export function MasterView({ simClients = [] }) {
   const cardsAtivos    = cards.filter(c => !['concluido','cancelado'].includes(c.status))
   // acceptedCards: cards aceitos/confirmados ativos — exibidos na seção "Cancelar Serviço Aceito"
   const acceptedCards  = cardsAtivos.filter(c => c.status==='confirmado' || c.status==='aceito')
+  const { falhas, marcarResolvida } = useFalhasSilenciosas()
 
   const TABS = [
     { id:'kpis',      label:'📊 Indicadores', badge: null },
@@ -158,6 +159,7 @@ export function MasterView({ simClients = [] }) {
     { id:'aprovacao', label:'📋 Aprovações',   badge: pendingAprov || null },
     { id:'servicos',  label:'🚫 Serviços',     badge: acceptedCards?.length || null },
     { id:'usuarios',  label:'👥 Usuários',     badge: pendingUsers.length || null },
+    { id:'falhas',    label:'⚠️ Falhas',       badge: falhas.length || null },
   ]
 
   const handleCancelCard = async (card, reason) => {
@@ -625,6 +627,39 @@ export function MasterView({ simClients = [] }) {
               </div>
             ) : (
               <div style={{ textAlign:'center', padding:'30px 0', color:T.textMuted, fontFamily:FONT, fontSize:12 }}>Nenhum serviço aceito no momento.</div>
+            )}
+          </div>
+        )}
+
+        {tab==='falhas' && (
+          <div style={{ flex:1, overflow:'auto', padding:'16px 20px' }}>
+            <h3 style={{ fontFamily:FONT, fontWeight:700, fontSize:16, color:T.text, margin:'0 0 4px' }}>
+              ⚠️ Falhas Silenciosas <span style={{ color:T.textMuted, fontWeight:500, fontSize:12 }}>exclusivo Master</span>
+            </h3>
+            <p style={{ color:T.textMuted, fontFamily:FONT, fontSize:11, margin:'0 0 16px' }}>
+              WhatsApp, push ou notificações que não chegaram ao destinatário, sem erro visível em nenhum outro lugar do sistema.
+            </p>
+            {falhas.length > 0 ? (
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                {falhas.map(f => (
+                  <div key={f.id} style={{ background:T.perigoLight, border:`1px solid ${T.perigo}30`, borderRadius:T.rLg, padding:'12px 16px', display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12 }}>
+                    <div style={{ minWidth:0 }}>
+                      <div style={{ display:'flex', gap:6, alignItems:'center', marginBottom:4 }}>
+                        <span style={{ background:T.perigo, color:'white', borderRadius:20, padding:'2px 8px', fontSize:9, fontWeight:700, fontFamily:FONT, textTransform:'uppercase' }}>{f.tipo}</span>
+                        <span style={{ fontFamily:FONT, fontSize:10, color:T.textMuted }}>{f.createdAt?.toDate ? f.createdAt.toDate().toLocaleString('pt-BR') : '—'}</span>
+                      </div>
+                      <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:T.text }}>{f.mensagem}</div>
+                      {f.contexto && <div style={{ fontFamily:FONT, fontSize:10, color:T.textMuted, marginTop:2, wordBreak:'break-word' }}>{f.contexto}</div>}
+                    </div>
+                    <button onClick={()=>marcarResolvida(f.id)}
+                      style={{ ...BS, background:T.surface, color:T.textSec, border:`1px solid ${T.border}`, fontSize:10, fontWeight:700, flexShrink:0, whiteSpace:'nowrap' }}>
+                      ✓ Resolvida
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ textAlign:'center', padding:'30px 0', color:T.textMuted, fontFamily:FONT, fontSize:12 }}>Nenhuma falha registrada — tudo entregando normalmente. ✅</div>
             )}
           </div>
         )}
