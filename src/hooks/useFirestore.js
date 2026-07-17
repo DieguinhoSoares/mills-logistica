@@ -421,6 +421,20 @@ export async function disablePushFor(user) {
   } catch { /* melhor esforço */ }
 }
 
+// Falhas silenciosas — WhatsApp/push/notifyRoles que não chegaram ao
+// destinatário, sem nenhum erro visível em lugar nenhum (ver
+// registrarFalhaSilenciosa em vercelApi.js). Visível só pro Master.
+export function useFalhasSilenciosas() {
+  const [falhas, setFalhas] = useState([])
+  useEffect(() => {
+    const q = query(collection(db,'falhasSilenciosas'), where('resolvido','==',false), orderBy('createdAt','desc'), limit(50))
+    const unsub = onSnapshot(q, snap=>setFalhas(snap.docs.map(d=>({ id:d.id, ...d.data() }))), ()=>{})
+    return unsub
+  }, [])
+  const marcarResolvida = id => updateDoc(doc(db,'falhasSilenciosas',id), { resolvido:true, resolvidoEm:serverTimestamp() })
+  return { falhas, marcarResolvida }
+}
+
 export function useNotifications() {
   const { user } = useAuth()
   const [notifications, setNotifications] = useState([])
