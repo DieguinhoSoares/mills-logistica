@@ -12,7 +12,7 @@ import { enviarWhatsApp, enviarPush, notificarRoles } from '../lib/vercelApi'
 // o bundler não conseguia separá-los em chunk próprio mesmo assim. O único
 // efeito prático era uma etapa assíncrona a mais sem propósito. O próprio
 // Vite já sinalizava isso como [INEFFECTIVE_DYNAMIC_IMPORT] no build.
-import { sendTeamsNotification } from '../lib/utils'
+import { sendTeamsNotification, todayStr, diasAtras } from '../lib/utils'
 import { calcularDistancia } from '../lib/freteCalc'
 
 export function useCards() {
@@ -23,7 +23,7 @@ export function useCards() {
     // Sem isso a coleção inteira era baixada em tempo real — custo de leitura e
     // memória crescendo linearmente com o histórico. Relatórios de períodos mais
     // antigos podem ler sob demanda com getDocs se um dia for necessário.
-    const cutoff = new Date(Date.now() - 180*86400000).toISOString().split('T')[0]
+    const cutoff = diasAtras(180)
     const q = query(collection(db,'cards'), where('startDate','>=',cutoff), orderBy('startDate','asc'))
     const unsub = onSnapshot(q,
       snap => { setCards(snap.docs.map(d=>({ id:d.id, ...d.data() }))); setLoading(false) },
@@ -697,7 +697,7 @@ function chunkBySize(items, maxBytes = 700000) {
 }
 
 export async function runDailyBackup(cards, requests) {
-  const today = new Date().toISOString().split('T')[0]
+  const today = todayStr()
   const ref = doc(db,'backups',today)
   const existing = await getDoc(ref)
   if (existing.exists()) {
