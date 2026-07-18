@@ -13,6 +13,11 @@ export function AssignDriverModal({ req, drivers, simClients, cards, onConfirm, 
   const [execType,setExecType]=useState('motorista')
   const [driverId,setDriverId]=useState('')
   const [transpNome,setTranspNome]=useState('')
+  // Trava contra duplo clique — bug real encontrado: sem isso, um clique
+  // duplo no botão "Confirmar" (comum em conexão lenta) disparava onConfirm
+  // duas vezes antes da primeira terminar, criando 2 cards idênticos pro
+  // mesmo motorista/solicitação, já que é uma criação nova (addDoc) sem ID.
+  const [saving,setSaving]=useState(false)
   const [transpCnpj,setTranspCnpj]=useState('')
   const [date,setDate]=useState(req?.desiredDate||todayStr())
   const [note,setNote]=useState('')
@@ -30,12 +35,18 @@ export function AssignDriverModal({ req, drivers, simClients, cards, onConfirm, 
     c.startDate && c.endDate &&
     date <= c.endDate && dateEnd >= c.startDate
   )
-  const handleConfirm=()=>{
+  const handleConfirm=async()=>{
+    if (saving) return // trava extra — ignora cliques repetidos mesmo se o disabled do botão não pegar a tempo
+    setSaving(true)
     const freteInfo = { veiculoId:frete?.veiculoId||'', veiculoLabel:frete?.veiculoLabel||'', freteEstimado:frete?.valorEstimado??null, freteSugerido:!!frete?.sugerido, km:frete?.km??null }
-    if(execType==='transportadora'){onConfirm({driverId:'',driverName:'',transportadoraNome:transpNome,transportadoraCnpj:transpCnpj,date,note,...freteInfo})}
-    else{onConfirm({driverId,driverName:selectedDriver?.name||'',transportadoraNome:'',transportadoraCnpj:'',date,note,...freteInfo})}
+    try {
+      if(execType==='transportadora'){await onConfirm({driverId:'',driverName:'',transportadoraNome:transpNome,transportadoraCnpj:transpCnpj,date,note,...freteInfo})}
+      else{await onConfirm({driverId,driverName:selectedDriver?.name||'',transportadoraNome:'',transportadoraCnpj:'',date,note,...freteInfo})}
+    } finally {
+      setSaving(false) // se o modal já fechou (sucesso), isso é inofensivo — só importa quando dá erro e o modal continua aberto
+    }
   }
-  const canConfirm=execType==='transportadora'?transpNome.trim():driverId
+  const canConfirm=(execType==='transportadora'?transpNome.trim():driverId) && !saving
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.55)', zIndex:2500, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)' }}>
       <motion.div initial={{ scale:.95, opacity:0 }} animate={{ scale:1, opacity:1 }}
@@ -83,7 +94,9 @@ export function AssignDriverModal({ req, drivers, simClients, cards, onConfirm, 
         </div>
         <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:20 }}>
           <button onClick={onCancel} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>Cancelar</button>
-          <button onClick={handleConfirm} disabled={!canConfirm} style={{ ...BS, background:canConfirm?T.verde:T.borderMid, color:'white', fontWeight:700, opacity:canConfirm?1:0.5 }}>✅ Confirmar e criar no calendário</button>
+          <button onClick={handleConfirm} disabled={!canConfirm} style={{ ...BS, background:canConfirm?T.verde:T.borderMid, color:'white', fontWeight:700, opacity:canConfirm?1:0.5, cursor:canConfirm?'pointer':'not-allowed' }}>
+            {saving ? '⏳ Salvando...' : '✅ Confirmar e criar no calendário'}
+          </button>
         </div>
       </motion.div>
     </div>

@@ -33,6 +33,16 @@ export function RotogramaModal({ driver, cards, profile, rotogramaAtivo, onClose
       const matriz = await calcularMatrizDistancias(pontos)
       if (!matriz) { addToast('Não foi possível calcular a rota (cidade não encontrada).', 'error'); return }
       const ordem = otimizarOrdemParadas(matriz) // ex: [0, 3, 1, 2] — índice 0 é a origem
+      // Se o OSRM não conseguir calcular rota até alguma parada (destino
+      // sem rota rodoviária conhecida, por exemplo), a matriz tem essa
+      // distância como Infinity e o algoritmo de otimização para cedo,
+      // devolvendo uma ordem menor que o número real de paradas. Sem essa
+      // checagem, a parada que ficou de fora simplesmente sumia da rota
+      // sem nenhum aviso — igual apagar um destino sem querer.
+      if (ordem.length !== matriz.length) {
+        addToast('⚠️ Não foi possível calcular rota até alguma parada — ordem mantida como está, nada foi alterado.', 'error')
+        return
+      }
       const novaOrdem = ordem.slice(1).map(i => paradas[i - 1])
       setParadas(novaOrdem)
       addToast('🧭 Ordem otimizada pela distância entre as paradas!', 'success')

@@ -148,7 +148,7 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
     selectedClient:null, clientName:'', semCliente:false, localLivre:'',
     desiredDate:todayStr(), desiredDateEnd:todayStr(), urgency:'medio', om:'',
     description:'', channel:'teams',
-    podeEmbarcar:null, destinoOficina:'', nfsRetorno:[],
+    podeEmbarcar:null, destinoOficina:'',
     temMaquinaRetorno:null, // null=não perguntado, 'sim'/'nao' — só usado quando o subtipo tem retorno opcional (ex: Rollout)
     movimento:'saida', refOrigem:'',
     driverId:'', driverName:'', transportadoraNome:'', transportadoraCnpj:'',
@@ -201,7 +201,7 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
     refOrigem:            initialData.refOrigem||'',
     paradasExtras:        initialData.paradas?.slice(1)?.map(p=>({tipo:p.tipo,cidade:p.cidade,uf:p.uf,clientName:p.clientName||'',nInternos:p.nInternos||[]})) || [],
     cardOrigemId:         initialData.cardOrigemId||'',
-    nfsRetorno:           initialData.nfsRetorno||[],
+    numeroNF:             initialData.numeroNF||'',
     nfConfirmada:         initialData.nfConfirmada||false,
     nfConfirmadaPor:      initialData.nfConfirmadaPor||'',
     nfConfirmadaEm:       initialData.nfConfirmadaEm||null,
@@ -719,14 +719,10 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
           )}
           {isCardEdit && needsNF && (
             <motion.div initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:'auto' }} exit={{ opacity:0, height:0 }} style={{ marginBottom:14 }}>
-              <ChipInput label="📄 Número(s) da NF" placeholder="Digite o número da NF e pressione Enter..."
-                values={form.nfsRetorno} onChange={v=>set('nfsRetorno',v)}
-                hint="Opcional só pra referência — a confirmação oficial é o botão abaixo."/>
-
               {form.nfConfirmada ? (
                 <div style={{ marginTop:8, padding:'10px 13px', background:T.sucessoLight, borderRadius:T.r, border:`1px solid ${T.sucesso}40`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                   <div>
-                    <div style={{ color:T.sucesso, fontFamily:FONT, fontWeight:700, fontSize:12 }}>✅ NF confirmada</div>
+                    <div style={{ color:T.sucesso, fontFamily:FONT, fontWeight:700, fontSize:12 }}>✅ NF {form.numeroNF||'—'} confirmada</div>
                     <div style={{ color:T.textSec, fontFamily:FONT, fontSize:10, marginTop:2 }}>
                       Por {form.nfConfirmadaPor || '—'}{form.nfConfirmadaEm ? ` · ${new Date(form.nfConfirmadaEm).toLocaleString('pt-BR')}` : ''}
                     </div>
@@ -737,18 +733,24 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
                   </button>
                 </div>
               ) : (
-                <div style={{ marginTop:8, padding:'10px 13px', background:T.perigoLight, borderRadius:T.r, border:`1px solid ${T.perigo}40`, display:'flex', justifyContent:'space-between', alignItems:'center', gap:10 }}>
-                  <div style={{ color:T.perigo, fontFamily:FONT, fontWeight:700, fontSize:11 }}>
+                <div style={{ marginTop:8, padding:'10px 13px', background:T.perigoLight, borderRadius:T.r, border:`1px solid ${T.perigo}40` }}>
+                  <div style={{ color:T.perigo, fontFamily:FONT, fontWeight:700, fontSize:11, marginBottom:8 }}>
                     ⚠ NF ainda não confirmada — o serviço não pode ser encerrado sem essa confirmação
                   </div>
-                  <button onClick={()=>{
-                      set('nfConfirmada', true)
-                      set('nfConfirmadaPor', profile?.name || 'Frotas')
-                      set('nfConfirmadaEm', new Date().toISOString())
-                    }}
-                    style={{ ...BS, background:T.perigo, color:'white', fontWeight:700, fontSize:11, whiteSpace:'nowrap' }}>
-                    ✅ Confirmar NF emitida
-                  </button>
+                  <div style={{ display:'flex', gap:8 }}>
+                    <input value={form.numeroNF||''} onChange={e=>set('numeroNF',e.target.value)}
+                      placeholder="Nº da NF..." style={{ ...IS, fontSize:12 }}/>
+                    <button onClick={()=>{
+                        if (!(form.numeroNF||'').trim()) return
+                        set('nfConfirmada', true)
+                        set('nfConfirmadaPor', profile?.name || 'Frotas')
+                        set('nfConfirmadaEm', new Date().toISOString())
+                      }}
+                      disabled={!(form.numeroNF||'').trim()}
+                      style={{ ...BS, background:(form.numeroNF||'').trim()?T.perigo:T.borderMid, color:'white', fontWeight:700, fontSize:11, whiteSpace:'nowrap', cursor:(form.numeroNF||'').trim()?'pointer':'not-allowed' }}>
+                      ✅ Confirmar NF emitida
+                    </button>
+                  </div>
                 </div>
               )}
             </motion.div>

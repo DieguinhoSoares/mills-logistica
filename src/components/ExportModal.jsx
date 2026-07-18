@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { T, FONT, BS, IS, LS } from '../lib/constants'
-import { fmt, todayStr, getWeekDays } from '../lib/utils'
+import { fmt, todayStr, getWeekDays, diasAtras } from '../lib/utils'
 
 export function ExportModal({ cards, onClose }) {
   const today=todayStr()
@@ -198,8 +198,8 @@ export function ExportModal({ cards, onClose }) {
                 ['Este mês',`${today.slice(0,7)}-01`,`${today.slice(0,7)}-${new Date(Number(today.slice(0,4)),Number(today.slice(5,7)),0).getDate().toString().padStart(2,'0')}`],
                 ['Mês passado', lastMonthStart.toISOString().split('T')[0], lastMonthEnd.toISOString().split('T')[0]],
                 ['Trimestre',   quarterStart.toISOString().split('T')[0], today],
-                ['Últimos 30 dias',new Date(Date.now()-30*86400000).toISOString().split('T')[0],today],
-                ['Últimos 90 dias',new Date(Date.now()-90*86400000).toISOString().split('T')[0],today],
+                ['Últimos 30 dias',diasAtras(30),today],
+                ['Últimos 90 dias',diasAtras(90),today],
               ]
             })().map(([lbl,f,t])=>(
               <button key={lbl} onClick={()=>{setDateFrom(f);setDateTo(t);setDone(false)}}
