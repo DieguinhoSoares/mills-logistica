@@ -129,3 +129,13 @@ describe('calcularEmissaoCard — Frete Rodando, consumo por modelo específico'
     expect(r.semDadoSuficiente).toBe(true)
   })
 })
+
+describe('diasAtras — bug de fuso horário corrigido (todayStr/diasAtras)', () => {
+  it('diasAtras(30) fica exatamente 30 dias antes de hoje, sem depender da hora do dia', async () => {
+    const { diasAtras, todayStr } = await import('./utils')
+    const hoje = new Date(todayStr()+'T12:00:00')
+    const trintaAtras = new Date(diasAtras(30)+'T12:00:00')
+    const diffDias = Math.round((hoje - trintaAtras) / 86400000)
+    expect(diffDias).toBe(30)
+  })
+})

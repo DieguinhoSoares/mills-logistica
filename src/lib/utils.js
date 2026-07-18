@@ -1,6 +1,25 @@
 import { WD_SHORT, CARD_TYPES, CARD_SUBTYPES, URGENCY } from './constants'
 
-export const todayStr  = () => new Date().toISOString().split('T')[0]
+// Antes usava toISOString(), que sempre retorna a data em UTC — entre 21h e
+// meia-noite no horário de Brasília (UTC-3), o UTC já tinha virado o dia
+// seguinte, fazendo o sistema achar que "hoje" já era amanhã (serviços do
+// dia apareciam atrasados 3h antes da hora, relatórios de período ficavam
+// um dia adiantados). Agora monta a data a partir dos componentes locais.
+export const todayStr  = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+// "N dias atrás", calculado a partir da meia-noite local de hoje — não usa
+// Date.now() diretamente (esse é o momento ATUAL, qualquer hora do dia; se
+// for calculado depois das 21h no Brasil, o UTC já virou o dia seguinte e o
+// resultado sai adiantado em 1 dia). Mesma causa raiz do bug corrigido em
+// todayStr() acima, encontrado depois em mais 2 lugares (ExportModal.jsx,
+// janela móvel de cards em useFirestore.js).
+export const diasAtras = n => {
+  const [y,m,d] = todayStr().split('-').map(Number)
+  const dt = new Date(y, m-1, d - n)
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`
+}
 export const fmt       = d  => { if (!d) return '—'; const [y,m,dd] = d.split('-'); return `${dd}/${m}/${y}` }
 export const uid       = () => `${Date.now()}_${Math.random().toString(36).slice(2,8)}`
 

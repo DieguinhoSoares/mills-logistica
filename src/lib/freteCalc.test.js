@@ -4,7 +4,7 @@
 // Rodar: npm test
 // ============================================================
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { calcularFrete, selecionarVeiculoPorPeso, resolverVeiculoTransporte, analisarRotaComParadas, getValorIda, otimizarOrdemParadas, DIARIAS, VEICULOS, formatBRL } from './freteCalc'
+import { calcularFrete, selecionarVeiculoPorPeso, resolverVeiculoTransporte, analisarRotaComParadas, getValorIda, otimizarOrdemParadas, DIARIAS, VEICULOS, formatBRL, PESO_GRUPO } from './freteCalc'
 
 describe('calcularFrete — entradas inválidas', () => {
   it('retorna null sem km', () => {
@@ -107,6 +107,25 @@ describe('selecionarVeiculoPorPeso — escala BID 2024', () => {
     expect(byId['bitruck']).toBe(17)
     expect(byId['prancha3']).toBe(32)
     expect(byId['prancha4']).toBe(40.5)
+  })
+  it('grupo desconhecido usa peso conservador (10,5t), não zero — bug real corrigido', () => {
+    // Antes: um grupo sem peso cadastrado contava como 0 na soma, podendo
+    // sugerir veículo menor que o necessário numa combinação de máquinas.
+    const semNenhumConhecido = selecionarVeiculoPorPeso(['Grupo Totalmente Inventado'])
+    expect(semNenhumConhecido.pesoTotal).toBe(10.5)
+    expect(semNenhumConhecido.temGrupoDesconhecido).toBe(true)
+  })
+  it('combinação com 1 grupo conhecido + 1 desconhecido soma o conservador, não ignora o desconhecido', () => {
+    const grupoConhecido = Object.keys(PESO_GRUPO)[0]
+    const pesoConhecido  = PESO_GRUPO[grupoConhecido]
+    const combo = selecionarVeiculoPorPeso([grupoConhecido, 'Grupo Inventado Xyz'])
+    expect(combo.pesoTotal).toBeCloseTo(pesoConhecido + 10.5, 1)
+    expect(combo.temGrupoDesconhecido).toBe(true)
+  })
+  it('todos os grupos conhecidos não sinaliza desconhecido', () => {
+    const grupoConhecido = Object.keys(PESO_GRUPO)[0]
+    const combo = selecionarVeiculoPorPeso([grupoConhecido])
+    expect(combo.temGrupoDesconhecido).toBe(false)
   })
 })
 
@@ -413,5 +432,24 @@ describe('otimizarOrdemParadas — heurística do vizinho mais próximo', () => 
     const ordem = otimizarOrdemParadas(matriz)
     expect(new Set(ordem).size).toBe(4) // sem repetição
     expect(ordem[0]).toBe(0) // sempre começa na origem
+  })
+
+  it('bug real corrigido: quando o OSRM não acha rota até uma parada (Infinity), a ordem sai INCOMPLETA — quem chama precisa checar o tamanho antes de aplicar', () => {
+    // Origem e A se enxergam bem, mas B é inalcançável de qualquer ponto
+    // (Infinity em toda a linha/coluna dele) — situação real quando o OSRM
+    // não consegue calcular rota rodoviária até algum destino.
+    const matriz = [
+      [0,        10,       Infinity],
+      [10,       0,        Infinity],
+      [Infinity, Infinity, 0       ],
+    ]
+    const ordem = otimizarOrdemParadas(matriz)
+    // A função em si não trava nem inventa dado — só para de adicionar
+    // paradas que não consegue alcançar. RotogramaModal.jsx é quem precisa
+    // comparar ordem.length com matriz.length antes de aplicar o resultado
+    // (ver correção em handleOtimizar), senão a parada B desaparece da rota
+    // sem nenhum aviso.
+    expect(ordem.length).toBeLessThan(matriz.length)
+    expect(ordem).not.toContain(2) // parada B (índice 2) ficou de fora
   })
 })

@@ -125,7 +125,7 @@ const GRUPO_VEICULO = {
 }
 
 // ── PESO OPERACIONAL POR GRUPO DE MODELO (t) ─────────────────
-const PESO_GRUPO = {
+export const PESO_GRUPO = {
   'Carregadeira de Pneus 1 a 2 t':             1.5,
   'Carregadeira de Pneus 2 a 3 t':             2.5,
   'Carregadeira de Pneus 8 a 9 t':             8.5,
@@ -599,7 +599,19 @@ export function sugerirVeiculo(grupoModelo) {
 // ── SELEÇÃO DE VEÍCULO por peso combinado (multi-carga) ──────
 export function selecionarVeiculoPorPeso(grupos) {
   if (!grupos?.length) return null
-  const pesoTotal = grupos.reduce((acc, g) => acc + (PESO_GRUPO[g] || 0), 0)
+  // Antes, um grupo sem peso cadastrado contava como 0 na soma — numa
+  // combinação de várias máquinas, isso podia subestimar o peso total e
+  // sugerir um veículo menor que o necessário, sem nenhum aviso. Agora usa
+  // o mesmo peso conservador (10,5t) já usado pelo restante do sistema
+  // (resolverVeiculoTransporte) pra máquina não reconhecida, e sinaliza a
+  // incerteza em vez de escondê-la.
+  let temGrupoDesconhecido = false
+  const PESO_FALLBACK_CONSERVADOR = 10.5
+  const pesoTotal = grupos.reduce((acc, g) => {
+    const peso = PESO_GRUPO[g]
+    if (peso === undefined) temGrupoDesconhecido = true
+    return acc + (peso ?? PESO_FALLBACK_CONSERVADOR)
+  }, 0)
   let veiculoId = null
   if      (pesoTotal <= 3.5)  veiculoId = '3/4'
   else if (pesoTotal <= 13)   veiculoId = 'truck'
@@ -611,6 +623,7 @@ export function selecionarVeiculoPorPeso(grupos) {
     pesoTotal: Math.round(pesoTotal * 10) / 10,
     combinacao: grupos.length > 1,
     veiculo: VEICULOS.find(v => v.id === veiculoId),
+    temGrupoDesconhecido,
   }
 }
 
