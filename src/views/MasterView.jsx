@@ -25,9 +25,15 @@ const PERFIS = [
 
 function CancelCardModal({ card, onConfirm, onClose }) {
   const [reason, setReason] = useState('')
+  const [saving, setSaving] = useState(false)
+  const handleConfirm = async () => {
+    if (!reason.trim() || saving) return
+    setSaving(true)
+    try { await onConfirm(reason) } finally { setSaving(false) }
+  }
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.55)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)' }}
-      onClick={e => e.target===e.currentTarget && onClose()}>
+      onClick={e => e.target===e.currentTarget && !saving && onClose()}>
       <motion.div initial={{ scale:.95, opacity:0 }} animate={{ scale:1, opacity:1 }}
         style={{ background:T.surface, borderRadius:T.rLg, padding:28, width:440, boxShadow:T.shadowLg, border:`2px solid ${T.perigo}` }}>
         <h3 style={{ color:T.perigo, fontFamily:FONT, fontWeight:700, fontSize:18, margin:'0 0 6px' }}>🚫 Cancelar Serviço</h3>
@@ -40,9 +46,9 @@ function CancelCardModal({ card, onConfirm, onClose }) {
             style={{ width:'100%', background:T.surfaceAlt, border:`1px solid ${T.border}`, borderRadius:8, padding:'9px 12px', color:T.text, fontSize:13, fontFamily:FONT, boxSizing:'border-box', outline:'none', height:80, resize:'vertical', marginTop:5 }}/>
         </div>
         <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
-          <button onClick={onClose} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>Voltar</button>
-          <button onClick={() => reason.trim() && onConfirm(reason)} disabled={!reason.trim()}
-            style={{ ...BS, background:reason.trim()?T.perigo:'#CCC', color:'white', fontWeight:700 }}>Confirmar</button>
+          <button onClick={onClose} disabled={saving} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>Voltar</button>
+          <button onClick={handleConfirm} disabled={!reason.trim()||saving}
+            style={{ ...BS, background:(reason.trim()&&!saving)?T.perigo:'#CCC', color:'white', fontWeight:700 }}>{saving?'⏳ Cancelando...':'Confirmar'}</button>
         </div>
       </motion.div>
     </div>

@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { T, FONT, CARD_TYPES } from '../lib/constants'
+import { T, FONT, CARD_TYPES, URGENCY } from '../lib/constants'
 import { resumirEmissoes } from '../lib/emissoes'
+import { todayStr } from '../lib/utils'
 
 function KPICard({ title, value, sub, color, bg, icon, trend }) {
   return (
@@ -89,7 +90,7 @@ export function KPIView({ cards, requests, simClients }) {
   const emissoes = useMemo(() => resumirEmissoes(cards, simClients), [cards, simClients])
 
   const stats = useMemo(() => {
-    const hoje      = new Date().toISOString().split('T')[0]
+    const hoje      = todayStr()
     const thisMonth = hoje.slice(0,7)
     const lastMonth = new Date(new Date().getFullYear(), new Date().getMonth()-1, 1).toISOString().slice(0,7)
 
@@ -168,14 +169,94 @@ export function KPIView({ cards, requests, simClients }) {
     const reqValidas = (requests||[]).filter(r=>r.status!=='cancelado').length
     const taxaAceit = reqValidas ? Math.round((aceitoReq/reqValidas)*100) : 0
 
-    return { total,totalAtivos,late,onTime,pctOnTime,pctAder,remanejados,byType,byDriver,byState,byFilial,tempoMedio,topRoutes,monthCards,growthPct,pendReq,taxaAceit }
+    // ── Cenário operacional AGORA — o que Rafael mais precisa ver de cara:
+    // não é histórico, é "o que está rolando com a equipe neste exato momento".
+    const emExecucao        = cards.filter(c=>c.status==='em_execucao').length
+    const aguardandoValid   = cards.filter(c=>c.status==='aguardando_validacao').length
+    const interrompidos     = cards.filter(c=>c.status==='interrompido').length
+    const atrasadosAgora    = cardsAtivos.filter(c => c.endDate && c.endDate < hoje)
+      .sort((a,b)=>a.endDate.localeCompare(b.endDate)).slice(0,6)
+      .map(c=>({ cliente:c.client||'—', driver:c.driver||'—', dias:Math.max(0,Math.round((new Date(hoje)-new Date(c.endDate))/86400000)) }))
+
+    // SLA por urgência — hoje só existe um "on-time %" geral, misturando
+    // crítico com baixo. Separado por faixa, fica claro se os serviços que
+    // mais importam (crítico/alto) estão sendo cumpridos, mesmo que a média
+    // geral pareça boa.
+    const slaPorUrgencia = ['critico','alto','medio','baixo'].map(u => {
+      const doGrupo = cardsAtivos.filter(c=>c.urgency===u)
+      const noPrazo = doGrupo.filter(c => !(c.endDate && c.endDate < hoje))
+      return {
+        urgencia: u,
+        total: doGrupo.length,
+        pctOnTime: doGrupo.length ? Math.round((noPrazo.length/doGrupo.length)*100) : null,
+      }
+    })
+
+    return { total,totalAtivos,late,onTime,pctOnTime,pctAder,remanejados,byType,byDriver,byState,byFilial,tempoMedio,topRoutes,monthCards,growthPct,pendReq,taxaAceit,
+      emExecucao,aguardandoValid,interrompidos,atrasadosAgora,slaPorUrgencia }
   }, [cards, requests])
 
   return (
     <div style={{ padding:'16px 20px', overflowY:'auto', height:'100%' }}>
       <div style={{ marginBottom:18 }}>
         <h2 style={{ fontFamily:FONT, fontWeight:900, fontSize:18, color:T.text, margin:0 }}>📊 Indicadores de Performance</h2>
-        <p style={{ fontFamily:FONT, fontSize:12, color:T.textMuted, margin:'3px 0 0' }}>Dados em tempo real · {stats.total} serviços · acesso exclusivo Master</p>
+        <p style={{ fontFamily:FONT, fontSize:12, color:T.textMuted, margin:'3px 0 0' }}>Dados em tempo real · {stats.total} serviços</p>
+      </div>
+
+      {/* Cenário operacional AGORA — visão rápida do que está rolando com a
+          equipe neste momento, não histórico. Pensado pra quem acompanha a
+          operação (ex: gestão regional) sem precisar entrar em cada tela
+          operacional pra montar esse panorama sozinho. */}
+      <div style={{ marginBottom:16 }}>
+        <div style={{ fontFamily:FONT, fontWeight:800, fontSize:11, color:T.text, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8 }}>
+          🟢 Cenário Operacional Agora
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:10 }}>
+          <KPICard title="Em Execução"          value={stats.emExecucao}      icon="🚛" color={T.info}    bg={T.infoLight}    sub="Motoristas em rota agora"/>
+          <KPICard title="Aguardando Validação"  value={stats.aguardandoValid} icon="📋" color={T.laranja} bg={T.laranjaXLight} sub="Concluídos pelo motorista, faltando conferir"/>
+          <KPICard title="Interrompidos"         value={stats.interrompidos}   icon="⏸"  color={T.perigo}  bg={T.perigoLight}  sub="Parados em campo, aguardando retomada"/>
+          <KPICard title="Solicitações Pendentes" value={stats.pendReq}        icon="📥" color={T.verde}   bg={T.verdeLight}   sub="Aguardando atribuição de motorista"/>
+        </div>
+        {stats.atrasadosAgora.length > 0 && (
+          <div style={{ background:T.perigoLight, borderRadius:T.r, padding:'10px 14px', border:`1px solid ${T.perigo}30` }}>
+            <div style={{ color:T.perigo, fontFamily:FONT, fontWeight:700, fontSize:11, marginBottom:6 }}>⚠️ Serviços atrasados agora mesmo</div>
+            <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+              {stats.atrasadosAgora.map((a,i) => (
+                <div key={i} style={{ fontFamily:FONT, fontSize:11, color:T.textSec, display:'flex', justifyContent:'space-between' }}>
+                  <span>{a.cliente} · {a.driver}</span>
+                  <span style={{ fontWeight:700, color:T.perigo }}>{a.dias}d de atraso</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* SLA por urgência — antes só existia um "no prazo %" geral, misturando
+          crítico com baixo. Aqui separa por faixa, então dá pra ver se os
+          serviços que mais importam estão realmente sendo cumpridos, mesmo
+          que a média geral pareça boa. */}
+      <div style={{ marginBottom:16 }}>
+        <div style={{ fontFamily:FONT, fontWeight:800, fontSize:11, color:T.text, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8 }}>
+          🎯 SLA por Urgência
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10 }}>
+          {stats.slaPorUrgencia.map(s => {
+            const u = URGENCY[s.urgencia]
+            return (
+              <div key={s.urgencia} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.r, padding:'12px 14px' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:6 }}>
+                  <span>{u.icon}</span>
+                  <span style={{ fontFamily:FONT, fontWeight:700, fontSize:11, color:T.text }}>{u.label}</span>
+                </div>
+                <div style={{ fontFamily:FONT, fontWeight:900, fontSize:20, color:s.pctOnTime===null?T.textMuted:(s.pctOnTime>=80?T.sucesso:s.pctOnTime>=50?T.laranja:T.perigo) }}>
+                  {s.pctOnTime===null ? '—' : `${s.pctOnTime}%`}
+                </div>
+                <div style={{ fontFamily:FONT, fontSize:10, color:T.textMuted }}>{s.total} em aberto</div>
+              </div>
+            )
+          })}
+        </div>
       </div>
 
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:14 }}>

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { db } from '../lib/firebase'
 import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { T, FONT, CARD_TYPES, URGENCY } from '../lib/constants'
-import { fmt } from '../lib/utils'
+import { fmt, todayStr } from '../lib/utils'
 import { notifyUser } from '../hooks/useFirestore'
 import { ConfirmModal } from '../components/UI'
 
@@ -243,7 +243,11 @@ function ServicoCard({ card, index, onUpdateStatus }) {
   }
 
   const handleRetomar = async () => {
-    await onUpdateStatus(card.id, 'em_execucao', { interrupcaoMotivo:null, interrupcaoDescricao:null })
+    // interrompidoEm também precisa ser limpo aqui — antes só interrupcaoMotivo/
+    // interrupcaoDescricao eram apagados, deixando esse timestamp obsoleto no
+    // card pra sempre (não aparece em nenhuma tela hoje, mas ficaria enganoso
+    // se um relatório futuro vier a usar esse campo).
+    await onUpdateStatus(card.id, 'em_execucao', { interrupcaoMotivo:null, interrupcaoDescricao:null, interrompidoEm:null })
   }
 
   return (
@@ -273,7 +277,7 @@ function ServicoCard({ card, index, onUpdateStatus }) {
           </div>
 
           {/* Alerta de atraso individual */}
-          {card.endDate && card.endDate < new Date().toISOString().split('T')[0] && !['concluido','cancelado'].includes(card.status) && (
+          {card.endDate && card.endDate < todayStr() && !['concluido','cancelado'].includes(card.status) && (
             <div style={{ background:'#3D1A1A', border:`1px solid #D32F2F40`, borderRadius:T.r, padding:'8px 12px', marginBottom:10, display:'flex', alignItems:'center', gap:8 }}>
               <span style={{ fontSize:16 }}>🚨</span>
               <div>
@@ -310,7 +314,7 @@ function ServicoCard({ card, index, onUpdateStatus }) {
           {/* Detalhes */}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
             {[
-              ['📅 Data',       `${fmt(card.startDate)}${card.endDate && card.endDate < new Date().toISOString().split('T')[0] && !['concluido','cancelado'].includes(card.status) ? ' 🚨' : ''}`],
+              ['📅 Data',       `${fmt(card.startDate)}${card.endDate && card.endDate < todayStr() && !['concluido','cancelado'].includes(card.status) ? ' 🚨' : ''}`],
               ['⚡ Urgência',   `${ug?.icon} ${ug?.label}`],
               ['🔧 Máquina',    card.machine||'—'],
               ['🔢 N° Interno', card.nInterno||'—'],
@@ -472,7 +476,7 @@ export function MotoristaView({ token }) {
     }
   }
 
-  const today      = new Date().toISOString().split('T')[0]
+  const today      = todayStr()
   const cardsHoje  = cards.filter(c=>c.startDate===today)
   const cardsSemana= cards.filter(c=>c.startDate>today)
   const cardsAntigos=cards.filter(c=>c.startDate<today&&!['concluido','cancelado'].includes(c.status))

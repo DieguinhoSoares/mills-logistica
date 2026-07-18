@@ -21,6 +21,107 @@ import { WeekView, MonthView, YearView } from '../components/CalendarViews'
 // Modais e sub-views extraídos para src/components/ (item 11 da revisão):
 // RotogramaModal · SettingsModal · DriversModal · AssignDriverModal
 // RequestsKanban · CsvUploadModal · CalendarViews (Week/Month/Year)
+// Modal de validação — antes era um cartãozinho apertado dentro do painel
+// lateral, sem espaço pra mostrar a foto que o motorista enviou nem pra
+// deixar claro qual serviço está sendo encerrado. Agora abre em destaque,
+// com a foto em tamanho real, a nota completa (sem cortar em 50 caracteres),
+// e trava o botão durante o salvamento (fix de um bug real: clique duplo
+// aqui disparava a notificação de conclusão duas vezes pro solicitante).
+function ValidacaoModal({ card, nfInput, onNfInputChange, onConfirmarNF, onValidar, onClose }) {
+  const [saving, setSaving] = useState(false)
+  const [fotoAmpliada, setFotoAmpliada] = useState(false)
+  const precisaNF = SUBTYPES_NF.includes(card.subtype) && !card.nfConfirmada
+
+  const handleValidar = async () => {
+    setSaving(true)
+    await onValidar(card)
+    setSaving(false)
+  }
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.6)', zIndex:3000, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)', padding:20 }}
+      onClick={e=>e.target===e.currentTarget && !saving && onClose()}>
+      <motion.div initial={{ scale:.95, opacity:0 }} animate={{ scale:1, opacity:1 }}
+        style={{ background:T.surface, borderRadius:T.rLg, padding:26, width:560, maxWidth:'100%', maxHeight:'90vh', overflowY:'auto', boxShadow:T.shadowLg, border:`2px solid ${T.verde}` }}>
+
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:4 }}>
+          <h3 style={{ color:T.text, fontFamily:FONT, fontWeight:800, fontSize:18, margin:0 }}>✅ Validar Serviço</h3>
+          <button onClick={onClose} disabled={saving} style={{ background:'none', border:'none', color:T.textMuted, fontSize:22, cursor:saving?'default':'pointer', lineHeight:1 }}>×</button>
+        </div>
+
+        {/* Identificação clara de QUAL serviço está sendo finalizado */}
+        <div style={{ background:T.surfaceAlt, borderRadius:T.r, padding:'12px 14px', margin:'14px 0' }}>
+          <div style={{ color:T.text, fontFamily:FONT, fontWeight:800, fontSize:15, marginBottom:4 }}>{card.client||'—'}</div>
+          <div style={{ color:T.textSec, fontFamily:FONT, fontSize:12, marginBottom:2 }}>{getSubtypeLabelSafe(card)}</div>
+          <div style={{ color:T.textMuted, fontFamily:FONT, fontSize:11 }}>
+            🗺 {card.originCity||card.origin||'—'} → {card.destCity||card.destination||'—'} &nbsp;·&nbsp;
+            🔧 {card.nInterno||'—'} &nbsp;·&nbsp;
+            👤 {card.driver||'—'} &nbsp;·&nbsp;
+            📅 {fmt(card.startDate)}
+          </div>
+        </div>
+
+        {/* Foto enviada pelo motorista — antes não aparecia em lugar nenhum */}
+        {card.conclusaoFoto ? (
+          <div style={{ marginBottom:14 }}>
+            <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:6 }}>📷 Foto enviada pelo motorista</div>
+            <img src={card.conclusaoFoto} alt="Comprovante do serviço"
+              onClick={()=>setFotoAmpliada(true)}
+              style={{ width:'100%', maxHeight:320, objectFit:'contain', borderRadius:T.r, border:`1px solid ${T.border}`, cursor:'zoom-in', background:T.surfaceLow }}/>
+          </div>
+        ) : (
+          <div style={{ marginBottom:14, padding:'10px 12px', background:T.perigoLight, borderRadius:T.rSm, color:T.perigo, fontFamily:FONT, fontSize:11, fontWeight:700 }}>
+            ⚠️ Nenhuma foto foi enviada pelo motorista neste serviço.
+          </div>
+        )}
+
+        {card.conclusaoNota && (
+          <div style={{ marginBottom:14 }}>
+            <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>📝 Observação do motorista</div>
+            <div style={{ color:T.textSec, fontFamily:FONT, fontSize:13, fontStyle:'italic', padding:'8px 10px', background:'rgba(0,64,66,.06)', borderRadius:T.rSm }}>"{card.conclusaoNota}"</div>
+          </div>
+        )}
+
+        {precisaNF ? (
+          <div style={{ marginBottom:14, padding:'12px 14px', background:T.perigoLight, borderRadius:T.r, border:`1px solid ${T.perigo}30` }}>
+            <div style={{ color:T.perigo, fontFamily:FONT, fontWeight:700, fontSize:12, marginBottom:8 }}>📄 Confirme a NF antes de validar</div>
+            <div style={{ display:'flex', gap:8 }}>
+              <input value={nfInput||''} onChange={e=>onNfInputChange(e.target.value)}
+                placeholder="Nº da NF..." style={{ ...IS, fontSize:12 }}/>
+              <button onClick={onConfirmarNF}
+                style={{ ...BS, background:T.laranja, color:'white', fontWeight:700, fontSize:12, whiteSpace:'nowrap' }}>
+                Confirmar NF
+              </button>
+            </div>
+          </div>
+        ) : (card.numeroNF && (
+          <div style={{ marginBottom:14, color:T.verde, fontSize:12, fontFamily:FONT, fontWeight:700 }}>📄 NF {card.numeroNF} confirmada</div>
+        ))}
+
+        <div style={{ display:'flex', gap:10 }}>
+          <button onClick={onClose} disabled={saving} style={{ ...BS, flex:1, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>Fechar</button>
+          <button onClick={handleValidar} disabled={precisaNF||saving}
+            style={{ ...BS, flex:2, background:(precisaNF||saving)?T.textMuted:T.verde, color:'white', fontWeight:700, cursor:(precisaNF||saving)?'not-allowed':'pointer', opacity:(precisaNF||saving)?0.6:1 }}>
+            {saving ? '⏳ Validando...' : '✅ Validar e Encerrar Serviço'}
+          </button>
+        </div>
+      </motion.div>
+
+      {/* Foto em tela cheia, ao clicar */}
+      {fotoAmpliada && card.conclusaoFoto && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.9)', zIndex:3500, display:'flex', alignItems:'center', justifyContent:'center', cursor:'zoom-out' }}
+          onClick={()=>setFotoAmpliada(false)}>
+          <img src={card.conclusaoFoto} alt="Comprovante ampliado" style={{ maxWidth:'92vw', maxHeight:'92vh', objectFit:'contain' }}/>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function getSubtypeLabelSafe(card) {
+  try { return getSubtypeLabel(card.type, card.subtype) } catch { return '' }
+}
+
 export function FrotasView() {
   const { profile, logout }              = useAuth()
   const { cards, saveCard, deleteCard, moveCard } = useCards()
@@ -69,6 +170,7 @@ export function FrotasView() {
   // "alguém confirmou"), sem guardar o número em si. Necessário pro
   // relatório de emissão de carbono, que precisa citar a NF de cada serviço.
   const [nfInputs, setNfInputs] = useState({})
+  const [reviewValidacao, setReviewValidacao] = useState(null)
   const handleConfirmarNF = async (card) => {
     const numero = (nfInputs[card.id] || '').trim()
     if (!numero) { addToast('Digite o número da NF antes de confirmar.', 'error'); return }
@@ -112,6 +214,11 @@ export function FrotasView() {
       destCity:    f.destCity?.m   || f.destCity || '',
       startDate:   f.desiredDate    || f.startDate || '',
       endDate:     f.desiredDateEnd || f.desiredDate || f.endDate || '',
+      // Cards criados direto (não vindos de solicitação aprovada) nunca
+      // recebiam `unit` — ficavam invisíveis no gráfico "Por filial de
+      // origem" do KPIView, sem ninguém perceber, já que não dava erro
+      // nenhum, só sumia da estatística.
+      unit:        f.unit || editCard?.unit || profile?.unit || '',
     }
     setModal(null); setEditCard(null)
     // Antes só passava pela tela de estimativa (AssignDriverModal, que é
@@ -122,7 +229,17 @@ export function FrotasView() {
     // Agora qualquer card SEM veículo cadastrado passa pela estimativa,
     // seja novo ou uma edição antiga — fecha o gap na origem, não só via
     // migração retroativa.
-    if (!mapped.veiculoId) {
+    // Antes checava `mapped.veiculoId` — mas o formulário de edição nunca
+    // carrega nem devolve esse campo (RequestForm não lida com veiculoId em
+    // nenhuma direção), então essa condição era SEMPRE verdadeira, forçando
+    // toda edição de card a passar pela tela de estimativa de novo — mesmo
+    // um card que já tinha veículo/frete calculados há meses. Risco real:
+    // a reestimativa não lembra de nenhuma escolha manual anterior, podendo
+    // substituir silenciosamente um valor correto por um recalculado, só
+    // porque alguém editou uma observação. Agora checa o CARD que já existe
+    // no banco (editCard) — só força a estimativa quando o card de verdade
+    // ainda não tem veículo definido, seja ele novo ou uma edição antiga.
+    if (!editCard?.veiculoId) {
       setPendingCardForm(mapped)
     } else {
       // Já tem veículo/km calculados — edição normal, sem repetir a estimativa
@@ -658,29 +775,33 @@ export function FrotasView() {
                           {validacoes.map(c=>{
                             const precisaNF = SUBTYPES_NF.includes(c.subtype) && !c.nfConfirmada
                             return (
-                            <div key={c.id} style={{ border:`1px solid ${T.verde}30`, borderRadius:T.rSm, padding:'9px 11px', marginBottom:7, background:T.verdeLight }}>
-                              <div style={{ color:T.text, fontWeight:700, fontSize:11, fontFamily:FONT, marginBottom:2 }}>{c.client||'—'}</div>
-                              <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT, marginBottom:6 }}>👤 {c.driver||'—'} · {fmt(c.startDate)}</div>
-                              {c.conclusaoNota&&<div style={{ color:T.textSec, fontSize:10, fontFamily:FONT, fontStyle:'italic', marginBottom:6, padding:'4px 7px', background:'rgba(0,64,66,.08)', borderRadius:T.rSm }}>"{c.conclusaoNota.slice(0,50)}{c.conclusaoNota.length>50?'..':''}"</div>}
-                              {precisaNF ? (
-                                <div style={{ marginBottom:7 }}>
-                                  <div style={{ display:'flex', gap:6 }}>
-                                    <input value={nfInputs[c.id]||''} onChange={e=>setNfInputs(prev=>({...prev,[c.id]:e.target.value}))}
-                                      placeholder="Nº da NF..." style={{ ...IS, fontSize:10, padding:'6px 8px' }}/>
-                                    <button onClick={()=>handleConfirmarNF(c)}
-                                      style={{ ...BS, background:T.laranja, color:'white', fontWeight:700, fontSize:10, whiteSpace:'nowrap', padding:'6px 10px' }}>
-                                      Confirmar NF
-                                    </button>
-                                  </div>
+                            <div key={c.id} onClick={()=>setReviewValidacao(c)}
+                              style={{ border:`1px solid ${T.verde}30`, borderRadius:T.rSm, padding:'9px 11px', marginBottom:7, background:T.verdeLight, cursor:'pointer' }}>
+                              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                                <div style={{ minWidth:0 }}>
+                                  <div style={{ color:T.text, fontWeight:700, fontSize:11, fontFamily:FONT, marginBottom:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{c.client||'—'}</div>
+                                  <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT }}>👤 {c.driver||'—'} · {fmt(c.startDate)}</div>
                                 </div>
-                              ) : (c.numeroNF && (
-                                <div style={{ color:T.verde, fontSize:9, fontFamily:FONT, fontWeight:700, marginBottom:6 }}>📄 NF {c.numeroNF} confirmada</div>
-                              ))}
-                              <button onClick={()=>handleValidarCard(c)} disabled={precisaNF}
-                                style={{ ...BS, background:precisaNF?T.textMuted:T.verde, color:'white', fontWeight:700, fontSize:10, width:'100%', cursor:precisaNF?'not-allowed':'pointer', opacity:precisaNF?0.6:1 }}>✅ Validar e encerrar</button>
+                                <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+                                  {c.conclusaoFoto && <span title="Tem foto anexada" style={{ fontSize:13 }}>📷</span>}
+                                  {precisaNF && <span style={{ background:T.perigo, color:'white', borderRadius:10, padding:'1px 6px', fontSize:8, fontWeight:800 }}>NF</span>}
+                                  <span style={{ color:T.verde, fontSize:11 }}>→</span>
+                                </div>
+                              </div>
                             </div>
                           )})}
                         </div>
+                      )}
+
+                      {reviewValidacao && (
+                        <ValidacaoModal
+                          card={reviewValidacao}
+                          nfInput={nfInputs[reviewValidacao.id]}
+                          onNfInputChange={v=>setNfInputs(prev=>({...prev,[reviewValidacao.id]:v}))}
+                          onConfirmarNF={()=>handleConfirmarNF(reviewValidacao)}
+                          onValidar={async(c)=>{ await handleValidarCard(c); setReviewValidacao(null) }}
+                          onClose={()=>setReviewValidacao(null)}
+                        />
                       )}
 
                       {semExecutorApp.length>0&&(
