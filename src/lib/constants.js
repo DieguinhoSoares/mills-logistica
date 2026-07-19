@@ -31,6 +31,13 @@ export const T = {
   shadow:   '0 1px 3px rgba(26,22,18,.07), 0 2px 8px rgba(26,22,18,.05)',
   shadowMd: '0 4px 16px rgba(26,22,18,.11)',
   shadowLg: '0 12px 40px rgba(26,22,18,.16)',
+  // Padrão visual "enterprise" (mockup 23a/19a/20a/20b) — sombra em duas
+  // camadas + borda quase invisível, usado em cards/painéis novos em vez
+  // do border colorido a 30% + shadow simples de antes. Fundo frio pra
+  // telas onde cards brancos precisam se destacar por cima.
+  shadowCard:   '0 1px 2px rgba(26,22,18,.04), 0 8px 24px -8px rgba(26,22,18,.06)',
+  borderSubtle: '1px solid rgba(26,22,18,.05)',
+  bgCold:       '#F7F5F1',
   r:   10, rSm: 6, rLg: 16, rXl: 24,
 }
 
