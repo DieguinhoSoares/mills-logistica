@@ -4,22 +4,41 @@ import { T, FONT, CARD_TYPES, URGENCY, BS } from '../lib/constants'
 import { resumirEmissoes } from '../lib/emissoes'
 import { todayStr } from '../lib/utils'
 
-function KPICard({ title, value, sub, color, bg, icon, trend, onClick }) {
+// Sombra "enterprise" em duas camadas — usada em todos os cards da tela
+// (KPICard, BarChart, DonutChart, ranking, gráfico de dias) pra dar
+// consistência visual, em vez do T.shadow simples de antes.
+const SOMBRA_CAMADAS = '0 1px 2px rgba(26,22,18,.04), 0 8px 24px -8px rgba(26,22,18,.06)'
+const BORDA_SUTIL = '1px solid rgba(26,22,18,.05)'
+
+function Sparkline({ points, color }) {
+  const max = Math.max(...points, 1), min = Math.min(...points, 0)
+  const range = (max - min) || 1
+  const coords = points.map((v,i) => `${(i/(points.length-1||1))*42},${16 - ((v-min)/range)*14}`).join(' ')
+  return (
+    <svg width="38" height="16" viewBox="0 0 42 18">
+      <polyline points={coords} fill="none" stroke={color} strokeWidth="1.5"/>
+    </svg>
+  )
+}
+
+function KPICard({ title, value, sub, color, bg, icon, trend, onClick, sparkline }) {
   return (
     <motion.div initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} onClick={onClick}
-      style={{ background:bg||T.surface, border:`1px solid ${color}30`, borderRadius:T.rLg, padding:'15px 16px', boxShadow:T.shadow, position:'relative', overflow:'hidden', cursor:onClick?'pointer':'default' }}>
-      <div style={{ position:'absolute', top:0, right:0, width:4, height:'100%', background:color, borderRadius:'0 12px 12px 0' }}/>
-      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:7 }}>
-        <span style={{ fontSize:18 }}>{icon}</span>
-        {trend!==undefined&&trend!==null && (
-          <span style={{ fontSize:10, fontFamily:FONT, fontWeight:800, color:trend>=0?T.sucesso:T.perigo, background:trend>=0?T.sucessoLight:T.perigoLight, borderRadius:20, padding:'2px 7px' }}>
-            {trend>=0?'↑':'↓'} {Math.abs(trend)}%
-          </span>
-        )}
+      style={{ background:bg||T.surface, border:BORDA_SUTIL, borderRadius:16, boxShadow:SOMBRA_CAMADAS, padding:'13px 15px', position:'relative', overflow:'hidden', cursor:onClick?'pointer':'default' }}>
+      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:6 }}>
+        <span style={{ color:T.textMuted, fontFamily:FONT, fontSize:9.5, fontWeight:600, letterSpacing:'-.01em' }}>{icon} {title}</span>
+        {onClick && <span style={{ color:T.textMuted, fontSize:10 }}>↗</span>}
       </div>
-      <div style={{ fontFamily:FONT, fontWeight:900, fontSize:26, color, lineHeight:1, marginBottom:3 }}>{value}</div>
-      <div style={{ fontFamily:FONT, fontWeight:800, fontSize:10, color:T.text, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:2 }}>{title}</div>
-      {sub && <div style={{ fontFamily:FONT, fontSize:10, color:T.textMuted }}>{sub}</div>}
+      <div style={{ display:'flex', alignItems:'flex-end', gap:8, marginBottom:4 }}>
+        <span style={{ fontFamily:FONT, fontWeight:700, fontSize:22, letterSpacing:'-.02em', color, lineHeight:1 }}>{value}</span>
+        {sparkline?.length > 1 && <Sparkline points={sparkline} color={color}/>}
+      </div>
+      {trend!==undefined&&trend!==null && (
+        <span style={{ fontSize:9, fontFamily:FONT, fontWeight:700, color:trend>=0?T.sucesso:T.perigo, background:trend>=0?T.sucessoLight:T.perigoLight, borderRadius:20, padding:'2px 8px' }}>
+          {trend>=0?'▲':'▼'} {Math.abs(trend)}%
+        </span>
+      )}
+      {sub && !trend && <div style={{ fontFamily:FONT, fontSize:10, color:T.textMuted }}>{sub}</div>}
     </motion.div>
   )
 }
@@ -27,8 +46,8 @@ function KPICard({ title, value, sub, color, bg, icon, trend, onClick }) {
 function BarChart({ title, data, color }) {
   const max = Math.max(...data.map(d=>d.value), 1)
   return (
-    <div style={{ background:T.surface, borderRadius:T.rLg, border:`1px solid ${T.border}`, padding:'14px 16px', boxShadow:T.shadow }}>
-      <div style={{ fontFamily:FONT, fontWeight:800, fontSize:10, color:T.text, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:12 }}>{title}</div>
+    <div style={{ background:T.surface, borderRadius:16, border:BORDA_SUTIL, padding:'16px 18px', boxShadow:SOMBRA_CAMADAS }}>
+      <div style={{ fontFamily:FONT, fontWeight:600, fontSize:11.5, color:T.text, letterSpacing:'-.01em', marginBottom:12 }}>{title}</div>
       {data.length===0 && <div style={{ color:T.textMuted, fontSize:12, fontFamily:FONT, textAlign:'center', padding:'12px 0' }}>Sem dados</div>}
       <div style={{ display:'flex', flexDirection:'column', gap:7 }}>
         {data.map((d,i) => (
@@ -58,8 +77,8 @@ function DonutChart({ title, data }) {
   let acc = 0
   for (const d of data) { const dashLen = d.value/total*C; segs.push({ ...d, dashLen, offset: acc }); acc += dashLen }
   return (
-    <div style={{ background:T.surface, borderRadius:T.rLg, border:`1px solid ${T.border}`, padding:'14px 16px', boxShadow:T.shadow }}>
-      <div style={{ fontFamily:FONT, fontWeight:800, fontSize:10, color:T.text, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:12 }}>{title}</div>
+    <div style={{ background:T.surface, borderRadius:16, border:BORDA_SUTIL, padding:'16px 18px', boxShadow:SOMBRA_CAMADAS }}>
+      <div style={{ fontFamily:FONT, fontWeight:600, fontSize:11.5, color:T.text, letterSpacing:'-.01em', marginBottom:12 }}>{title}</div>
       <div style={{ display:'flex', gap:14, alignItems:'center' }}>
         <svg width="82" height="82" viewBox="0 0 82 82" style={{ flexShrink:0 }}>
           <circle cx="41" cy="41" r={R} fill="none" stroke={T.surfaceLow} strokeWidth="9"/>
@@ -67,17 +86,71 @@ function DonutChart({ title, data }) {
             <circle key={i} cx="41" cy="41" r={R} fill="none" stroke={d.color} strokeWidth="9"
               strokeDasharray={`${d.dashLen} ${C}`} strokeDashoffset={-d.offset} transform="rotate(-90 41 41)" strokeLinecap="round"/>
           ))}
-          <text x="41" y="46" textAnchor="middle" fontFamily="IBM Plex Sans,sans-serif" fontWeight="900" fontSize="13" fill={T.text}>{total}</text>
+          <text x="41" y="39" textAnchor="middle" fontFamily="IBM Plex Sans,sans-serif" fontWeight="700" fontSize="14" fill={T.text}>{total}</text>
+          <text x="41" y="49" textAnchor="middle" fontFamily="IBM Plex Sans,sans-serif" fontSize="6.5" fill={T.textMuted}>total</text>
         </svg>
-        <div style={{ flex:1, display:'flex', flexDirection:'column', gap:5 }}>
+        <div style={{ flex:1, display:'flex', flexDirection:'column', gap:6 }}>
           {data.map((d,i) => (
-            <div key={i} style={{ display:'flex', alignItems:'center', gap:6 }}>
-              <div style={{ width:9, height:9, borderRadius:3, background:d.color, flexShrink:0 }}/>
-              <span style={{ fontFamily:FONT, fontSize:10, color:T.textSec, flex:1 }}>{d.label}</span>
-              <span style={{ fontFamily:FONT, fontSize:10, fontWeight:800, color:T.text }}>{d.value}</span>
+            <div key={i} style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <div style={{ width:8, height:8, borderRadius:2, background:d.color, flexShrink:0 }}/>
+              <span style={{ fontFamily:FONT, fontSize:10.5, color:T.text, fontWeight:600, flex:1, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{d.label}</span>
+              <span style={{ fontFamily:FONT, fontSize:10.5, fontWeight:700, color:T.textMuted }}>{d.value}</span>
             </div>
           ))}
         </div>
+      </div>
+    </div>
+  )
+}
+
+// Ranking top 5 com posição numerada + barra proporcional — usado pro
+// "Top motoristas". Diferente do BarChart genérico: aqui a posição (1º,
+// 2º...) importa visualmente, não só o valor.
+function RankingList({ title, data }) {
+  const max = Math.max(...data.map(d=>d.value), 1)
+  return (
+    <div style={{ background:T.surface, borderRadius:16, border:BORDA_SUTIL, padding:'16px 18px', boxShadow:SOMBRA_CAMADAS }}>
+      <div style={{ fontFamily:FONT, fontWeight:700, fontSize:11.5, color:T.text, marginBottom:12 }}>{title}</div>
+      {data.length===0 && <div style={{ color:T.textMuted, fontSize:12, fontFamily:FONT, textAlign:'center', padding:'12px 0' }}>Sem dados</div>}
+      <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
+        {data.slice(0,5).map((d,i) => (
+          <div key={i} style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <span style={{ fontFamily:FONT, fontSize:10.5, color:T.textMuted, fontWeight:700, width:14 }}>{i+1}</span>
+            <span style={{ fontFamily:FONT, fontSize:11, color:T.text, fontWeight:600, flex:1, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{d.label}</span>
+            <div style={{ width:80, height:6, background:T.surfaceLow, borderRadius:3, overflow:'hidden', flexShrink:0 }}>
+              <motion.div initial={{ width:0 }} animate={{ width:`${(d.value/max)*100}%` }}
+                transition={{ delay:i*0.05, duration:.5, ease:'easeOut' }}
+                style={{ height:'100%', background:T.laranja }}/>
+            </div>
+            <span style={{ fontFamily:FONT, fontSize:10, color:T.textMuted, fontWeight:700, width:14, textAlign:'right' }}>{d.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// "Serviços por dia" — últimos 7 dias com uma linha tracejada de meta
+// (média do período, arredondada) cruzando o gráfico. Dia com o maior
+// volume vira laranja, o resto verde-escuro — mesmo padrão do mockup.
+function DayChart({ title, dias, meta }) {
+  const max = Math.max(...dias.map(d=>d.value), meta, 1)
+  const idxMax = dias.reduce((best,d,i)=> d.value>dias[best].value ? i : best, 0)
+  const metaTopo = 100 - (meta/max)*100
+  return (
+    <div style={{ background:T.surface, borderRadius:16, border:BORDA_SUTIL, padding:'16px 18px', boxShadow:SOMBRA_CAMADAS }}>
+      <div style={{ display:'flex', justifyContent:'space-between', marginBottom:12 }}>
+        <span style={{ fontFamily:FONT, fontWeight:700, fontSize:11, color:T.text }}>{title}</span>
+        <span style={{ fontFamily:FONT, fontSize:9.5, color:T.textMuted }}>Meta: {meta}/dia ┄</span>
+      </div>
+      <div style={{ display:'flex', alignItems:'flex-end', gap:10, height:64, position:'relative' }}>
+        <div style={{ position:'absolute', top:`${metaTopo}%`, left:0, right:0, borderTop:`1px dashed ${T.laranja}` }}/>
+        {dias.map((d,i) => (
+          <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:5 }}>
+            <div style={{ width:'100%', background:d.value===0?T.border:(i===idxMax?T.laranja:T.verde), borderRadius:'4px 4px 0 0', height:Math.max(2,(d.value/max)*64) }}/>
+            <span style={{ fontSize:8, color:T.textMuted, fontFamily:FONT }}>{d.label}</span>
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -87,6 +160,7 @@ export function KPIView({ cards, requests, simClients, onNavigateToAprovacoes })
   // Filtro por unidade — chips no topo, recalcula tudo abaixo. 'todas' não
   // filtra nada (comportamento igual ao de antes de existir esse filtro).
   const [unidadeFiltro, setUnidadeFiltro] = useState('todas')
+  const [periodoComparacao, setPeriodoComparacao] = useState('semana')
   const unidadesDisponiveis = useMemo(() =>
     ['todas', ...Array.from(new Set(cards.map(c=>c.unit).filter(Boolean))).sort()]
   , [cards])
@@ -115,6 +189,19 @@ export function KPIView({ cards, requests, simClients, onNavigateToAprovacoes })
     const monthCards = cardsValidos.filter(c=>c.startDate?.startsWith(thisMonth))
     const lastCards  = cardsValidos.filter(c=>c.startDate?.startsWith(lastMonth))
     const total      = cardsValidos.length
+
+    // Últimos 7 dias — alimenta o gráfico "Serviços por dia" e o sparkline
+    // do card "Serviços". Meta = média do período, arredondada (não é um
+    // valor fixo cravado no código, se ajusta ao volume real da operação).
+    const diasSemana = []
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i)
+      const dataStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+      const label = ['D','S','T','Q','Q','S','S'][d.getDay()]
+      diasSemana.push({ label, value: cardsValidos.filter(c=>c.startDate===dataStr).length })
+    }
+    const metaDia = Math.max(1, Math.round(diasSemana.reduce((a,d)=>a+d.value,0) / 7))
+    const sparklineServicos = diasSemana.map(d=>d.value)
 
     // Atrasado = card ativo com endDate < hoje (concluídos e cancelados não contam)
     const late = cardsAtivos.filter(c =>
@@ -203,7 +290,7 @@ export function KPIView({ cards, requests, simClients, onNavigateToAprovacoes })
     })
 
     return { total,totalAtivos,late,onTime,pctOnTime,pctAder,remanejados,byType,byDriver,byState,byFilial,tempoMedio,topRoutes,monthCards,growthPct,pendReq,taxaAceit,
-      emExecucao,aguardandoValid,interrompidos,atrasadosAgora,slaPorUrgencia }
+      emExecucao,aguardandoValid,interrompidos,atrasadosAgora,slaPorUrgencia,diasSemana,metaDia,sparklineServicos }
   }, [cardsFiltrados, requests])
 
   const painelRef = useRef(null)
@@ -225,7 +312,7 @@ export function KPIView({ cards, requests, simClients, onNavigateToAprovacoes })
   }
 
   return (
-    <div ref={painelRef} style={{ padding:'16px 20px', overflowY:'auto', height:'100%' }}>
+    <div ref={painelRef} style={{ padding:'16px 20px', overflowY:'auto', height:'100%', background:'#F7F5F1' }}>
       <div style={{ marginBottom:18, display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
         <div>
           <h2 style={{ fontFamily:FONT, fontWeight:900, fontSize:18, color:T.text, margin:0 }}>📊 Indicadores de Performance</h2>
@@ -238,15 +325,29 @@ export function KPIView({ cards, requests, simClients, onNavigateToAprovacoes })
       </div>
 
       {unidadesDisponiveis.length > 2 && (
-        <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:14 }}>
+        <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:10 }}>
           {unidadesDisponiveis.map(u => (
             <button key={u} onClick={()=>setUnidadeFiltro(u)}
-              style={{ ...BS, background:unidadeFiltro===u?T.laranja:T.surface, color:unidadeFiltro===u?'white':T.textSec, border:`1px solid ${unidadeFiltro===u?T.laranja:T.border}`, fontSize:10, fontWeight:700, padding:'4px 12px' }}>
-              {u==='todas' ? '🏢 Todas as unidades' : u}
+              style={{ ...BS, background:unidadeFiltro===u?'#1A1612':'#fff', color:unidadeFiltro===u?'white':'#4A3F35', border:`1px solid ${unidadeFiltro===u?'#1A1612':'rgba(26,22,18,.08)'}`, fontSize:10.5, fontWeight:unidadeFiltro===u?700:600, padding:'5px 12px' }}>
+              {u==='todas' ? 'Todas as unidades' : u}
             </button>
           ))}
         </div>
       )}
+
+      {/* Semana/Mês — decide a janela de comparação do "vs. período anterior".
+          Hoje só afeta a leitura visual do rótulo; o cálculo em si (mês
+          atual vs. mês passado) continua sendo o que já existia, já que
+          trocar a base de comparação de verdade é mudança de lógica, não
+          de visual (fora do escopo deste pacote, que é só estilo). */}
+      <div style={{ background:'#fff', border:'1px solid rgba(26,22,18,.08)', borderRadius:8, display:'flex', padding:2, gap:2, width:'fit-content', marginBottom:14 }}>
+        {['semana','mes'].map(p => (
+          <button key={p} onClick={()=>setPeriodoComparacao(p)}
+            style={{ padding:'4px 10px', borderRadius:6, background:periodoComparacao===p?T.laranja:'transparent', color:periodoComparacao===p?'white':T.textMuted, fontSize:9.5, fontWeight:700, border:'none', cursor:'pointer', fontFamily:FONT }}>
+            {p==='semana'?'Semana':'Mês'}
+          </button>
+        ))}
+      </div>
 
       {/* Cenário operacional AGORA — visão rápida do que está rolando com a
           equipe neste momento, não histórico. Pensado pra quem acompanha a
@@ -305,7 +406,7 @@ export function KPIView({ cards, requests, simClients, onNavigateToAprovacoes })
       </div>
 
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:14 }}>
-        <KPICard title="Total de Serviços"  value={stats.total}            icon="📋" color={T.laranja} bg={T.laranjaXLight} trend={stats.growthPct} sub="Todos os períodos"/>
+        <KPICard title="Total de Serviços"  value={stats.total}            icon="📋" color={T.laranja} bg={T.laranjaXLight} trend={stats.growthPct} sub="Todos os períodos" sparkline={stats.sparklineServicos}/>
         <KPICard title="No Prazo"           value={`${stats.pctOnTime}%`}  icon="✅" color={T.sucesso} bg={T.sucessoLight}  sub={`${stats.onTime}/${stats.totalAtivos} em aberto`}/>
         <KPICard title="Aderência"          value={`${stats.pctAder}%`}    icon="📅" color={T.verde}   bg={T.verdeLight}    sub={`${stats.remanejados} remanejamentos`}/>
         <KPICard title="Tempo Médio"        value={stats.tempoMedio}       icon="⏱" color={T.info}    bg={T.infoLight}     sub={stats.tempoMedio==='—'?'Serviços de 1 dia não contam':'Duração por serviço'}/>
@@ -321,8 +422,12 @@ export function KPIView({ cards, requests, simClients, onNavigateToAprovacoes })
 
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:10 }}>
         <DonutChart title="Por tipo de serviço" data={stats.byType}/>
-        <BarChart   title="Por motorista"       data={stats.byDriver} color={T.laranja}/>
+        <RankingList title="🏆 Top motoristas"   data={stats.byDriver}/>
         <BarChart   title="Por cidade destino"  data={stats.byState}  color={T.verde}/>
+      </div>
+
+      <div style={{ marginBottom:10 }}>
+        <DayChart title="Serviços por dia" dias={stats.diasSemana} meta={stats.metaDia}/>
       </div>
 
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
