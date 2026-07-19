@@ -216,7 +216,7 @@ function MobileRequestCard({ req, profile, onOpen }) {
 
   return (
     <motion.div layout initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }}
-      style={{ background:T.surface, borderRadius:T.rLg, padding:'14px 16px', boxShadow:T.shadow, border:`1.5px solid ${sc.color}25`, marginBottom:10 }}>
+      style={{ background:T.surface, borderRadius:16, padding:'14px 16px', boxShadow:T.shadowCard, border:T.borderSubtle, marginBottom:10 }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
         <div style={{ display:'flex', gap:6, flexWrap:'wrap', flex:1 }}>
           <span style={{ background:ct?.bg, border:`1px solid ${ct?.color}40`, borderRadius:20, padding:'3px 10px', color:ct?.color, fontSize:10, fontWeight:700, fontFamily:FONT }}>{ct?.icon} {ct?.short}</span>
@@ -271,7 +271,7 @@ function DesktopRequestCard({ req, profile, onView }) {
 
   return (
     <motion.div layout initial={{ opacity:0, y:5 }} animate={{ opacity:1, y:0 }}
-      style={{ background:T.surface, border:`1.5px solid ${sc.color}25`, borderRadius:T.rLg, padding:'14px 16px', boxShadow:T.shadow, marginBottom:10 }}>
+      style={{ background:T.surface, border:T.borderSubtle, borderRadius:16, padding:'14px 16px', boxShadow:T.shadowCard, marginBottom:10 }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
         <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
           <span style={{ background:ct?.bg, border:`1px solid ${ct?.color}40`, borderRadius:20, padding:'2px 9px', color:ct?.color, fontSize:9, fontWeight:800, fontFamily:FONT }}>{ct?.icon} {ct?.short}</span>

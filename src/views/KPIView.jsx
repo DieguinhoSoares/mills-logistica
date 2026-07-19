@@ -7,9 +7,6 @@ import { todayStr } from '../lib/utils'
 // Sombra "enterprise" em duas camadas — usada em todos os cards da tela
 // (KPICard, BarChart, DonutChart, ranking, gráfico de dias) pra dar
 // consistência visual, em vez do T.shadow simples de antes.
-const SOMBRA_CAMADAS = '0 1px 2px rgba(26,22,18,.04), 0 8px 24px -8px rgba(26,22,18,.06)'
-const BORDA_SUTIL = '1px solid rgba(26,22,18,.05)'
-
 function Sparkline({ points, color }) {
   const max = Math.max(...points, 1), min = Math.min(...points, 0)
   const range = (max - min) || 1
@@ -24,7 +21,7 @@ function Sparkline({ points, color }) {
 function KPICard({ title, value, sub, color, bg, icon, trend, onClick, sparkline }) {
   return (
     <motion.div initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} onClick={onClick}
-      style={{ background:bg||T.surface, border:BORDA_SUTIL, borderRadius:16, boxShadow:SOMBRA_CAMADAS, padding:'13px 15px', position:'relative', overflow:'hidden', cursor:onClick?'pointer':'default' }}>
+      style={{ background:bg||T.surface, border:T.borderSubtle, borderRadius:16, boxShadow:T.shadowCard, padding:'13px 15px', position:'relative', overflow:'hidden', cursor:onClick?'pointer':'default' }}>
       <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:6 }}>
         <span style={{ color:T.textMuted, fontFamily:FONT, fontSize:9.5, fontWeight:600, letterSpacing:'-.01em' }}>{icon} {title}</span>
         {onClick && <span style={{ color:T.textMuted, fontSize:10 }}>↗</span>}
@@ -46,7 +43,7 @@ function KPICard({ title, value, sub, color, bg, icon, trend, onClick, sparkline
 function BarChart({ title, data, color }) {
   const max = Math.max(...data.map(d=>d.value), 1)
   return (
-    <div style={{ background:T.surface, borderRadius:16, border:BORDA_SUTIL, padding:'16px 18px', boxShadow:SOMBRA_CAMADAS }}>
+    <div style={{ background:T.surface, borderRadius:16, border:T.borderSubtle, padding:'16px 18px', boxShadow:T.shadowCard }}>
       <div style={{ fontFamily:FONT, fontWeight:600, fontSize:11.5, color:T.text, letterSpacing:'-.01em', marginBottom:12 }}>{title}</div>
       {data.length===0 && <div style={{ color:T.textMuted, fontSize:12, fontFamily:FONT, textAlign:'center', padding:'12px 0' }}>Sem dados</div>}
       <div style={{ display:'flex', flexDirection:'column', gap:7 }}>
@@ -77,7 +74,7 @@ function DonutChart({ title, data }) {
   let acc = 0
   for (const d of data) { const dashLen = d.value/total*C; segs.push({ ...d, dashLen, offset: acc }); acc += dashLen }
   return (
-    <div style={{ background:T.surface, borderRadius:16, border:BORDA_SUTIL, padding:'16px 18px', boxShadow:SOMBRA_CAMADAS }}>
+    <div style={{ background:T.surface, borderRadius:16, border:T.borderSubtle, padding:'16px 18px', boxShadow:T.shadowCard }}>
       <div style={{ fontFamily:FONT, fontWeight:600, fontSize:11.5, color:T.text, letterSpacing:'-.01em', marginBottom:12 }}>{title}</div>
       <div style={{ display:'flex', gap:14, alignItems:'center' }}>
         <svg width="82" height="82" viewBox="0 0 82 82" style={{ flexShrink:0 }}>
@@ -109,7 +106,7 @@ function DonutChart({ title, data }) {
 function RankingList({ title, data }) {
   const max = Math.max(...data.map(d=>d.value), 1)
   return (
-    <div style={{ background:T.surface, borderRadius:16, border:BORDA_SUTIL, padding:'16px 18px', boxShadow:SOMBRA_CAMADAS }}>
+    <div style={{ background:T.surface, borderRadius:16, border:T.borderSubtle, padding:'16px 18px', boxShadow:T.shadowCard }}>
       <div style={{ fontFamily:FONT, fontWeight:700, fontSize:11.5, color:T.text, marginBottom:12 }}>{title}</div>
       {data.length===0 && <div style={{ color:T.textMuted, fontSize:12, fontFamily:FONT, textAlign:'center', padding:'12px 0' }}>Sem dados</div>}
       <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
@@ -138,7 +135,7 @@ function DayChart({ title, dias, meta }) {
   const idxMax = dias.reduce((best,d,i)=> d.value>dias[best].value ? i : best, 0)
   const metaTopo = 100 - (meta/max)*100
   return (
-    <div style={{ background:T.surface, borderRadius:16, border:BORDA_SUTIL, padding:'16px 18px', boxShadow:SOMBRA_CAMADAS }}>
+    <div style={{ background:T.surface, borderRadius:16, border:T.borderSubtle, padding:'16px 18px', boxShadow:T.shadowCard }}>
       <div style={{ display:'flex', justifyContent:'space-between', marginBottom:12 }}>
         <span style={{ fontFamily:FONT, fontWeight:700, fontSize:11, color:T.text }}>{title}</span>
         <span style={{ fontFamily:FONT, fontSize:9.5, color:T.textMuted }}>Meta: {meta}/dia ┄</span>
@@ -312,7 +309,7 @@ export function KPIView({ cards, requests, simClients, onNavigateToAprovacoes })
   }
 
   return (
-    <div ref={painelRef} style={{ padding:'16px 20px', overflowY:'auto', height:'100%', background:'#F7F5F1' }}>
+    <div ref={painelRef} style={{ padding:'16px 20px', overflowY:'auto', height:'100%', background:T.bgCold }}>
       <div style={{ marginBottom:18, display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
         <div>
           <h2 style={{ fontFamily:FONT, fontWeight:900, fontSize:18, color:T.text, margin:0 }}>📊 Indicadores de Performance</h2>

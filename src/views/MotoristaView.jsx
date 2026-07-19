@@ -264,8 +264,8 @@ function ServicoCard({ card, index, onUpdateStatus }) {
       </AnimatePresence>
 
       <motion.div initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }} transition={{ delay:index*0.05 }}
-        style={{ background:T.surface, borderRadius:T.rLg, padding:'16px', marginBottom:12, boxShadow:T.shadowMd,
-          border: isAtrasado ? `2px dashed ${T.perigo}` : `1.5px solid ${ct?.color}30`, position:'relative', overflow:'hidden' }}>
+        style={{ background:T.surface, borderRadius:16, padding:'16px', marginBottom:12, boxShadow:T.shadowCard,
+          border: isAtrasado ? `2px dashed ${T.perigo}` : T.borderSubtle, position:'relative', overflow:'hidden' }}>
 
         {isAtrasado && (
           <div style={{ background:T.perigo, color:'white', borderRadius:20, padding:'2px 10px', fontSize:9, fontWeight:800, fontFamily:FONT, position:'absolute', top:10, right:10, zIndex:1 }}>
