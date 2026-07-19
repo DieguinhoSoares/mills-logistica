@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
 import { useManagerialRequests, useNotifications, useConfig, approveAsSupervisor, refuseAsSupervisor, approveAsGerente, refuseAsGerente } from '../hooks/useFirestore'
 import { MillsLogo, NotificationBell, ToastContainer, useToasts } from '../components/UI'
-import { T, FONT, CARD_TYPES, URGENCY, URGENCY_SLA_MS, BS, IS, LS } from '../lib/constants'
+import { T, FONT, CARD_TYPES, URGENCY, URGENCY_SLA_MS, BS, IS, LS, SHADOW_CARD, BORDER_SUBTLE } from '../lib/constants'
 import { fmt, getSubtypeLabel, sortByUrgency } from '../lib/utils'
 import { db } from '../lib/firebase'
 import { salvarWhatsAppConfig } from '../lib/vercelApi'
@@ -81,8 +81,8 @@ function ApprovalModal({ req, profile, onApprove, onRefuse, onClose, isMobile, s
     <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.6)', zIndex:2000, display:'flex', alignItems:isMobile?'flex-end':'center', justifyContent:'center', backdropFilter:'blur(4px)' }}
       onClick={e=>e.target===e.currentTarget&&onClose()}>
       <motion.div initial={{ y:isMobile?100:0, scale:isMobile?1:.95, opacity:0 }} animate={{ y:0, scale:1, opacity:1 }}
-        style={{ background:T.surface, borderRadius:isMobile?'20px 20px 0 0':T.rLg, padding:isMobile?'20px 16px 32px':28,
-          width:isMobile?'100%':540, maxHeight:isMobile?'92vh':'90vh', overflowY:'auto', boxShadow:T.shadowLg, border:`1px solid ${T.border}` }}>
+        style={{ background:T.surface, borderRadius:isMobile?'20px 20px 0 0':18, padding:isMobile?'20px 16px 32px':28,
+          width:isMobile?'100%':540, maxHeight:isMobile?'92vh':'90vh', overflowY:'auto', boxShadow:SHADOW_CARD, border:BORDER_SUBTLE }}>
 
         {isMobile && <div style={{ width:40, height:4, background:T.borderMid, borderRadius:2, margin:'0 auto 16px', flexShrink:0 }}/>}
 
@@ -403,7 +403,7 @@ export function GerenteView({ simClients = [] }) {
 
   // ── MOBILE LAYOUT ──────────────────────────────────────────────────────────
   if (isMobile) return (
-    <div style={{ background:T.bg, minHeight:'100vh', display:'flex', flexDirection:'column', fontFamily:FONT }}>
+    <div style={{ background:T.bgCold, minHeight:'100vh', display:'flex', flexDirection:'column', fontFamily:FONT }}>
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
       <ToastContainer toasts={toasts} onDismiss={dismiss}/>
       {reviewing && <ApprovalModal req={reviewing} profile={profile} isMobile={true} onApprove={handleApproveFromModal} onRefuse={handleRefuseFromModal} onClose={()=>setReviewing(null)} simClients={simClients}/>}
@@ -480,9 +480,9 @@ export function GerenteView({ simClients = [] }) {
               { l:'No time Frotas',v:totalAprovados,  c:T.verde,   bg:T.verdeLight  },
               { l:'Recusadas',    v:totalRecusados,   c:T.perigo,  bg:T.perigoLight },
             ].map(s=>(
-              <div key={s.l} style={{ background:s.bg, border:`1px solid ${s.c}30`, borderRadius:T.rLg, padding:'14px 12px', boxShadow:T.shadow }}>
-                <div style={{ color:s.c, fontFamily:FONT, fontWeight:900, fontSize:28, lineHeight:1 }}>{s.v}</div>
-                <div style={{ color:T.textSec, fontSize:10, fontFamily:FONT, fontWeight:700, textTransform:'uppercase', marginTop:4 }}>{s.l}</div>
+              <div key={s.l} style={{ background:s.bg, border:BORDER_SUBTLE, borderRadius:16, padding:'14px 12px', boxShadow:SHADOW_CARD }}>
+                <div style={{ color:s.c, fontFamily:FONT, fontWeight:800, fontSize:28, lineHeight:1, letterSpacing:'-.02em' }}>{s.v}</div>
+                <div style={{ color:T.textSec, fontSize:10, fontFamily:FONT, fontWeight:600, letterSpacing:'-.005em', marginTop:4 }}>{s.l}</div>
               </div>
             ))}
           </div>
@@ -502,7 +502,7 @@ export function GerenteView({ simClients = [] }) {
         {tab==='config' && (
           <div style={{ maxWidth:500 }}>
             <h2 style={{ fontFamily:FONT, fontWeight:700, fontSize:18, color:T.text, margin:'0 0 16px' }}>⚙️ Configurações</h2>
-            <div style={{ background:T.surface, borderRadius:T.rLg, border:`1px solid ${T.border}`, padding:16, boxShadow:T.shadow }}>
+            <div style={{ background:T.surface, borderRadius:16, border:BORDER_SUBTLE, padding:16, boxShadow:SHADOW_CARD }}>
               <div style={{ marginBottom:14 }}>
                 <label style={LS}>💬 Número WhatsApp (ex: 5518999999999)</label>
                 <input value={waPhone} onChange={e=>setWaPhone(e.target.value)} placeholder="5518999999999" style={{ ...IS, marginTop:6 }}/>
@@ -531,7 +531,7 @@ export function GerenteView({ simClients = [] }) {
 
   // ── DESKTOP LAYOUT ──────────────────────────────────────────────────────────
   return (
-    <div style={{ background:T.bg, height:'100vh', display:'flex', flexDirection:'column', overflow:'hidden', fontFamily:FONT }}>
+    <div style={{ background:T.bgCold, height:'100vh', display:'flex', flexDirection:'column', overflow:'hidden', fontFamily:FONT }}>
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
       <ToastContainer toasts={toasts} onDismiss={dismiss}/>
       {reviewing && <ApprovalModal req={reviewing} profile={profile} isMobile={false} onApprove={handleApproveFromModal} onRefuse={handleRefuseFromModal} onClose={()=>setReviewing(null)} simClients={simClients}/>}
@@ -642,9 +642,9 @@ export function GerenteView({ simClients = [] }) {
               { l:'No time de Frotas', v:totalAprovados,   c:T.verde,   bg:T.verdeLight  },
               { l:'Recusadas',         v:totalRecusados,   c:T.perigo,  bg:T.perigoLight },
             ].map(s=>(
-              <div key={s.l} style={{ background:s.bg, border:`1px solid ${s.c}30`, borderRadius:T.rLg, padding:'14px 16px', boxShadow:T.shadow }}>
-                <div style={{ color:s.c, fontFamily:FONT, fontWeight:900, fontSize:28, lineHeight:1 }}>{s.v}</div>
-                <div style={{ color:T.textSec, fontSize:9, fontFamily:FONT, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.07em', marginTop:4 }}>{s.l}</div>
+              <div key={s.l} style={{ background:s.bg, border:BORDER_SUBTLE, borderRadius:16, padding:'14px 16px', boxShadow:SHADOW_CARD }}>
+                <div style={{ color:s.c, fontFamily:FONT, fontWeight:800, fontSize:28, lineHeight:1, letterSpacing:'-.02em' }}>{s.v}</div>
+                <div style={{ color:T.textSec, fontSize:9.5, fontFamily:FONT, fontWeight:600, letterSpacing:'-.005em', marginTop:4 }}>{s.l}</div>
               </div>
             ))}
           </div>
@@ -664,7 +664,7 @@ export function GerenteView({ simClients = [] }) {
       {tab==='config' && (
         <div style={{ flex:1, overflow:'auto', padding:'16px 20px', maxWidth:600 }}>
           <h2 style={{ fontFamily:FONT, fontWeight:700, fontSize:20, color:T.text, margin:'0 0 16px' }}>⚙️ Configurações</h2>
-          <div style={{ background:T.surface, borderRadius:T.rLg, border:`1px solid ${T.border}`, padding:20, boxShadow:T.shadow }}>
+          <div style={{ background:T.surface, borderRadius:16, border:BORDER_SUBTLE, padding:20, boxShadow:SHADOW_CARD }}>
             <div style={{ marginBottom:14 }}>
               <label style={LS}>💬 Número WhatsApp (com DDI+DDD, ex: 5518999999999)</label>
               <input value={waPhone} onChange={e=>setWaPhone(e.target.value)} placeholder="5518999999999" style={{ ...IS, marginTop:6 }}/>
