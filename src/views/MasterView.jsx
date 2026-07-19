@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
 import { MillsLogo, ToastContainer, useToasts, BrazilMap, NotificationBell, ConfirmModal } from '../components/UI'
 import { KPIView } from './KPIView'
-import { T, FONT, CARD_TYPES, BS, IS, LS } from '../lib/constants'
+import { T, FONT, CARD_TYPES, BS, IS, LS, URGENCY_SLA_MS } from '../lib/constants'
 import { detectConflicts, fmt, getSubtypeLabel, sortByUrgency } from '../lib/utils'
 import { doc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore'
 import { db } from '../lib/firebase'
@@ -395,6 +395,38 @@ export function MasterView({ simClients = [] }) {
                 </div>
               ))}
             </div>
+            {(() => {
+              const now = Date.now()
+              const urgentesMaster = mgrReqs.filter(r => {
+                if (!['pendente_supervisor','pendente_gerente'].includes(r.status)) return false
+                const sla = URGENCY_SLA_MS[r.urgency]
+                if (!sla || !['critico','alto'].includes(r.urgency)) return false
+                return new Date(r.desiredDate).getTime() + sla - now < 2 * 3600000
+              })
+              return urgentesMaster.length > 0 && (
+                <div style={{ background:'#1A1612', borderRadius:T.r, padding:'12px 16px', marginBottom:14 }}>
+                  <div style={{ color:'#9E9590', fontSize:9, fontFamily:FONT, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:8 }}>
+                    🚨 Atenção agora — {urgentesMaster.length} {urgentesMaster.length===1?'item':'itens'} próximo{urgentesMaster.length===1?'':'s'} do prazo
+                  </div>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
+                    {urgentesMaster.map(r => {
+                      const vence = new Date(r.desiredDate).getTime() + URGENCY_SLA_MS[r.urgency]
+                      const diffM = Math.max(0, Math.round((vence - now) / 60000))
+                      const borda = r.urgency==='critico' ? '#D32F2F' : '#E65100'
+                      return (
+                        <div key={r.id} onClick={()=>setFilterAprov(r.status)}
+                          style={{ background:r.urgency==='critico'?'rgba(211,47,47,.15)':'rgba(230,81,0,.15)', border:`1px solid ${borda}`, borderRadius:T.rSm, padding:'8px 12px', cursor:'pointer', flex:'1 1 280px', display:'flex', justifyContent:'space-between', alignItems:'center', gap:10 }}>
+                          <span style={{ color:'white', fontFamily:FONT, fontWeight:700, fontSize:11 }}>{r.clientName||r.requesterName||'—'}</span>
+                          <span style={{ color:borda, fontFamily:FONT, fontWeight:800, fontSize:10, whiteSpace:'nowrap' }}>
+                            {diffM<=0 ? '⚠️ Vencido' : `${diffM}min restantes`}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })()}
             <div style={{ display:'flex', gap:8, marginBottom:14, flexWrap:'wrap' }}>
               {[['todos','Todos'],['pendente_supervisor','Aguard. Supervisor'],['pendente_gerente','Aguard. Gerência'],['pendente','No time de Frotas'],['aceito','Aceito'],['recusado','Recusado'],['concluido','Concluído']].map(([v,l])=>(
                 <button key={v} onClick={()=>setFilterAprov(v)}
