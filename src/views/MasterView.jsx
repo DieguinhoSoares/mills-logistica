@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
 import { MillsLogo, ToastContainer, useToasts, BrazilMap, NotificationBell, ConfirmModal } from '../components/UI'
 import { KPIView } from './KPIView'
-import { T, FONT, CARD_TYPES, BS, IS, LS, URGENCY_SLA_MS } from '../lib/constants'
+import { T, FONT, CARD_TYPES, BS, IS, LS, URGENCY_SLA_MS, SHADOW_CARD, BORDER_SUBTLE } from '../lib/constants'
 import { detectConflicts, fmt, getSubtypeLabel, sortByUrgency } from '../lib/utils'
 import { doc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore'
 import { db } from '../lib/firebase'
@@ -254,7 +254,7 @@ export function MasterView({ simClients = [] }) {
   const backupStale = !backupStatus || !backupLastAt || backupHorasAtras > 26
 
   return (
-    <div style={{ background:T.bg, height:'100vh', display:'flex', flexDirection:'column', overflow:'hidden', fontFamily:FONT }}>
+    <div style={{ background:T.bgCold, height:'100vh', display:'flex', flexDirection:'column', overflow:'hidden', fontFamily:FONT }}>
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
       <ToastContainer toasts={toasts} onDismiss={dismiss}/>
       {/* Botão de migração única — corrige origin/destination vazios */}
@@ -352,7 +352,7 @@ export function MasterView({ simClients = [] }) {
                 const ct = CARD_TYPES[r.type]
                 const sc = { pendente_supervisor:{color:'#B8860B',bg:'#FFF8E1'}, pendente_gerente:{color:T.info,bg:T.infoLight}, pendente:{color:T.amarelo,bg:T.amareloLight}, aceito:{color:T.verde,bg:T.verdeLight}, recusado:{color:T.perigo,bg:T.perigoLight} }[r.status] || {}
                 return (
-                  <motion.div key={r.id} layout style={{ background:T.surface, border:`1px solid ${sc.color||T.border}30`, borderRadius:T.rLg, padding:'14px 16px', boxShadow:T.shadow }}>
+                  <motion.div key={r.id} layout style={{ background:T.surface, border:BORDER_SUBTLE, borderRadius:16, padding:'14px 16px', boxShadow:SHADOW_CARD }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
                       <div>
                         <span style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:T.text }}>{r.requesterName||'—'}</span>
@@ -390,9 +390,9 @@ export function MasterView({ simClients = [] }) {
                 { l:'Com o Frotas',      v:mgrReqs.filter(r=>['pendente','aceito'].includes(r.status)).length,                 c:T.verde,   bg:T.verdeLight  },
                 { l:'Recusadas',         v:mgrReqs.filter(r=>r.status==='recusado').length,                                    c:T.perigo,  bg:T.perigoLight },
               ].map(s=>(
-                <div key={s.l} style={{ background:s.bg, border:`1px solid ${s.c}30`, borderRadius:T.rLg, padding:'12px 14px', boxShadow:T.shadow }}>
-                  <div style={{ color:s.c, fontFamily:FONT, fontWeight:900, fontSize:24, lineHeight:1 }}>{s.v}</div>
-                  <div style={{ color:T.textSec, fontSize:9, fontFamily:FONT, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.07em', marginTop:3 }}>{s.l}</div>
+                <div key={s.l} style={{ background:s.bg, border:BORDER_SUBTLE, borderRadius:16, padding:'12px 14px', boxShadow:SHADOW_CARD }}>
+                  <div style={{ color:s.c, fontFamily:FONT, fontWeight:800, fontSize:24, lineHeight:1, letterSpacing:'-.02em' }}>{s.v}</div>
+                  <div style={{ color:T.textSec, fontSize:9, fontFamily:FONT, fontWeight:600, letterSpacing:'-.005em', marginTop:3 }}>{s.l}</div>
                 </div>
               ))}
             </div>
@@ -442,7 +442,7 @@ export function MasterView({ simClients = [] }) {
                 const sc = { pendente_supervisor:{label:'⏳ Aguard. Supervisor',color:'#B8860B',bg:'#FFF8E1'}, pendente_gerente:{label:'📋 Aguard. Gerência',color:T.info,bg:T.infoLight}, pendente:{label:'🚛 No time de Frotas',color:T.verde,bg:T.verdeLight}, aceito:{label:'✅ Aceito',color:T.sucesso,bg:T.sucessoLight}, recusado:{label:'❌ Recusado',color:T.perigo,bg:T.perigoLight} }[r.status] || {}
                 const canApprove = ['pendente_supervisor','pendente_gerente'].includes(r.status)
                 return (
-                  <motion.div key={r.id} layout style={{ background:T.surface, border:`1.5px solid ${sc.color||T.border}25`, borderRadius:T.rLg, padding:'14px 16px', boxShadow:T.shadow }}>
+                  <motion.div key={r.id} layout style={{ background:T.surface, border:BORDER_SUBTLE, borderRadius:16, padding:'14px 16px', boxShadow:SHADOW_CARD }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
                       <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
                         <span style={{ background:ct?.bg, border:`1px solid ${ct?.color}40`, borderRadius:20, padding:'2px 9px', color:ct?.color, fontSize:9, fontWeight:800, fontFamily:FONT }}>{ct?.icon} {ct?.short}</span>
@@ -490,7 +490,7 @@ export function MasterView({ simClients = [] }) {
             <h2 style={{ fontFamily:FONT, fontWeight:700, fontSize:20, color:T.text, margin:'0 0 16px' }}>⚙️ Configurações</h2>
 
             {/* WhatsApp */}
-            <div style={{ background:T.surface, borderRadius:T.rLg, border:`1px solid ${T.border}`, padding:20, boxShadow:T.shadow, marginBottom:16 }}>
+            <div style={{ background:T.surface, borderRadius:16, border:BORDER_SUBTLE, padding:20, boxShadow:SHADOW_CARD, marginBottom:16 }}>
               <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:T.text, marginBottom:14 }}>💬 Notificações WhatsApp</div>
               <div style={{ marginBottom:14 }}>
                 <label style={LS}>Número WhatsApp (com DDI+DDD, ex: 5518999999999)</label>
@@ -511,7 +511,7 @@ export function MasterView({ simClients = [] }) {
             </div>
 
             {/* TollGuru */}
-            <div style={{ background:T.surface, borderRadius:T.rLg, border:`1px solid ${T.border}`, padding:20, boxShadow:T.shadow }}>
+            <div style={{ background:T.surface, borderRadius:16, border:BORDER_SUBTLE, padding:20, boxShadow:SHADOW_CARD }}>
               <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:T.text, marginBottom:4 }}>🛣️ Estimativa de Pedágio (TollGuru)</div>
               <p style={{ color:T.textMuted, fontSize:11, fontFamily:FONT, margin:'0 0 14px', lineHeight:1.5 }}>
                 Necessário para calcular pedágios automaticamente nas estimativas de frete.<br/>
@@ -556,7 +556,7 @@ export function MasterView({ simClients = [] }) {
                 <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:10 }}>⏳ Aguardando aprovação</div>
                 <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
                   {pendingUsers.map(u => (
-                    <motion.div key={u.id} layout style={{ background:T.surface, border:`1px solid ${T.amarelo}40`, borderRadius:T.rLg, padding:'16px 18px', boxShadow:T.shadow }}>
+                    <motion.div key={u.id} layout style={{ background:T.surface, border:`1px solid ${T.amarelo}40`, borderRadius:16, padding:'16px 18px', boxShadow:SHADOW_CARD }}>
                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:12 }}>
                         <div>
                           <div style={{ fontFamily:FONT, fontWeight:700, fontSize:14, color:T.text }}>{u.name}</div>
@@ -599,7 +599,7 @@ export function MasterView({ simClients = [] }) {
                   const statusBg    = isAtivo ? T.verdeLight : u.status==='bloqueado' ? T.perigoLight : T.surfaceLow
                   const statusLabel = isAtivo ? '✅ Ativo' : u.status==='bloqueado' ? '🔒 Bloqueado' : u.status
                   return (
-                    <motion.div key={u.id} layout style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.rLg, padding:'12px 16px', boxShadow:T.shadow }}>
+                    <motion.div key={u.id} layout style={{ background:T.surface, border:BORDER_SUBTLE, borderRadius:16, padding:'12px 16px', boxShadow:SHADOW_CARD }}>
                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                         <div style={{ flex:1 }}>
                           <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:3 }}>
@@ -647,7 +647,7 @@ export function MasterView({ simClients = [] }) {
                 {acceptedCards.map(c => {
                   const ct = CARD_TYPES[c.type]
                   return (
-                    <div key={c.id} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.rLg, padding:'12px 16px', boxShadow:T.shadow, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <div key={c.id} style={{ background:T.surface, border:BORDER_SUBTLE, borderRadius:16, padding:'12px 16px', boxShadow:SHADOW_CARD, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                       <div>
                         <div style={{ display:'flex', gap:6, alignItems:'center', marginBottom:4 }}>
                           <span style={{ background:ct?.bg, color:ct?.color, borderRadius:20, padding:'2px 8px', fontSize:9, fontWeight:700, fontFamily:FONT }}>{ct?.icon} {ct?.short}</span>
@@ -722,7 +722,7 @@ function ApprovalModal({ req, profile, simClients, onApprove, onRefuse, onClose 
     <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.55)', zIndex:2100, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)' }}
       onClick={e=>e.target===e.currentTarget&&onClose()}>
       <motion.div initial={{ scale:.95, opacity:0 }} animate={{ scale:1, opacity:1 }}
-        style={{ background:T.surface, borderRadius:T.rLg, padding:28, width:540, maxHeight:'92vh', overflowY:'auto', boxShadow:T.shadowLg, border:`1px solid ${T.border}` }}>
+        style={{ background:T.surface, borderRadius:18, padding:28, width:540, maxHeight:'92vh', overflowY:'auto', boxShadow:SHADOW_CARD, border:BORDER_SUBTLE }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
           <div>
             <h2 style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:20, margin:0 }}>📋 Aprovação Master</h2>
