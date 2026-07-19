@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth }        from '../contexts/AuthContext'
 import { useCards, useRequests, useNotifications, useSimClients, useConfig, useDrivers, useAllRotogramas, notifyUser } from '../hooks/useFirestore'
 import { MillsLogo, ToastContainer, useToasts, BrazilMap, NotificationBell, ConfirmModal } from '../components/UI'
-import { T, FONT, CARD_TYPES, MONTH_NAMES, BS, IS, NB, SUBTYPES_NF } from '../lib/constants'
+import { T, FONT, CARD_TYPES, MONTH_NAMES, BS, IS, NB, SUBTYPES_NF, SHADOW_CARD, BORDER_SUBTLE } from '../lib/constants'
 import { fmt, todayStr, getWeekDays, detectConflicts, getSubtypeLabel, findRelatedPendingRequest, sortByUrgency, sendTeamsNotification } from '../lib/utils'
 import { db } from '../lib/firebase'
 import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore'
@@ -489,7 +489,7 @@ export function FrotasView() {
       <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}} ::-webkit-scrollbar{width:5px;height:5px} ::-webkit-scrollbar-track{background:${T.bg}} ::-webkit-scrollbar-thumb{background:${T.borderMid};border-radius:10px}`}</style>
 
       {/* HEADER */}
-      <div style={{ background:T.surface, borderBottom:`1px solid ${T.border}`, padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:56, flexShrink:0, boxShadow:`0 1px 0 ${T.border},0 2px 8px rgba(26,22,18,.04)` }}>
+      <div style={{ background:'rgba(255,255,255,.9)', backdropFilter:'blur(8px)', borderBottom:'1px solid rgba(26,22,18,.06)', padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:56, flexShrink:0 }}>
         <div style={{ display:'flex', alignItems:'center', gap:14 }}>
           <MillsLogo height={30}/>
           <div style={{ width:1, height:26, background:T.border }}/>
@@ -520,7 +520,7 @@ export function FrotasView() {
               ))}
             </div>
             <button onClick={()=>setExportModal(true)} style={{ ...BS, background:T.verdeLight, color:T.verde, border:`1px solid ${T.verde}40`, fontSize:11, fontWeight:700 }}>📤 Relatório</button>
-            <button onClick={()=>{setEditCard(null);setDefaultDate(baseDate);setModal('card');}} style={{ ...BS, background:T.laranja, color:'white', fontWeight:700, fontSize:11 }}>+ Novo Serviço</button>
+            <button onClick={()=>{setEditCard(null);setDefaultDate(baseDate);setModal('card');}} style={{ ...BS, background:T.laranja, color:'white', fontWeight:700, fontSize:11, boxShadow:'0 2px 8px rgba(243,112,33,.3)' }}>+ Novo Serviço</button>
           </>}
           <NotificationBell notifications={notifications} unreadCount={unreadCount} onMarkAllRead={markAllRead} onMarkRead={markRead} onDelete={deleteNotification} onEnablePush={enablePush} onDisablePush={disablePush}/>
           {/* Menu "Mais" */}
@@ -679,16 +679,16 @@ export function FrotasView() {
         {l:'Atribuídos',            v:atribuidos.length,   c:T.info,     bg:T.infoLight},
         {l:'Aguard. Validação',     v:validacoes.length,   c:'#6D28D9',  bg:'#EDE9FE'},
       ].map(s=>(
-        <div key={s.l} style={{ background:s.bg, border:`1px solid ${s.c}30`, borderRadius:T.r, padding:'8px 10px' }}>
-          <div style={{ color:s.c, fontFamily:'Barlow Condensed,IBM Plex Sans,sans-serif', fontWeight:800, fontSize:22, lineHeight:1 }}>{s.v}</div>
-          <div style={{ color:T.textSec, fontSize:8, fontFamily:FONT, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.07em' }}>{s.l}</div>
+        <div key={s.l} style={{ background:s.bg, border:BORDER_SUBTLE, borderRadius:14, padding:'10px 12px', boxShadow:SHADOW_CARD }}>
+          <div style={{ color:s.c, fontFamily:'Barlow Condensed,IBM Plex Sans,sans-serif', fontWeight:800, fontSize:22, lineHeight:1, letterSpacing:'-.02em' }}>{s.v}</div>
+          <div style={{ color:T.textSec, fontSize:9, fontFamily:FONT, fontWeight:600, letterSpacing:'-.005em' }}>{s.l}</div>
         </div>
       ))}
     </div>
 
     <div style={{ flex:'0 0 36%', display:'grid', gridTemplateColumns:'1fr 310px', gap:10, padding:'0 20px 14px', minHeight:0, overflow:'hidden' }}>
           {/* Espaço liberado pelo mapa — timeline de hoje / KPIs rápidos, alternando a cada 30s */}
-          <div style={{ background:T.surface, borderRadius:T.rLg, border:`1px solid ${T.border}`, boxShadow:T.shadow, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+          <div style={{ background:T.surface, borderRadius:18, border:BORDER_SUBTLE, boxShadow:SHADOW_CARD, overflow:'hidden', display:'flex', flexDirection:'column' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'9px 13px', borderBottom:`1px solid ${T.border}`, flexShrink:0 }}>
               <span style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:11, textTransform:'uppercase', letterSpacing:'0.06em' }}>
                 {rodapeSlide===0 ? '🕐 Serviços de hoje' : '⚡ KPIs rápidos'}
@@ -738,7 +738,7 @@ export function FrotasView() {
           </div>
 
           {/* PAINEL ÚNICO com abas: Resumo / Solicitações / Validação — 100% da altura agora */}
-          <div style={{ background:T.surface, borderRadius:T.rLg, border:`1px solid ${T.border}`, display:'flex', flexDirection:'column', overflow:'hidden', boxShadow:T.shadow }}>
+          <div style={{ background:T.surface, borderRadius:18, border:BORDER_SUBTLE, boxShadow:SHADOW_CARD, overflow:'hidden', display:'flex', flexDirection:'column' }}>
                 {/* Abas */}
                 <div style={{ display:'flex', borderBottom:`1px solid ${T.border}`, flexShrink:0 }}>
                   {[

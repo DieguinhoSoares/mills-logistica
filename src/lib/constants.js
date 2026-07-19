@@ -41,6 +41,12 @@ export const T = {
   r:   10, rSm: 6, rLg: 16, rXl: 24,
 }
 
+// Tratamento visual "enterprise" (mockups 17a/18a/19a) — sombra em duas
+// camadas e borda quase invisível, para usar no lugar de `border:${color}30`
+// + `boxShadow:T.shadow` em cards/painéis.
+export const SHADOW_CARD = '0 1px 2px rgba(26,22,18,.04), 0 8px 24px -8px rgba(26,22,18,.06)'
+export const BORDER_SUBTLE = '1px solid rgba(26,22,18,.05)'
+
 export const FONT = "'Nunito', 'IBM Plex Sans', sans-serif"
 
 export const CARD_TYPES = {
