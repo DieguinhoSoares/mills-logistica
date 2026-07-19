@@ -272,9 +272,9 @@ export function MasterView({ simClients = [] }) {
         </div>
       )}
       {migrateLog && (
-        <div style={{ margin:'16px 20px 0', padding:'12px 16px', background:'#ECFDF5', borderRadius:8, border:'1px solid #10B981', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <div style={{ fontFamily:'IBM Plex Sans,sans-serif', fontSize:12, color:'#065F46' }}>✅ {migrateLog}</div>
-          <button onClick={()=>setMigrateLog(null)} style={{ background:'none', border:'none', color:'#6B7280', fontSize:18, cursor:'pointer' }}>×</button>
+        <div style={{ margin:'16px 20px 0', padding:'12px 16px', background:T.sucessoLight, borderRadius:8, border:`1px solid ${T.sucesso}40`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <div style={{ fontFamily:FONT, fontSize:12, color:T.sucesso }}>✅ {migrateLog}</div>
+          <button onClick={()=>setMigrateLog(null)} style={{ background:'none', border:'none', color:T.textMuted, fontSize:18, cursor:'pointer' }}>×</button>
         </div>
       )}
 
@@ -329,7 +329,8 @@ export function MasterView({ simClients = [] }) {
       )}
 
       <div style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column' }}>
-        {tab==='kpis' && <KPIView cards={cards} requests={requests} simClients={simClients}/>}
+        {tab==='kpis' && <KPIView cards={cards} requests={requests} simClients={simClients}
+          onNavigateToAprovacoes={()=>{ setTab('aprovacao'); setFilterAprov('todos') }}/>}
 
         {tab==='map' && (
           <div style={{ flex:1, padding:'16px 20px', overflow:'hidden' }}>

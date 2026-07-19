@@ -135,6 +135,14 @@ export function FrotasView() {
 
   const [activeTab,    setActiveTab]    = useState('agenda')
   const [view,         setView]         = useState('semana')
+  // Toggle Compacto/Padrão do calendário — cards menores (mais serviços
+  // visíveis de uma vez) vs. detalhados (340px/linha, mais fácil de ler
+  // cada serviço sem precisar rolar dentro do dia).
+  const [calCompact,   setCalCompact]   = useState(false)
+  // Faixa "Em destaque agora" — alterna 1 serviço do dia a cada 10s, com
+  // barra de progresso. Reinicia o índice se a lista mudar de tamanho
+  // (evita apontar pra um item que não existe mais depois de uma edição).
+  const [destaqueIdx, setDestaqueIdx] = useState(0)
   const [busca,        setBusca]        = useState('')
   const buscaResultados = useMemo(() => {
     if (!busca.trim()) return []
@@ -467,6 +475,13 @@ export function FrotasView() {
 
   const cardsHoje = cards.filter(c => c.startDate === todayStr() && c.status !== 'cancelado').sort((a,b)=>(a.startDate||'').localeCompare(b.startDate||''))
 
+  useEffect(() => {
+    if (cardsHoje.length <= 1) { setDestaqueIdx(0); return }
+    setDestaqueIdx(i => i >= cardsHoje.length ? 0 : i) // não aponta pra item que sumiu
+    const iv = setInterval(() => setDestaqueIdx(i => (i + 1) % cardsHoje.length), 10000)
+    return () => clearInterval(iv)
+  }, [cardsHoje.length])
+
   return (
     <div style={{ background:T.bg, height:'100vh', display:'flex', flexDirection:'column', overflow:'hidden', fontFamily:'IBM Plex Sans,sans-serif' }}>
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Barlow+Condensed:wght@400;600;700;800&display=swap" rel="stylesheet"/>
@@ -609,11 +624,44 @@ export function FrotasView() {
               {conflicts.length>0&&<div style={{ display:'flex', alignItems:'center', gap:4, background:T.amareloLight, border:`1px solid ${T.amarelo}50`, borderRadius:20, padding:'2px 9px' }}>
                 <span style={{ color:'#B8860B', fontSize:8, fontWeight:700 }}>⚠ {conflicts.length} otimiz.</span>
               </div>}
+              {view==='semana' && (
+                <button onClick={()=>setCalCompact(c=>!c)}
+                  style={{ ...BS, background:calCompact?T.laranjaLight:T.surface, color:calCompact?T.laranja:T.textSec, border:`1px solid ${calCompact?T.laranja:T.border}`, fontSize:9, fontWeight:700, padding:'3px 9px' }}>
+                  {calCompact ? '▦ Compacto' : '▤ Padrão'}
+                </button>
+              )}
             </div>
           </div>
+
+          {cardsHoje.length > 0 && (() => {
+            const destaque = cardsHoje[destaqueIdx] || cardsHoje[0]
+            const ct = CARD_TYPES[destaque.type]
+            return (
+              <div key={destaque.id} style={{ background:T.laranjaXLight, border:`1px solid ${T.laranja}30`, borderRadius:T.r, padding:'8px 14px', marginBottom:8, position:'relative', overflow:'hidden' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
+                    <span style={{ color:T.laranja, fontFamily:FONT, fontWeight:800, fontSize:9, textTransform:'uppercase', letterSpacing:'0.06em', flexShrink:0 }}>🔶 Em destaque agora</span>
+                    <span style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:12, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                      {ct?.icon} {destaque.client||'—'} · {destaque.driver||'Sem motorista'} · {destaque.nInterno||'—'}
+                    </span>
+                  </div>
+                  {cardsHoje.length > 1 && (
+                    <div style={{ display:'flex', gap:3, flexShrink:0 }}>
+                      {cardsHoje.map((_,i) => (
+                        <div key={i} onClick={()=>setDestaqueIdx(i)} style={{ width:5, height:5, borderRadius:'50%', cursor:'pointer', background:i===destaqueIdx?T.laranja:T.border }}/>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {cardsHoje.length > 1 && (
+                  <div style={{ position:'absolute', bottom:0, left:0, height:2, background:T.laranja, animation:'destaqueProgresso 10s linear' }} key={destaqueIdx}/>
+                )}
+              </div>
+            )
+          })()}
           <AnimatePresence mode="wait">
             <motion.div key={view} initial={{ opacity:0, y:5 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-5 }} transition={{ duration:.1 }} style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-              {view==='semana'&&<WeekView cards={cards} baseDate={baseDate} conflicts={conflicts} onEdit={c=>{setEditCard(c);setModal('card');}} onAddCard={d=>{setDefaultDate(d);setEditCard(null);setModal('card');}} onMoveCard={handleMoveCard}/>}
+              {view==='semana'&&<WeekView cards={cards} baseDate={baseDate} conflicts={conflicts} onEdit={c=>{setEditCard(c);setModal('card');}} onAddCard={d=>{setDefaultDate(d);setEditCard(null);setModal('card');}} onMoveCard={handleMoveCard} compact={calCompact}/>}
               {view==='mes'&&<MonthView cards={cards} year={yr} month={mo} conflicts={conflicts} onEdit={c=>{setEditCard(c);setModal('card');}} onAddCard={d=>{setDefaultDate(d);setEditCard(null);setModal('card');}} onMoveCard={handleMoveCard}/>}
               {view==='ano'&&<div style={{ overflow:'auto', flex:1 }}><YearView cards={cards} year={yr} onMonthClick={m=>{setMo(m);setView('mes');}}/></div>}
             </motion.div>

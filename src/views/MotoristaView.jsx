@@ -219,6 +219,12 @@ function ServicoCard({ card, index, onUpdateStatus }) {
   const [showConclusao,   setShowConclusao]   = useState(false)
   const [showInterrupcao, setShowInterrupcao] = useState(false)
 
+  // Alerta de atraso individual — antes só existia um aviso geral ("N
+  // serviço(s) pendente(s)") lá em cima da lista, sem indicar QUAL serviço
+  // específico está atrasado nem há quanto tempo, direto no card dele.
+  const isAtrasado = card.startDate && card.startDate < todayStr() && !['concluido','cancelado'].includes(card.status)
+  const diasAtraso = isAtrasado ? Math.round((new Date(todayStr()) - new Date(card.startDate)) / 86400000) : 0
+
   const origem    = card.originCity  || card.origin       || '—'
   const destino   = card.destCity    || card.destination  || '—'
   const origemUF  = card.origin      || ''
@@ -258,7 +264,14 @@ function ServicoCard({ card, index, onUpdateStatus }) {
       </AnimatePresence>
 
       <motion.div initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }} transition={{ delay:index*0.05 }}
-        style={{ background:T.surface, borderRadius:T.rLg, padding:'16px', marginBottom:12, boxShadow:T.shadowMd, border:`1.5px solid ${ct?.color}30`, position:'relative', overflow:'hidden' }}>
+        style={{ background:T.surface, borderRadius:T.rLg, padding:'16px', marginBottom:12, boxShadow:T.shadowMd,
+          border: isAtrasado ? `2px dashed ${T.perigo}` : `1.5px solid ${ct?.color}30`, position:'relative', overflow:'hidden' }}>
+
+        {isAtrasado && (
+          <div style={{ background:T.perigo, color:'white', borderRadius:20, padding:'2px 10px', fontSize:9, fontWeight:800, fontFamily:FONT, position:'absolute', top:10, right:10, zIndex:1 }}>
+            🚨 Atrasado desde {fmt(card.startDate)} · {diasAtraso} dia{diasAtraso===1?'':'s'}
+          </div>
+        )}
 
         <div style={{ position:'absolute', left:0, top:0, bottom:0, width:4, background:ct?.color, borderRadius:'4px 0 0 4px' }}/>
 

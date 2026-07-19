@@ -1,13 +1,13 @@
-import { useMemo } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { T, FONT, CARD_TYPES, URGENCY } from '../lib/constants'
+import { T, FONT, CARD_TYPES, URGENCY, BS } from '../lib/constants'
 import { resumirEmissoes } from '../lib/emissoes'
 import { todayStr } from '../lib/utils'
 
-function KPICard({ title, value, sub, color, bg, icon, trend }) {
+function KPICard({ title, value, sub, color, bg, icon, trend, onClick }) {
   return (
-    <motion.div initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }}
-      style={{ background:bg||T.surface, border:`1px solid ${color}30`, borderRadius:T.rLg, padding:'15px 16px', boxShadow:T.shadow, position:'relative', overflow:'hidden' }}>
+    <motion.div initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} onClick={onClick}
+      style={{ background:bg||T.surface, border:`1px solid ${color}30`, borderRadius:T.rLg, padding:'15px 16px', boxShadow:T.shadow, position:'relative', overflow:'hidden', cursor:onClick?'pointer':'default' }}>
       <div style={{ position:'absolute', top:0, right:0, width:4, height:'100%', background:color, borderRadius:'0 12px 12px 0' }}/>
       <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:7 }}>
         <span style={{ fontSize:18 }}>{icon}</span>
@@ -83,11 +83,21 @@ function DonutChart({ title, data }) {
   )
 }
 
-export function KPIView({ cards, requests, simClients }) {
+export function KPIView({ cards, requests, simClients, onNavigateToAprovacoes }) {
+  // Filtro por unidade — chips no topo, recalcula tudo abaixo. 'todas' não
+  // filtra nada (comportamento igual ao de antes de existir esse filtro).
+  const [unidadeFiltro, setUnidadeFiltro] = useState('todas')
+  const unidadesDisponiveis = useMemo(() =>
+    ['todas', ...Array.from(new Set(cards.map(c=>c.unit).filter(Boolean))).sort()]
+  , [cards])
+  const cardsFiltrados = useMemo(() =>
+    unidadeFiltro==='todas' ? cards : cards.filter(c=>c.unit===unidadeFiltro)
+  , [cards, unidadeFiltro])
+
   // Emissão de CO2 (Escopo 1/3) — dado enviado ao time de Meio Ambiente da
   // Mills pra divulgação externa. Ver src/lib/emissoes.js: consumo médio por
   // veículo ainda marcado "a confirmar" com o time de Meio Ambiente.
-  const emissoes = useMemo(() => resumirEmissoes(cards, simClients), [cards, simClients])
+  const emissoes = useMemo(() => resumirEmissoes(cardsFiltrados, simClients), [cardsFiltrados, simClients])
 
   const stats = useMemo(() => {
     const hoje      = todayStr()
@@ -98,7 +108,7 @@ export function KPIView({ cards, requests, simClients }) {
     // distribuição por motorista/filial/rota, nem comparativo mensal.
     // cardsValidos: base histórica — inclui concluídos, exclui cancelados.
     // Usado para métricas de volume, por tipo, por motorista, rotas (dados históricos completos).
-    const cardsValidos = cards.filter(c => c.status !== 'cancelado')
+    const cardsValidos = cardsFiltrados.filter(c => c.status !== 'cancelado')
     // cardsAtivos: só o que está em execução — para métricas operacionais (atrasados, prazo).
     const cardsAtivos  = cardsValidos.filter(c => c.status !== 'concluido')
 
@@ -171,9 +181,9 @@ export function KPIView({ cards, requests, simClients }) {
 
     // ── Cenário operacional AGORA — o que Rafael mais precisa ver de cara:
     // não é histórico, é "o que está rolando com a equipe neste exato momento".
-    const emExecucao        = cards.filter(c=>c.status==='em_execucao').length
-    const aguardandoValid   = cards.filter(c=>c.status==='aguardando_validacao').length
-    const interrompidos     = cards.filter(c=>c.status==='interrompido').length
+    const emExecucao        = cardsFiltrados.filter(c=>c.status==='em_execucao').length
+    const aguardandoValid   = cardsFiltrados.filter(c=>c.status==='aguardando_validacao').length
+    const interrompidos     = cardsFiltrados.filter(c=>c.status==='interrompido').length
     const atrasadosAgora    = cardsAtivos.filter(c => c.endDate && c.endDate < hoje)
       .sort((a,b)=>a.endDate.localeCompare(b.endDate)).slice(0,6)
       .map(c=>({ cliente:c.client||'—', driver:c.driver||'—', dias:Math.max(0,Math.round((new Date(hoje)-new Date(c.endDate))/86400000)) }))
@@ -194,14 +204,49 @@ export function KPIView({ cards, requests, simClients }) {
 
     return { total,totalAtivos,late,onTime,pctOnTime,pctAder,remanejados,byType,byDriver,byState,byFilial,tempoMedio,topRoutes,monthCards,growthPct,pendReq,taxaAceit,
       emExecucao,aguardandoValid,interrompidos,atrasadosAgora,slaPorUrgencia }
-  }, [cards, requests])
+  }, [cardsFiltrados, requests])
+
+  const painelRef = useRef(null)
+  const [exportandoImg, setExportandoImg] = useState(false)
+  const handleExportarImagem = async () => {
+    setExportandoImg(true)
+    try {
+      const html2canvas = (await import('html2canvas')).default
+      const canvas = await html2canvas(painelRef.current, { backgroundColor:'#F9F6F1', scale:2 })
+      const link = document.createElement('a')
+      link.download = `mills-indicadores_${todayStr()}.png`
+      link.href = canvas.toDataURL('image/png')
+      link.click()
+    } catch (err) {
+      console.error('Erro ao exportar imagem do painel:', err)
+    } finally {
+      setExportandoImg(false)
+    }
+  }
 
   return (
-    <div style={{ padding:'16px 20px', overflowY:'auto', height:'100%' }}>
-      <div style={{ marginBottom:18 }}>
-        <h2 style={{ fontFamily:FONT, fontWeight:900, fontSize:18, color:T.text, margin:0 }}>📊 Indicadores de Performance</h2>
-        <p style={{ fontFamily:FONT, fontSize:12, color:T.textMuted, margin:'3px 0 0' }}>Dados em tempo real · {stats.total} serviços</p>
+    <div ref={painelRef} style={{ padding:'16px 20px', overflowY:'auto', height:'100%' }}>
+      <div style={{ marginBottom:18, display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+        <div>
+          <h2 style={{ fontFamily:FONT, fontWeight:900, fontSize:18, color:T.text, margin:0 }}>📊 Indicadores de Performance</h2>
+          <p style={{ fontFamily:FONT, fontSize:12, color:T.textMuted, margin:'3px 0 0' }}>Dados em tempo real · {stats.total} serviços</p>
+        </div>
+        <button onClick={handleExportarImagem} disabled={exportandoImg}
+          style={{ ...BS, background:T.surface, color:T.textSec, border:`1px solid ${T.border}`, fontSize:11, fontWeight:700, whiteSpace:'nowrap' }}>
+          {exportandoImg ? '⏳ Gerando...' : '📷 Exportar imagem'}
+        </button>
       </div>
+
+      {unidadesDisponiveis.length > 2 && (
+        <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:14 }}>
+          {unidadesDisponiveis.map(u => (
+            <button key={u} onClick={()=>setUnidadeFiltro(u)}
+              style={{ ...BS, background:unidadeFiltro===u?T.laranja:T.surface, color:unidadeFiltro===u?'white':T.textSec, border:`1px solid ${unidadeFiltro===u?T.laranja:T.border}`, fontSize:10, fontWeight:700, padding:'4px 12px' }}>
+              {u==='todas' ? '🏢 Todas as unidades' : u}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Cenário operacional AGORA — visão rápida do que está rolando com a
           equipe neste momento, não histórico. Pensado pra quem acompanha a
@@ -267,7 +312,8 @@ export function KPIView({ cards, requests, simClients }) {
       </div>
 
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:14 }}>
-        <KPICard title="Atrasados"          value={stats.late}              icon="🔴" color={T.perigo}  bg={T.perigoLight}  sub={stats.late?'endDate < hoje, não concluídos':'Tudo em dia 🎉'}/>
+        <KPICard title="Atrasados"          value={stats.late}              icon="🔴" color={T.perigo}  bg={T.perigoLight}  sub={stats.late?(onNavigateToAprovacoes?'Clique pra ver na fila de aprovações':'endDate < hoje, não concluídos'):'Tudo em dia 🎉'}
+          onClick={stats.late && onNavigateToAprovacoes ? onNavigateToAprovacoes : undefined}/>
         <KPICard title="Mês Atual"          value={stats.monthCards.length} icon="📆" color={T.amarelo} bg={T.amareloLight} sub="Serviços no mês"/>
         <KPICard title="Solicitações Pend." value={stats.pendReq}           icon="📥" color={T.laranjaDeep} bg="#FDEEE9"        sub="Aguardando resposta"/>
         <KPICard title="Taxa de Aceite"     value={`${stats.taxaAceit}%`}   icon="🤝" color={T.sucesso} bg={T.sucessoLight} sub="Solicitações aceitas"/>
@@ -298,8 +344,18 @@ export function KPIView({ cards, requests, simClients }) {
 
       {stats.total===0 && (
         <div style={{ textAlign:'center', padding:'40px 0', color:T.textMuted, fontFamily:FONT, marginTop:20 }}>
-          <div style={{ fontSize:44, marginBottom:10 }}>📊</div>
-          <p>Os indicadores serão calculados automaticamente conforme os serviços forem inseridos.</p>
+          <div style={{ fontSize:44, marginBottom:10 }}>{unidadeFiltro!=='todas' ? '🔍' : '📊'}</div>
+          <p>
+            {unidadeFiltro!=='todas'
+              ? `Nenhum serviço encontrado para "${unidadeFiltro}" no período.`
+              : 'Os indicadores serão calculados automaticamente conforme os serviços forem inseridos.'}
+          </p>
+          {unidadeFiltro!=='todas' && (
+            <button onClick={()=>setUnidadeFiltro('todas')}
+              style={{ ...BS, background:T.laranjaLight, color:T.laranja, border:`1px solid ${T.laranja}40`, fontSize:11, fontWeight:700, marginTop:10 }}>
+              Limpar filtros
+            </button>
+          )}
         </div>
       )}
     </div>
