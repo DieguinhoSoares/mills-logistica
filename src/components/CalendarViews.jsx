@@ -8,7 +8,7 @@ import { todayStr, getWeekDays, getMonthWeeks, cardsForDay } from '../lib/utils'
 import { ServiceCard, MoveModal } from './UI'
 
 /* ══ WEEK VIEW ════════════════════════════════════════════════════════════════ */
-export function WeekView({ cards, baseDate, conflicts, onEdit, onAddCard, onMoveCard }) {
+export function WeekView({ cards, baseDate, conflicts, onEdit, onAddCard, onMoveCard, compact=false }) {
   const days = getWeekDays(baseDate)
   const [dragCard, setDragCard] = useState(null)
   const [dragOver, setDragOver] = useState(null)
@@ -26,7 +26,8 @@ export function WeekView({ cards, baseDate, conflicts, onEdit, onAddCard, onMove
             <div key={day}
               onDragOver={e=>{e.preventDefault();setDragOver(day);}} onDragLeave={()=>setDragOver(null)}
               onDrop={e=>{e.preventDefault();if(dragCard&&day!==dragCard.startDate)setPending({card:dragCard,tgt:day});setDragCard(null);setDragOver(null);}}
-              style={{ background:isDO?'#FFF3E8':isToday?'#FFFAF5':T.surface, border:`1.5px solid ${isToday?T.laranja:isDO?T.laranja:T.border}`, borderRadius:T.r, padding:9, minHeight:110, display:'flex', flexDirection:'column', overflowY:'auto', boxShadow:isToday?`0 0 0 1px ${T.laranja}40,${T.shadow}`:T.shadow, transition:'all .1s' }}>
+              style={{ background:isDO?'#FFF3E8':isToday?'#FFFAF5':T.surface, border:`1.5px solid ${isToday?T.laranja:isDO?T.laranja:T.border}`, borderRadius:T.r, padding:9, minHeight:compact?110:340, display:'flex', flexDirection:'column', overflowY:'auto', boxShadow:isToday?`0 0 0 1px ${T.laranja}40,${T.shadow}`:T.shadow, transition:'all .1s' }}>
+
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:7, flexShrink:0 }}>
                 <div>
                   <div style={{ color:T.textMuted, fontSize:9, fontWeight:700, fontFamily:'IBM Plex Sans,sans-serif', textTransform:'uppercase', letterSpacing:'0.06em' }}>{WD_SHORT[idx]}</div>
@@ -34,7 +35,7 @@ export function WeekView({ cards, baseDate, conflicts, onEdit, onAddCard, onMove
                 </div>
                 <button onClick={()=>onAddCard(day)} style={{ background:T.laranjaLight, border:`1px solid ${T.laranja}50`, borderRadius:T.rSm, color:T.laranja, width:22, height:22, cursor:'pointer', fontSize:14, display:'flex', alignItems:'center', justifyContent:'center' }}>+</button>
               </div>
-              {dc.map(c => <ServiceCard key={c.id} card={c} conflicts={conflicts} onEdit={onEdit} onDragStart={(e,c2)=>{setDragCard(c2);e.dataTransfer.effectAllowed='move';}}/>)}
+              {dc.map(c => <ServiceCard key={c.id} card={c} conflicts={conflicts} onEdit={onEdit} compact={compact} onDragStart={(e,c2)=>{setDragCard(c2);e.dataTransfer.effectAllowed='move';}}/>)}
               {!dc.length && <div style={{ color:T.textMuted, fontSize:10, fontFamily:'IBM Plex Sans,sans-serif', textAlign:'center', marginTop:'auto', opacity:.4 }}>—</div>}
             </div>
           )
