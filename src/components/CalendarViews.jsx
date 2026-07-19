@@ -3,7 +3,7 @@
 // Extraído de FrotasView.jsx (item 11 da revisão)
 // ============================================================
 import { useState } from 'react'
-import { T, CARD_TYPES, MONTH_NAMES, WD_SHORT } from '../lib/constants'
+import { T, CARD_TYPES, MONTH_NAMES, WD_SHORT, SHADOW_CARD, BORDER_SUBTLE } from '../lib/constants'
 import { todayStr, getWeekDays, getMonthWeeks, cardsForDay } from '../lib/utils'
 import { ServiceCard, MoveModal } from './UI'
 
@@ -26,7 +26,7 @@ export function WeekView({ cards, baseDate, conflicts, onEdit, onAddCard, onMove
             <div key={day}
               onDragOver={e=>{e.preventDefault();setDragOver(day);}} onDragLeave={()=>setDragOver(null)}
               onDrop={e=>{e.preventDefault();if(dragCard&&day!==dragCard.startDate)setPending({card:dragCard,tgt:day});setDragCard(null);setDragOver(null);}}
-              style={{ background:isDO?'#FFF3E8':isToday?'#FFFAF5':T.surface, border:`1.5px solid ${isToday?T.laranja:isDO?T.laranja:T.border}`, borderRadius:T.r, padding:9, minHeight:compact?110:340, display:'flex', flexDirection:'column', overflowY:'auto', boxShadow:isToday?`0 0 0 1px ${T.laranja}40,${T.shadow}`:T.shadow, transition:'all .1s' }}>
+              style={{ background:isDO?'#FFF3E8':isToday?'#FFFAF5':T.surface, border:isToday||isDO?`1.5px solid ${T.laranja}`:BORDER_SUBTLE, borderRadius:14, padding:9, minHeight:compact?110:340, display:'flex', flexDirection:'column', overflowY:'auto', boxShadow:isToday?`0 0 0 1px ${T.laranja}40, ${SHADOW_CARD}`:SHADOW_CARD, transition:'all .1s' }}>
 
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:7, flexShrink:0 }}>
                 <div>
@@ -67,7 +67,7 @@ export function MonthView({ cards, year, month, conflicts, onEdit, onAddCard, on
               const dc = cardsForDay(cards, day), isToday = day===t
               return (
                 <div key={day} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();if(dragCard&&day!==dragCard.startDate)setPending({card:dragCard,tgt:day});setDragCard(null);}} onClick={()=>!dc.length&&onAddCard(day)}
-                  style={{ background:isToday?'#FFFAF5':T.surface, border:`1px solid ${isToday?T.laranja:T.border}`, borderRadius:T.rSm, padding:5, minHeight:70, cursor:dc.length?'default':'pointer', transition:'all .1s' }}>
+                  style={{ background:isToday?'#FFFAF5':T.surface, border:isToday?`1px solid ${T.laranja}`:BORDER_SUBTLE, borderRadius:T.rSm, padding:5, minHeight:70, cursor:dc.length?'default':'pointer', transition:'all .1s' }}>
                   <div style={{ color:isToday?T.laranja:T.textSec, fontFamily:'Barlow Condensed,IBM Plex Sans,sans-serif', fontWeight:700, fontSize:13, marginBottom:3 }}>{day.split('-')[2]}</div>
                   {dc.slice(0,3).map(c => (
                     <div key={c.id} draggable onDragStart={e=>{setDragCard(c);e.dataTransfer.effectAllowed='move';}} onClick={e=>{e.stopPropagation();onEdit(c);}}
@@ -96,9 +96,9 @@ export function YearView({ cards, year, onMonthClick }) {
         const late = mc.filter(c=>c.status==='atrasado').length
         return (
           <div key={name} onClick={()=>onMonthClick(mi)}
-            style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.r, padding:13, cursor:'pointer', transition:'all .15s' }}
+            style={{ background:T.surface, border:BORDER_SUBTLE, borderRadius:14, padding:13, cursor:'pointer', transition:'all .15s', boxShadow:SHADOW_CARD }}
             onMouseEnter={e=>{e.currentTarget.style.borderColor=T.laranja;e.currentTarget.style.boxShadow=T.shadowMd;}}
-            onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.boxShadow='none';}}>
+            onMouseLeave={e=>{e.currentTarget.style.borderColor='rgba(26,22,18,.05)';e.currentTarget.style.boxShadow=SHADOW_CARD;}}>
             <div style={{ color:T.text, fontFamily:'Barlow Condensed,IBM Plex Sans,sans-serif', fontWeight:700, fontSize:15, marginBottom:8 }}>{name}</div>
             <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginBottom:7 }}>
               {Object.entries(tc).map(([k,n]) => (

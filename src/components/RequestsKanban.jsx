@@ -4,7 +4,7 @@
 // ============================================================
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { T, FONT, CARD_TYPES, URGENCY, URGENCY_SLA_MS, BS, IS, LS } from '../lib/constants'
+import { T, FONT, CARD_TYPES, URGENCY, URGENCY_SLA_MS, BS, IS, LS, SHADOW_CARD, BORDER_SUBTLE } from '../lib/constants'
 import { fmt, getSubtypeLabel, sortByUrgency } from '../lib/utils'
 import { db } from '../lib/firebase'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
@@ -115,7 +115,7 @@ export function RequestsKanban({ requests, teamsWebhookUrl, onRespond, onCancel,
           <div key={col.key} style={{ background:col.bg, borderRadius:T.rLg, border:`1px solid ${col.color}30`, padding:14, display:'flex', flexDirection:'column', overflow:'hidden' }}>
             <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12, flexShrink:0 }}>
               <div style={{ width:10, height:10, borderRadius:'50%', background:col.color }}/>
-              <span style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:15, textTransform:'uppercase', letterSpacing:'0.04em' }}>{col.label}</span>
+              <span style={{ color:T.text, fontFamily:FONT, fontWeight:600, fontSize:14, letterSpacing:'-.01em' }}>{col.label}</span>
               <span style={{ marginLeft:'auto', background:col.color, color:'white', borderRadius:20, padding:'0 5px', fontSize:9, fontWeight:800 }}>{groups[col.key].length}</span>
             </div>
             <div style={{ overflowY:'auto', flex:1, display:'flex', flexDirection:'column', gap:10 }}>
@@ -124,7 +124,7 @@ export function RequestsKanban({ requests, teamsWebhookUrl, onRespond, onCancel,
                 const ct=CARD_TYPES[r.type],ug=URGENCY[r.urgency]
                 return (
                   <motion.div key={r.id} layout whileHover={{ y:-1, boxShadow:T.shadowMd }}
-                    style={{ background:T.surface, borderRadius:T.r, padding:'13px 14px', boxShadow:T.shadow, border:`1px solid ${T.border}`, transition:'all .12s' }}>
+                    style={{ background:T.surface, borderRadius:14, padding:'13px 14px', boxShadow:SHADOW_CARD, border:BORDER_SUBTLE, transition:'all .12s' }}>
                     <div style={{ display:'flex', gap:6, marginBottom:8, flexWrap:'wrap' }}>
                       <span style={{ background:ct?.bg, border:`1px solid ${ct?.color}40`, borderRadius:20, padding:'2px 8px', color:ct?.color, fontSize:9, fontWeight:700, fontFamily:FONT }}>{ct?.icon} {ct?.short}</span>
                       <span style={{ background:ug?.bg, borderRadius:20, padding:'2px 8px', color:ug?.color, fontSize:9, fontWeight:700, fontFamily:FONT }}>{ug?.icon}</span>

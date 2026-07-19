@@ -483,7 +483,7 @@ export function FrotasView() {
   }, [cardsHoje.length])
 
   return (
-    <div style={{ background:T.bg, height:'100vh', display:'flex', flexDirection:'column', overflow:'hidden', fontFamily:'IBM Plex Sans,sans-serif' }}>
+    <div style={{ background:T.bgCold, height:'100vh', display:'flex', flexDirection:'column', overflow:'hidden', fontFamily:'IBM Plex Sans,sans-serif' }}>
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Barlow+Condensed:wght@400;600;700;800&display=swap" rel="stylesheet"/>
       <ToastContainer toasts={toasts} onDismiss={dismiss}/>
       <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}} ::-webkit-scrollbar{width:5px;height:5px} ::-webkit-scrollbar-track{background:${T.bg}} ::-webkit-scrollbar-thumb{background:${T.borderMid};border-radius:10px}`}</style>
@@ -531,7 +531,7 @@ export function FrotasView() {
               {simClients.length===0&&<span style={{ marginLeft:4, color:maisOpen?'white':T.perigo }}>⚠️</span>}
             </button>
             {maisOpen&&(
-              <div onClick={e=>e.stopPropagation()} style={{ position:'absolute', top:36, right:0, background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.rLg, boxShadow:T.shadowLg, zIndex:999, minWidth:200, padding:8 }}>
+              <div onClick={e=>e.stopPropagation()} style={{ position:'absolute', top:36, right:0, background:T.surface, border:BORDER_SUBTLE, borderRadius:16, boxShadow:SHADOW_CARD, zIndex:999, minWidth:200, padding:8 }}>
                 <button onClick={()=>{setCsvModal(true);setMaisOpen(false)}}
                   style={{ width:'100%', textAlign:'left', padding:'8px 12px', borderRadius:T.rSm, border:'none', background:'transparent', cursor:'pointer', fontFamily:FONT, fontSize:12, color:T.text, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                   <span>⬆️ Atualizar base SIM</span>
@@ -593,7 +593,7 @@ export function FrotasView() {
                     style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:T.textMuted, fontSize:13, lineHeight:1 }}>×</button>
                 )}
                 {busca.trim().length>=1 && (
-                  <div style={{ position:'absolute', top:34, right:0, width:320, background:T.surface, borderRadius:T.r, boxShadow:T.shadowLg, border:`1px solid ${T.border}`, zIndex:999, maxHeight:360, overflowY:'auto' }}>
+                  <div style={{ position:'absolute', top:34, right:0, width:320, background:T.surface, borderRadius:14, boxShadow:SHADOW_CARD, border:BORDER_SUBTLE, zIndex:999, maxHeight:360, overflowY:'auto' }}>
                     {buscaResultados.length===0 ? (
                       <div style={{ padding:'14px 16px', color:T.textMuted, fontSize:12, fontFamily:FONT }}>Nenhum resultado encontrado</div>
                     ) : buscaResultados.map(card=>{
@@ -727,9 +727,9 @@ export function FrotasView() {
                     ['Atribuídos',      atribuidos.length,   T.info,    T.infoLight],
                     ['Rotas otimiz.',   conflicts.length,    '#B8860B', T.amareloLight],
                   ].map(([l,v,color,bg])=>(
-                    <div key={l} style={{ background:bg, border:`1px solid ${color}30`, borderRadius:T.r, padding:'10px 12px' }}>
-                      <div style={{ color, fontFamily:FONT, fontWeight:900, fontSize:22, lineHeight:1 }}>{v}</div>
-                      <div style={{ color:T.textSec, fontSize:9, fontFamily:FONT, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', marginTop:3 }}>{l}</div>
+                    <div key={l} style={{ background:bg, border:BORDER_SUBTLE, borderRadius:14, padding:'10px 12px', boxShadow:SHADOW_CARD }}>
+                      <div style={{ color, fontFamily:FONT, fontWeight:800, fontSize:22, lineHeight:1, letterSpacing:'-.02em' }}>{v}</div>
+                      <div style={{ color:T.textSec, fontSize:9, fontFamily:FONT, fontWeight:600, letterSpacing:'-.005em', marginTop:3 }}>{l}</div>
                     </div>
                   ))}
                 </div>
@@ -764,9 +764,9 @@ export function FrotasView() {
                         ['Atribuídos', atribuidos.length, T.verde, T.verdeLight],
                         ['Antecipados', antecipados.length, T.info, T.infoLight],
                       ].map(([l,v,color,bg])=>(
-                        <div key={l} style={{ background:bg, border:`1px solid ${color}20`, borderRadius:T.r, padding:'10px 12px' }}>
-                          <div style={{ color, fontFamily:FONT, fontWeight:900, fontSize:22, lineHeight:1 }}>{v}</div>
-                          <div style={{ color:T.textSec, fontSize:9, fontFamily:FONT, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', marginTop:3 }}>{l}</div>
+                        <div key={l} style={{ background:bg, border:BORDER_SUBTLE, borderRadius:14, padding:'10px 12px', boxShadow:SHADOW_CARD }}>
+                          <div style={{ color, fontFamily:FONT, fontWeight:800, fontSize:22, lineHeight:1, letterSpacing:'-.02em' }}>{v}</div>
+                          <div style={{ color:T.textSec, fontSize:9, fontFamily:FONT, fontWeight:600, letterSpacing:'-.005em', marginTop:3 }}>{l}</div>
                         </div>
                       ))}
                     </div>
@@ -938,7 +938,7 @@ export function FrotasView() {
           <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.35)', zIndex:1500, display:'flex', alignItems:'center', justifyContent:'center' }}
             onClick={e=>e.target===e.currentTarget&&setMapModal(false)}>
             <motion.div initial={{ scale:.96, opacity:0 }} animate={{ scale:1, opacity:1 }}
-              style={{ background:T.surface, borderRadius:T.rLg, width:320, maxWidth:'92vw', maxHeight:'85vh', overflow:'hidden', boxShadow:T.shadowLg, border:`1px solid ${T.border}` }}>
+              style={{ background:T.surface, borderRadius:18, width:320, maxWidth:'92vw', maxHeight:'85vh', overflow:'hidden', boxShadow:SHADOW_CARD, border:BORDER_SUBTLE }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 14px', borderBottom:`1px solid ${T.border}` }}>
                 <span style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:12 }}>🗺 Mapa de rotas</span>
                 <button onClick={()=>setMapModal(false)} style={{ background:'none', border:'none', color:T.textMuted, fontSize:20, cursor:'pointer' }}>×</button>
