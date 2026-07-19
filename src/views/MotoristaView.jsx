@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { db } from '../lib/firebase'
 import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore'
-import { T, FONT, CARD_TYPES, URGENCY } from '../lib/constants'
+import { T, FONT, CARD_TYPES, URGENCY, SHADOW_CARD, BORDER_SUBTLE } from '../lib/constants'
 import { fmt, todayStr } from '../lib/utils'
 import { notifyUser } from '../hooks/useFirestore'
 import { ConfirmModal } from '../components/UI'
@@ -90,7 +90,7 @@ function ConclusaoModal({ card, onConfirm, onClose }) {
     <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.6)', zIndex:3000, display:'flex', alignItems:'flex-end', justifyContent:'center', backdropFilter:'blur(4px)' }}
       onClick={e=>e.target===e.currentTarget&&onClose()}>
       <motion.div initial={{ y:300, opacity:0 }} animate={{ y:0, opacity:1 }} exit={{ y:300, opacity:0 }}
-        style={{ background:T.surface, borderRadius:'20px 20px 0 0', padding:'20px 18px 36px', width:'100%', maxWidth:480, maxHeight:'90vh', overflowY:'auto', boxShadow:T.shadowLg }}>
+        style={{ background:T.surface, borderRadius:'20px 20px 0 0', padding:'20px 18px 36px', width:'100%', maxWidth:480, maxHeight:'90vh', overflowY:'auto', boxShadow:SHADOW_CARD, border:BORDER_SUBTLE }}>
 
         <div style={{ width:40, height:4, background:T.borderMid, borderRadius:2, margin:'0 auto 18px' }}/>
 
@@ -172,7 +172,7 @@ function InterrupcaoModal({ card, onConfirm, onClose }) {
     <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.6)', zIndex:3000, display:'flex', alignItems:'flex-end', justifyContent:'center', backdropFilter:'blur(4px)' }}
       onClick={e=>e.target===e.currentTarget&&onClose()}>
       <motion.div initial={{ y:300, opacity:0 }} animate={{ y:0, opacity:1 }} exit={{ y:300, opacity:0 }}
-        style={{ background:T.surface, borderRadius:'20px 20px 0 0', padding:'20px 18px 36px', width:'100%', maxWidth:480, maxHeight:'90vh', overflowY:'auto', boxShadow:T.shadowLg }}>
+        style={{ background:T.surface, borderRadius:'20px 20px 0 0', padding:'20px 18px 36px', width:'100%', maxWidth:480, maxHeight:'90vh', overflowY:'auto', boxShadow:SHADOW_CARD, border:BORDER_SUBTLE }}>
 
         <div style={{ width:40, height:4, background:T.borderMid, borderRadius:2, margin:'0 auto 18px' }}/>
 
@@ -499,13 +499,13 @@ export function MotoristaView({ token }) {
     : null
 
   if (loading) return (
-    <div style={{ background:T.bg, minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:FONT }}>
+    <div style={{ background:T.bgCold, minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:FONT }}>
       <div style={{ textAlign:'center' }}><div style={{ fontSize:40, marginBottom:12 }}>⏳</div><div style={{ color:T.textMuted }}>Carregando...</div></div>
     </div>
   )
 
   if (error) return (
-    <div style={{ background:T.bg, minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:FONT, padding:'20px' }}>
+    <div style={{ background:T.bgCold, minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:FONT, padding:'20px' }}>
       <div style={{ textAlign:'center', maxWidth:320 }}>
         <div style={{ fontSize:48, marginBottom:12 }}>🔒</div>
         <div style={{ color:T.perigo, fontFamily:FONT, fontWeight:700, fontSize:16, marginBottom:8 }}>Acesso não autorizado</div>
@@ -515,7 +515,7 @@ export function MotoristaView({ token }) {
   )
 
   return (
-    <div style={{ background:T.bg, minHeight:'100vh', fontFamily:FONT, maxWidth:480, margin:'0 auto' }}>
+    <div style={{ background:T.bgCold, minHeight:'100vh', fontFamily:FONT, maxWidth:480, margin:'0 auto' }}>
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 
       <div style={{ background:T.verde, padding:'16px', position:'sticky', top:0, zIndex:100, boxShadow:T.shadowMd }}>
@@ -619,7 +619,7 @@ export function MotoristaView({ token }) {
                         <div style={{ width:28, height:28, borderRadius:'50%', background:concluido?T.sucesso:T.laranja, color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:FONT, fontWeight:700, fontSize:13, flexShrink:0 }}>{concluido?'✓':i+1}</div>
                         {i<rotograma.paradas.length-1&&<div style={{ width:2, flex:1, background:T.border, minHeight:20, marginTop:4 }}/>}
                       </div>
-                      <div style={{ flex:1, background:T.surface, borderRadius:T.r, padding:'10px 12px', boxShadow:T.shadow, marginBottom:4, border:`1px solid ${concluido?T.sucesso+'40':T.border}` }}>
+                      <div style={{ flex:1, background:T.surface, borderRadius:14, padding:'10px 12px', boxShadow:SHADOW_CARD, marginBottom:4, border:concluido?`1px solid ${T.sucesso}40`:BORDER_SUBTLE }}>
                         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:4 }}>
                           <span style={{ background:ct?.bg, color:ct?.color, borderRadius:20, padding:'1px 7px', fontSize:9, fontWeight:700, fontFamily:FONT }}>{ct?.icon} {ct?.short}</span>
                           <div style={{ display:'flex', alignItems:'center', gap:5 }}>
