@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
 import { useRequests, useNotifications, useMessages } from '../hooks/useFirestore'
 import { MillsLogo, NotificationBell, ClientInput, FrotaInput, MunicipioInput, ToastContainer, useToasts } from '../components/UI'
-import { T, FONT, CARD_TYPES, CARD_SUBTYPES, URGENCY, URGENCY_SLA, IS, LS, BS } from '../lib/constants'
+import { T, FONT, CARD_TYPES, CARD_SUBTYPES, URGENCY, URGENCY_SLA, IS, LS, BS, SHADOW_CARD, BORDER_SUBTLE } from '../lib/constants'
 import { fmt, todayStr, getSubtypeLabel, sortByUrgency } from '../lib/utils'
 import { db } from '../lib/firebase'
 import { MessageThread } from '../components/MessageThread'
@@ -73,16 +73,16 @@ export function SolicitanteView({ simClients }) {
   }, [requests, search])
 
   return (
-    <div style={{ background:T.bg, minHeight:'100vh', fontFamily:FONT }}>
+    <div style={{ background:T.bgCold, minHeight:'100vh', fontFamily:FONT }}>
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
       <ToastContainer toasts={toasts} onDismiss={dismiss}/>
 
-      <div style={{ background:T.surface, borderBottom:`1px solid ${T.border}`, padding:'0 12px', display:'flex', alignItems:'center', justifyContent:'space-between', height:56 }}>
+      <div style={{ background:'rgba(255,255,255,.9)', backdropFilter:'blur(8px)', borderBottom:'1px solid rgba(26,22,18,.06)', padding:'0 12px', display:'flex', alignItems:'center', justifyContent:'space-between', height:56 }}>
         <div style={{ display:'flex', alignItems:'center', gap:12 }}>
           <MillsLogo height={28}/>
-          <div style={{ width:1, height:22, background:T.border }}/>
+          <div style={{ width:1, height:22, background:'rgba(26,22,18,.08)' }}/>
           <div>
-            <div style={{ color:T.text, fontFamily:FONT, fontWeight:800, fontSize:12, letterSpacing:'0.06em', textTransform:'uppercase' }}>Portal do Solicitante</div>
+            <div style={{ color:T.text, fontFamily:FONT, fontWeight:600, fontSize:12.5, letterSpacing:'-.01em' }}>Portal do Solicitante</div>
             <div style={{ color:T.textMuted, fontSize:9, letterSpacing:'0.1em', textTransform:'uppercase' }}>{profile?.unit||'mills'}</div>
           </div>
         </div>
@@ -133,9 +133,9 @@ export function SolicitanteView({ simClients }) {
             { label:'Pendentes', value:requests.filter(r=>['pendente','pendente_supervisor','pendente_gerente'].includes(r.status)).length, color:T.amarelo, bg:T.amareloLight },
             { label:'Aceitas',   value:requests.filter(r=>r.status==='aceito').length,   color:T.verde,   bg:T.verdeLight   },
           ].map(s => (
-            <div key={s.label} style={{ background:s.bg, border:`1px solid ${s.color}30`, borderRadius:T.rLg, padding:'14px 16px' }}>
-              <div style={{ color:s.color, fontFamily:FONT, fontWeight:900, fontSize:26, lineHeight:1 }}>{s.value}</div>
-              <div style={{ color:T.textSec, fontSize:9, fontFamily:FONT, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.07em', marginTop:3 }}>{s.label}</div>
+            <div key={s.label} style={{ background:s.bg, border:BORDER_SUBTLE, borderRadius:16, padding:'14px 16px', boxShadow:SHADOW_CARD }}>
+              <div style={{ color:s.color, fontFamily:FONT, fontWeight:800, fontSize:26, lineHeight:1, letterSpacing:'-.02em' }}>{s.value}</div>
+              <div style={{ color:T.textSec, fontSize:9.5, fontFamily:FONT, fontWeight:600, letterSpacing:'-.005em', marginTop:3 }}>{s.label}</div>
             </div>
           ))}
         </div>
@@ -157,7 +157,7 @@ export function SolicitanteView({ simClients }) {
         </div>
 
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-          <h3 style={{ color:T.text, fontFamily:FONT, fontWeight:800, fontSize:16, margin:0 }}>Minhas Solicitações</h3>
+          <h3 style={{ color:T.text, fontFamily:FONT, fontWeight:600, fontSize:15, letterSpacing:'-.01em', margin:0 }}>Minhas Solicitações</h3>
           {search && <span style={{ color:T.textMuted, fontFamily:FONT, fontSize:12 }}>{filtered.length} resultado(s)</span>}
         </div>
 
@@ -183,10 +183,11 @@ export function SolicitanteView({ simClients }) {
             ].map(col => {
               const items = sortByUrgency(requests.filter(r => col.statuses.includes(r.status)), 'desiredDate')
               return (
-                <div key={col.key} style={{ background:col.bg, border:`1px solid ${col.color}30`, borderRadius:T.rLg, padding:'10px 12px', minHeight:80 }}>
-                  <div style={{ color:col.color, fontFamily:FONT, fontWeight:800, fontSize:10, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>
-                    {col.label}
-                    {items.length > 0 && <span style={{ background:col.color+'30', borderRadius:10, padding:'1px 7px', fontSize:10 }}>{items.length}</span>}
+                <div key={col.key} style={{ background:T.surface, border:BORDER_SUBTLE, borderRadius:16, padding:'10px 12px', minHeight:80, boxShadow:SHADOW_CARD }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:10 }}>
+                    <span style={{ width:7, height:7, borderRadius:'50%', background:col.color, flexShrink:0 }}/>
+                    <span style={{ color:T.text, fontFamily:FONT, fontWeight:600, fontSize:10.5, letterSpacing:'-.005em' }}>{col.label}</span>
+                    <span style={{ marginLeft:'auto', color:T.textMuted, fontSize:10, fontWeight:600 }}>{items.length}</span>
                   </div>
                   {items.length===0 && <div style={{ color:T.textMuted, fontFamily:FONT, fontSize:11, textAlign:'center', padding:'16px 0' }}>—</div>}
                   {items.map(r => {
@@ -195,7 +196,7 @@ export function SolicitanteView({ simClients }) {
                     const ug = URGENCY[r.urgency]
                     return (
                       <motion.div key={r.id} layout initial={{ opacity:0, y:4 }} animate={{ opacity:1, y:0 }}
-                        style={{ background:T.surface, border:`1.5px solid ${sc.color}20`, borderRadius:T.r, padding:'10px 12px', marginBottom:8, boxShadow:T.shadow }}>
+                        style={{ background:T.surfaceAlt, border:BORDER_SUBTLE, borderRadius:12, padding:'10px 12px', marginBottom:8 }}>
                         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
                           <span style={{ background:ct?.bg, border:`1px solid ${ct?.color}40`, borderRadius:20, padding:'1px 7px', color:ct?.color, fontSize:9, fontWeight:800, fontFamily:FONT }}>{ct?.icon} {ct?.short}</span>
                           <span style={{ fontSize:11 }}>{ug?.icon}</span>
@@ -236,7 +237,7 @@ export function SolicitanteView({ simClients }) {
               const ug = URGENCY[r.urgency]
               return (
                 <motion.div key={r.id} layout initial={{ opacity:0, y:5 }} animate={{ opacity:1, y:0 }}
-                  style={{ background:T.surface, border:`1.5px solid ${sc.color}25`, borderRadius:T.rLg, padding:'14px 16px', boxShadow:T.shadow }}>
+                  style={{ background:T.surface, border:BORDER_SUBTLE, borderRadius:16, padding:'14px 16px', boxShadow:SHADOW_CARD }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
                     <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
                       <span style={{ background:ct?.bg, border:`1px solid ${ct?.color}40`, borderRadius:20, padding:'2px 9px', color:ct?.color, fontSize:9, fontWeight:800, fontFamily:FONT }}>{ct?.icon} {ct?.short}</span>
