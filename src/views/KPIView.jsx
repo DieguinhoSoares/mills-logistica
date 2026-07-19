@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { T, FONT, CARD_TYPES, URGENCY, BS } from '../lib/constants'
+import { T, FONT, CARD_TYPES, URGENCY, BS, SHADOW_CARD, BORDER_SUBTLE } from '../lib/constants'
 import { resumirEmissoes } from '../lib/emissoes'
 import { todayStr } from '../lib/utils'
 
@@ -387,7 +387,7 @@ export function KPIView({ cards, requests, simClients, onNavigateToAprovacoes })
           {stats.slaPorUrgencia.map(s => {
             const u = URGENCY[s.urgencia]
             return (
-              <div key={s.urgencia} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.r, padding:'12px 14px' }}>
+              <div key={s.urgencia} style={{ background:T.surface, border:BORDER_SUBTLE, borderRadius:14, padding:'12px 14px', boxShadow:SHADOW_CARD }}>
                 <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:6 }}>
                   <span>{u.icon}</span>
                   <span style={{ fontFamily:FONT, fontWeight:700, fontSize:11, color:T.text }}>{u.label}</span>
