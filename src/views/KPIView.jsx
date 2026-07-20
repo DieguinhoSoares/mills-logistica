@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { T, FONT, CARD_TYPES, URGENCY, BS, SHADOW_CARD, BORDER_SUBTLE } from '../lib/constants'
 import { resumirEmissoes } from '../lib/emissoes'
-import { todayStr } from '../lib/utils'
+import { todayStr, getWeekDays } from '../lib/utils'
 
 // Sombra "enterprise" em duas camadas — usada em todos os cards da tela
 // (KPICard, BarChart, DonutChart, ranking, gráfico de dias) pra dar
@@ -187,6 +187,16 @@ export function KPIView({ cards, requests, simClients, onNavigateToAprovacoes })
     const lastCards  = cardsValidos.filter(c=>c.startDate?.startsWith(lastMonth))
     const total      = cardsValidos.length
 
+    // Comparativo semana atual vs. anterior — mesma lógica do comparativo
+    // mensal (membership no período, não "até hoje"), só que na janela
+    // segunda–domingo já usada pelo resto do app (getWeekDays).
+    const thisWeekDays = getWeekDays(hoje)
+    const lastWeekStartDate = new Date(thisWeekDays[0]); lastWeekStartDate.setDate(lastWeekStartDate.getDate()-7)
+    const lastWeekDays = getWeekDays(lastWeekStartDate.toISOString().split('T')[0])
+    const weekCards     = cardsValidos.filter(c=>c.startDate>=thisWeekDays[0] && c.startDate<=thisWeekDays[6])
+    const lastWeekCards = cardsValidos.filter(c=>c.startDate>=lastWeekDays[0] && c.startDate<=lastWeekDays[6])
+    const growthPctSemana = lastWeekCards.length ? Math.round(((weekCards.length-lastWeekCards.length)/lastWeekCards.length)*100) : null
+
     // Últimos 7 dias — alimenta o gráfico "Serviços por dia" e o sparkline
     // do card "Serviços". Meta = média do período, arredondada (não é um
     // valor fixo cravado no código, se ajusta ao volume real da operação).
@@ -287,7 +297,8 @@ export function KPIView({ cards, requests, simClients, onNavigateToAprovacoes })
     })
 
     return { total,totalAtivos,late,onTime,pctOnTime,pctAder,remanejados,byType,byDriver,byState,byFilial,tempoMedio,topRoutes,monthCards,growthPct,pendReq,taxaAceit,
-      emExecucao,aguardandoValid,interrompidos,atrasadosAgora,slaPorUrgencia,diasSemana,metaDia,sparklineServicos }
+      emExecucao,aguardandoValid,interrompidos,atrasadosAgora,slaPorUrgencia,diasSemana,metaDia,sparklineServicos,
+      weekCards,lastWeekCards,growthPctSemana }
   }, [cardsFiltrados, requests])
 
   const painelRef = useRef(null)
@@ -332,11 +343,9 @@ export function KPIView({ cards, requests, simClients, onNavigateToAprovacoes })
         </div>
       )}
 
-      {/* Semana/Mês — decide a janela de comparação do "vs. período anterior".
-          Hoje só afeta a leitura visual do rótulo; o cálculo em si (mês
-          atual vs. mês passado) continua sendo o que já existia, já que
-          trocar a base de comparação de verdade é mudança de lógica, não
-          de visual (fora do escopo deste pacote, que é só estilo). */}
+      {/* Semana/Mês — decide a janela de comparação do card "Total de Serviços"
+          logo abaixo: semana atual vs. semana anterior (segunda–domingo) ou
+          mês atual vs. mês passado. */}
       <div style={{ background:'#fff', border:'1px solid rgba(26,22,18,.08)', borderRadius:8, display:'flex', padding:2, gap:2, width:'fit-content', marginBottom:14 }}>
         {['semana','mes'].map(p => (
           <button key={p} onClick={()=>setPeriodoComparacao(p)}
@@ -403,7 +412,12 @@ export function KPIView({ cards, requests, simClients, onNavigateToAprovacoes })
       </div>
 
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:14 }}>
-        <KPICard title="Total de Serviços"  value={stats.total}            icon="📋" color={T.laranja} bg={T.laranjaXLight} trend={stats.growthPct} sub="Todos os períodos" sparkline={stats.sparklineServicos}/>
+        <KPICard title="Total de Serviços"
+          value={periodoComparacao==='semana' ? stats.weekCards.length : stats.total}
+          icon="📋" color={T.laranja} bg={T.laranjaXLight}
+          trend={periodoComparacao==='semana' ? stats.growthPctSemana : stats.growthPct}
+          sub={periodoComparacao==='semana' ? `vs. ${stats.lastWeekCards.length} na semana anterior` : 'Todos os períodos'}
+          sparkline={stats.sparklineServicos}/>
         <KPICard title="No Prazo"           value={`${stats.pctOnTime}%`}  icon="✅" color={T.sucesso} bg={T.sucessoLight}  sub={`${stats.onTime}/${stats.totalAtivos} em aberto`}/>
         <KPICard title="Aderência"          value={`${stats.pctAder}%`}    icon="📅" color={T.verde}   bg={T.verdeLight}    sub={`${stats.remanejados} remanejamentos`}/>
         <KPICard title="Tempo Médio"        value={stats.tempoMedio}       icon="⏱" color={T.info}    bg={T.infoLight}     sub={stats.tempoMedio==='—'?'Serviços de 1 dia não contam':'Duração por serviço'}/>
