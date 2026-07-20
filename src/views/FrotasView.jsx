@@ -514,7 +514,7 @@ export function FrotasView() {
       <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}} ::-webkit-scrollbar{width:5px;height:5px} ::-webkit-scrollbar-track{background:${T.bg}} ::-webkit-scrollbar-thumb{background:${T.borderMid};border-radius:10px}`}</style>
 
       {/* HEADER */}
-      <div style={{ background:'rgba(255,255,255,.9)', backdropFilter:'blur(8px)', borderBottom:'1px solid rgba(26,22,18,.06)', padding:'0 22px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60, flexShrink:0 }}>
+      <div style={{ position:'relative', zIndex:100, background:'rgba(255,255,255,.9)', backdropFilter:'blur(8px)', borderBottom:'1px solid rgba(26,22,18,.06)', padding:'0 22px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60, flexShrink:0 }}>
         <div style={{ display:'flex', alignItems:'center', gap:14 }}>
           <MillsLogo height={18}/>
           <div style={{ width:1, height:24, background:T.border }}/>
