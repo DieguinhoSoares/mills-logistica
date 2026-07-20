@@ -595,8 +595,9 @@ export function FrotasView() {
       {/* AGENDA TAB */}
       {activeTab==='agenda'&&(
       <div style={{ position:'relative', flex:1, display:'flex', flexDirection:'column', overflow:'hidden', minHeight:0 }}>
-        <div style={{ flex:'1 1 62%', overflow:'hidden', padding:'12px 20px 6px', display:'flex', flexDirection:'column', minHeight:0 }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10, flexShrink:0 }}>
+        <div style={{ flex:1, display:'grid', gridTemplateColumns:'minmax(0,1fr) 310px', gap:14, padding:'12px 20px 14px', minHeight:0, overflow:'hidden' }}>
+        <div style={{ display:'flex', flexDirection:'column', gap:10, minHeight:0, overflow:'hidden' }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
             <div style={{ display:'flex', alignItems:'center', gap:8 }}>
               <button onClick={()=>view==='semana'?navWeek(-1):view==='mes'?navMonth(-1):setYr(y=>y-1)} style={NB}>‹</button>
               <button onClick={()=>view==='semana'?navWeek(1):view==='mes'?navMonth(1):setYr(y=>y+1)} style={NB}>›</button>
@@ -678,28 +679,28 @@ export function FrotasView() {
               </motion.div>
             </AnimatePresence>
           )}
+
+          {/* ── Faixa de 4 KPIs (Proposta D validada) ──────────────────────────── */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8, flexShrink:0 }}>
+            {[
+              {l:'Serviços ativos',       v:cardsAtivos.length,  c:T.laranja},
+              {l:'Atrasados',             v:atrasados.length,    c:T.perigo},
+              {l:'Atribuídos',            v:atribuidos.length,   c:T.info},
+              {l:'Rotas otimizáveis',     v:conflicts.length,    c:'#B8860B'},
+            ].map(s=>(
+              <div key={s.l} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:'10px 12px' }}>
+                <div style={{ color:s.c, fontFamily:FONT, fontWeight:800, fontSize:20, lineHeight:1, marginBottom:2 }}>{s.v}</div>
+                <div style={{ color:T.textSec, fontSize:10.5, fontFamily:FONT, fontWeight:700 }}>{s.l}</div>
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* Bottom: Central de ações + Ao vivo */}
-        {/* ── Faixa de 4 KPIs (Proposta D validada) ──────────────────────────── */}
-    <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8, padding:'0 20px 8px', flexShrink:0 }}>
-      {[
-        {l:'Serviços ativos',       v:cardsAtivos.length,  c:T.laranja},
-        {l:'Atrasados',             v:atrasados.length,    c:T.perigo},
-        {l:'Atribuídos',            v:atribuidos.length,   c:T.info},
-        {l:'Rotas otimizáveis',     v:conflicts.length,    c:'#B8860B'},
-      ].map(s=>(
-        <div key={s.l} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:'10px 12px' }}>
-          <div style={{ color:s.c, fontFamily:FONT, fontWeight:800, fontSize:20, lineHeight:1, marginBottom:2 }}>{s.v}</div>
-          <div style={{ color:T.textSec, fontSize:10.5, fontFamily:FONT, fontWeight:700 }}>{s.l}</div>
-        </div>
-      ))}
-    </div>
-
-    <div style={{ flex:'0 0 36%', display:'grid', gridTemplateColumns:'1fr 310px', gap:10, padding:'0 20px 14px', minHeight:0, overflow:'hidden' }}>
+        {/* Coluna lateral — altura inteira, ao lado do calendário (posição igual à Proposta D validada) */}
+        <div style={{ display:'flex', flexDirection:'column', gap:10, minHeight:0, overflow:'hidden' }}>
           {/* "Ao vivo" (Proposta D validada) — alterna a cada 7s entre o ticker "em
               destaque" (1 serviço, troca a cada 3.5s) e a lista de serviços de hoje. */}
-          <div style={{ background:T.surface, borderRadius:14, border:`1px solid ${T.border}`, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+          <div style={{ background:T.surface, borderRadius:14, border:`1px solid ${T.border}`, overflow:'hidden', display:'flex', flexDirection:'column', flexShrink:0, maxHeight:'40%' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 14px 0', flexShrink:0 }}>
               <span style={{ color:T.text, fontFamily:FONT, fontWeight:800, fontSize:11 }}>Ao vivo</span>
               <div style={{ display:'flex', gap:8, alignItems:'center' }}>
@@ -749,8 +750,7 @@ export function FrotasView() {
             </div>
           </div>
 
-          <div style={{ display:'flex', flexDirection:'column', gap:10, minHeight:0, overflow:'hidden' }}>
-            {/* Central de Ações — resume validação/NF/atribuição/solicitações num só lugar (achado #7 do diagnóstico) */}
+          {/* Central de Ações — resume validação/NF/atribuição/solicitações num só lugar (achado #7 do diagnóstico) */}
             <div style={{ background:T.surface, borderRadius:14, border:`1px solid ${T.border}`, padding:'12px 14px', flexShrink:0 }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
                 <span style={{ color:T.verde, fontWeight:800, fontSize:11.5, fontFamily:FONT }}>Central de ações</span>
@@ -779,8 +779,8 @@ export function FrotasView() {
               )}
             </div>
 
-          {/* PAINEL ÚNICO com abas: Resumo / Solicitações / Validação — 100% da altura agora */}
-          <div style={{ background:T.surface, borderRadius:18, border:BORDER_SUBTLE, boxShadow:SHADOW_CARD, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+          {/* PAINEL ÚNICO com abas: Resumo / Solicitações / Validação — ocupa o espaço restante da coluna */}
+          <div style={{ flex:1, background:T.surface, borderRadius:14, border:`1px solid ${T.border}`, overflow:'hidden', display:'flex', flexDirection:'column', minHeight:0 }}>
                 {/* Abas */}
                 <div style={{ display:'flex', borderBottom:`1px solid ${T.border}`, flexShrink:0 }}>
                   {[
@@ -914,8 +914,8 @@ export function FrotasView() {
                   )}
                 </div>
               </div>
-            </div>
           </div>
+        </div>
 
         {/* Overlay "Central de ações" expandida — lista completa priorizada, cada item resolve reaproveitando o fluxo já existente */}
         {centralExpanded && (
