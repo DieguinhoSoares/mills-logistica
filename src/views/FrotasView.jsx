@@ -149,9 +149,9 @@ export function FrotasView() {
   // abre um overlay com a lista completa; cada item resolve reaproveitando os
   // fluxos que já existem (abas Resumo/Solicitações/Validação, modais atuais).
   const [centralExpanded, setCentralExpanded] = useState(false)
-  // Faixa "Em destaque agora" — alterna 1 serviço do dia a cada 10s, com
-  // barra de progresso. Reinicia o índice se a lista mudar de tamanho
-  // (evita apontar pra um item que não existe mais depois de uma edição).
+  // Índice do ticker "Em destaque agora" do card "Ao vivo" (coluna lateral) —
+  // alterna a cada 3.5s. Reinicia se a lista mudar de tamanho (evita apontar
+  // pra um item que não existe mais depois de uma edição).
   const [destaqueIdx, setDestaqueIdx] = useState(0)
   const [busca,        setBusca]        = useState('')
   const buscaResultados = useMemo(() => {
@@ -200,7 +200,7 @@ export function FrotasView() {
       addToast('Erro ao confirmar NF. Tente novamente.', 'error')
     }
   }
-  const [rodapeSlide,  setRodapeSlide]  = useState(0) // 0 = timeline de hoje, 1 = KPIs rápidos
+  const [rodapeSlide,  setRodapeSlide]  = useState(0) // 0 = ticker "em destaque", 1 = serviços de hoje (card "Ao vivo")
 
   const hoje      = todayStr()
   const atrasados = cards.filter(c=>c.endDate&&c.endDate<hoje&&!['concluido','cancelado'].includes(c.status))
@@ -489,18 +489,21 @@ export function FrotasView() {
     }
   }
 
-  // Alterna a cada 30s entre a timeline de hoje e os KPIs rápidos no espaço liberado pelo mapa
+  // "Ao vivo" (card na coluna lateral, Proposta D) — alterna a cada 7s entre o
+  // slide de ticker (1 serviço em destaque) e o slide "serviços de hoje".
   useEffect(() => {
-    const iv = setInterval(() => setRodapeSlide(s => s === 0 ? 1 : 0), 30000)
+    const iv = setInterval(() => setRodapeSlide(s => s === 0 ? 1 : 0), 7000)
     return () => clearInterval(iv)
   }, [])
 
   const cardsHoje = cards.filter(c => c.startDate === todayStr() && c.status !== 'cancelado').sort((a,b)=>(a.startDate||'').localeCompare(b.startDate||''))
 
+  // Ticker do slide "Em destaque agora" — troca de serviço a cada 3.5s, mesmo
+  // timing do mockup validado (Proposta D).
   useEffect(() => {
     if (cardsHoje.length <= 1) { setDestaqueIdx(0); return }
     setDestaqueIdx(i => i >= cardsHoje.length ? 0 : i) // não aponta pra item que sumiu
-    const iv = setInterval(() => setDestaqueIdx(i => (i + 1) % cardsHoje.length), 10000)
+    const iv = setInterval(() => setDestaqueIdx(i => (i + 1) % cardsHoje.length), 3500)
     return () => clearInterval(iv)
   }, [cardsHoje.length])
 
@@ -657,32 +660,8 @@ export function FrotasView() {
             </div>
           </div>
 
-          {cardsHoje.length > 0 && (() => {
-            const destaque = cardsHoje[destaqueIdx] || cardsHoje[0]
-            const ct = CARD_TYPES[destaque.type]
-            return (
-              <div key={destaque.id} style={{ background:T.laranjaXLight, border:`1px solid ${T.laranja}30`, borderRadius:T.r, padding:'8px 14px', marginBottom:8, position:'relative', overflow:'hidden' }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10 }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
-                    <span style={{ color:T.laranja, fontFamily:FONT, fontWeight:800, fontSize:9, textTransform:'uppercase', letterSpacing:'0.06em', flexShrink:0 }}>🔶 Em destaque agora</span>
-                    <span style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:12, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                      {ct?.icon} {destaque.client||'—'} · {destaque.driver||'Sem motorista'} · {destaque.nInterno||'—'}
-                    </span>
-                  </div>
-                  {cardsHoje.length > 1 && (
-                    <div style={{ display:'flex', gap:3, flexShrink:0 }}>
-                      {cardsHoje.map((_,i) => (
-                        <div key={i} onClick={()=>setDestaqueIdx(i)} style={{ width:5, height:5, borderRadius:'50%', cursor:'pointer', background:i===destaqueIdx?T.laranja:T.border }}/>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                {cardsHoje.length > 1 && (
-                  <div style={{ position:'absolute', bottom:0, left:0, height:2, background:T.laranja, animation:'destaqueProgresso 10s linear' }} key={destaqueIdx}/>
-                )}
-              </div>
-            )
-          })()}
+          {/* "Em destaque agora" saiu daqui — na Proposta D validada esse ticker vive
+              só no card "Ao vivo" da coluna lateral (destaqueIdx é reaproveitado lá). */}
           {view==='semana' && calendarCollapsed ? (
             <div style={{ background:T.surface, border:BORDER_SUBTLE, borderRadius:14, padding:'14px 16px', display:'flex', justifyContent:'space-between', alignItems:'center', boxShadow:SHADOW_CARD }}>
               <span style={{ fontSize:12, color:T.textSec, fontWeight:700, fontFamily:FONT }}>
@@ -701,16 +680,14 @@ export function FrotasView() {
           )}
         </div>
 
-        {/* Bottom: Mapa maior + KPIs + solicitações rápidas */}
-        {/* ── Faixa de 6 KPIs ─────────────────────────────────────────────────── */}
-    <div style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:8, padding:'0 20px 8px', flexShrink:0 }}>
+        {/* Bottom: Central de ações + Ao vivo */}
+        {/* ── Faixa de 4 KPIs (Proposta D validada) ──────────────────────────── */}
+    <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8, padding:'0 20px 8px', flexShrink:0 }}>
       {[
-        {l:'Serviços',              v:cardsAtivos.length,  c:T.laranja,  bg:T.laranjaLight},
+        {l:'Serviços ativos',       v:cardsAtivos.length,  c:T.laranja,  bg:T.laranjaLight},
         {l:'Atrasados',             v:atrasados.length,    c:T.perigo,   bg:T.perigoLight},
-        {l:'Antecipados',           v:antecipados.length,  c:T.verde,    bg:T.verdeLight},
-        {l:'Otimizações',           v:conflicts.length,    c:'#B8860B',  bg:T.amareloLight},
         {l:'Atribuídos',            v:atribuidos.length,   c:T.info,     bg:T.infoLight},
-        {l:'Aguard. Validação',     v:validacoes.length,   c:'#6D28D9',  bg:'#EDE9FE'},
+        {l:'Rotas otimizáveis',     v:conflicts.length,    c:'#B8860B',  bg:T.amareloLight},
       ].map(s=>(
         <div key={s.l} style={{ background:s.bg, border:BORDER_SUBTLE, borderRadius:14, padding:'10px 12px', boxShadow:SHADOW_CARD }}>
           <div style={{ color:s.c, fontFamily:'Barlow Condensed,IBM Plex Sans,sans-serif', fontWeight:800, fontSize:22, lineHeight:1, letterSpacing:'-.02em' }}>{s.v}</div>
@@ -720,12 +697,11 @@ export function FrotasView() {
     </div>
 
     <div style={{ flex:'0 0 36%', display:'grid', gridTemplateColumns:'1fr 310px', gap:10, padding:'0 20px 14px', minHeight:0, overflow:'hidden' }}>
-          {/* Espaço liberado pelo mapa — timeline de hoje / KPIs rápidos, alternando a cada 30s */}
+          {/* "Ao vivo" (Proposta D validada) — alterna a cada 7s entre o ticker "em
+              destaque" (1 serviço, troca a cada 3.5s) e a lista de serviços de hoje. */}
           <div style={{ background:T.surface, borderRadius:18, border:BORDER_SUBTLE, boxShadow:SHADOW_CARD, overflow:'hidden', display:'flex', flexDirection:'column' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'9px 13px', borderBottom:`1px solid ${T.border}`, flexShrink:0 }}>
-              <span style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:11, textTransform:'uppercase', letterSpacing:'0.06em' }}>
-                {rodapeSlide===0 ? '🕐 Serviços de hoje' : '⚡ KPIs rápidos'}
-              </span>
+              <span style={{ color:T.text, fontFamily:FONT, fontWeight:800, fontSize:11 }}>Ao vivo</span>
               <div style={{ display:'flex', gap:5, alignItems:'center' }}>
                 <button onClick={()=>setMapModal(true)} title="Ver mapa" style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}`, fontSize:11, padding:'3px 9px' }}>🗺 Mapa</button>
                 {[0,1].map(i=>(
@@ -737,35 +713,36 @@ export function FrotasView() {
               {rodapeSlide===0 ? (
                 cardsHoje.length===0 ? (
                   <p style={{ color:T.textMuted, fontSize:11, fontFamily:FONT, margin:0 }}>Nenhum serviço para hoje.</p>
+                ) : (() => {
+                  const destaque = cardsHoje[destaqueIdx] || cardsHoje[0]
+                  const ct = CARD_TYPES[destaque.type]
+                  return (
+                    <div onClick={()=>{setEditCard(destaque);setModal('card')}}
+                      style={{ background:T.laranjaXLight, border:`1px solid ${T.laranja}30`, borderRadius:T.rSm, padding:'9px 11px', cursor:'pointer' }}>
+                      <div style={{ color:T.laranja, fontFamily:FONT, fontWeight:800, fontSize:9, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:3 }}>🔶 Em destaque agora</div>
+                      <div style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:11.5 }}>{ct?.icon} {destaque.client||'—'}</div>
+                      <div style={{ color:T.textSec, fontFamily:FONT, fontSize:10, marginTop:1 }}>👤 {destaque.driver||'Sem motorista'} · {destaque.nInterno||'—'}</div>
+                    </div>
+                  )
+                })()
+              ) : (
+                cardsHoje.length===0 ? (
+                  <p style={{ color:T.textMuted, fontSize:11, fontFamily:FONT, margin:0 }}>Nenhum serviço para hoje.</p>
                 ) : cardsHoje.map(c=>{
-                  const ct = CARD_TYPES[c.type]
                   const atrasado = atrasados.some(a=>a.id===c.id)
+                  const statusColor = atrasado ? T.perigo : c.status==='aguardando_validacao' ? T.laranja : c.status==='em_execucao' ? T.info : T.textMuted
+                  const statusLabel = atrasado ? 'Atrasado' : c.status==='aguardando_validacao' ? 'Aguard. validação' : c.status==='em_execucao' ? 'Em execução' : c.status==='confirmado' ? 'Confirmado' : (c.status||'—')
                   return (
                     <div key={c.id} onClick={()=>{setEditCard(c);setModal('card')}}
-                      style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 10px', marginBottom:6, borderRadius:T.rSm, cursor:'pointer',
-                        border:`1px solid ${atrasado?T.perigo:T.border}`, background:atrasado?T.perigoLight:T.surfaceAlt }}>
-                      <span style={{ background:ct?.bg, color:ct?.color, borderRadius:20, padding:'1px 6px', fontSize:9, fontWeight:700, fontFamily:FONT, flexShrink:0 }}>{ct?.icon} {ct?.short}</span>
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ color:T.text, fontWeight:700, fontSize:11, fontFamily:FONT }}>{c.client||'—'}</div>
-                        <div style={{ color:T.textMuted, fontSize:9, fontFamily:FONT }}>{c.driver||c.transportadoraNome||'sem motorista'}{atrasado?' · ⚠ atrasado':''}</div>
+                      style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, padding:'6px 9px', marginBottom:6, borderRadius:8, cursor:'pointer', background:T.surfaceAlt }}>
+                      <div style={{ minWidth:0 }}>
+                        <div style={{ color:T.text, fontWeight:700, fontSize:10.5, fontFamily:FONT }}>{c.client||'—'}</div>
+                        <div style={{ color:T.textMuted, fontSize:9.5, fontFamily:FONT }}>{c.driver||c.transportadoraNome||'Sem motorista'}</div>
                       </div>
+                      <span style={{ color:statusColor, fontWeight:700, fontSize:9.5, fontFamily:FONT, flexShrink:0, whiteSpace:'nowrap' }}>{statusLabel}</span>
                     </div>
                   )
                 })
-              ) : (
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                  {[
-                    ['Serviços/semana', cardsAtivos.length,  T.laranja, T.laranjaLight],
-                    ['Atrasados',       atrasados.length,    T.perigo,  T.perigoLight],
-                    ['Atribuídos',      atribuidos.length,   T.info,    T.infoLight],
-                    ['Rotas otimiz.',   conflicts.length,    '#B8860B', T.amareloLight],
-                  ].map(([l,v,color,bg])=>(
-                    <div key={l} style={{ background:bg, border:BORDER_SUBTLE, borderRadius:14, padding:'10px 12px', boxShadow:SHADOW_CARD }}>
-                      <div style={{ color, fontFamily:FONT, fontWeight:800, fontSize:22, lineHeight:1, letterSpacing:'-.02em' }}>{v}</div>
-                      <div style={{ color:T.textSec, fontSize:9, fontFamily:FONT, fontWeight:600, letterSpacing:'-.005em', marginTop:3 }}>{l}</div>
-                    </div>
-                  ))}
-                </div>
               )}
             </div>
           </div>
