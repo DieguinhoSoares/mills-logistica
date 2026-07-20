@@ -696,60 +696,10 @@ export function FrotasView() {
           </div>
         </div>
 
-        {/* Coluna lateral — altura inteira, ao lado do calendário (posição igual à Proposta D validada) */}
+        {/* Coluna lateral — altura inteira, ao lado do calendário (posição igual à Proposta D validada).
+            Central de Ações e o menu de abas ficam fixos no topo; só o conteúdo de cada aba rola
+            (inclusive a aba "Ao vivo", que não é mais um card solto — não invade mais nada). */}
         <div style={{ display:'flex', flexDirection:'column', gap:10, minHeight:0, overflow:'hidden' }}>
-          {/* "Ao vivo" (Proposta D validada) — alterna a cada 7s entre o ticker "em
-              destaque" (1 serviço, troca a cada 3.5s) e a lista de serviços de hoje. */}
-          <div style={{ background:T.surface, borderRadius:14, border:`1px solid ${T.border}`, overflow:'hidden', display:'flex', flexDirection:'column', flexShrink:0, maxHeight:'40%' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 14px 0', flexShrink:0 }}>
-              <span style={{ color:T.text, fontFamily:FONT, fontWeight:800, fontSize:11 }}>Ao vivo</span>
-              <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-                <button onClick={()=>setMapModal(true)} title="Ver mapa" style={{ background:'none', border:'none', color:T.textMuted, fontSize:14, cursor:'pointer', padding:0 }}>🗺</button>
-                <div style={{ display:'flex', gap:4 }}>
-                  {[0,1].map(i=>(
-                    <div key={i} onClick={()=>setRodapeSlide(i)} style={{ width:6, height:6, borderRadius:'50%', cursor:'pointer', background:rodapeSlide===i?T.laranja:T.border }}/>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div style={{ flex:1, overflowY:'auto', padding:'9px 14px 12px' }}>
-              {rodapeSlide===0 ? (
-                cardsHoje.length===0 ? (
-                  <p style={{ color:T.textMuted, fontSize:11, fontFamily:FONT, margin:0 }}>Nenhum serviço para hoje.</p>
-                ) : (() => {
-                  const destaque = cardsHoje[destaqueIdx] || cardsHoje[0]
-                  const ct = CARD_TYPES[destaque.type]
-                  return (
-                    <div onClick={()=>{setEditCard(destaque);setModal('card')}}
-                      style={{ background:T.laranjaXLight, border:`1px solid ${T.laranja}30`, borderRadius:10, padding:'9px 11px', cursor:'pointer' }}>
-                      <div style={{ color:T.laranja, fontFamily:FONT, fontWeight:800, fontSize:9, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:3 }}>🔶 Em destaque agora</div>
-                      <div style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:11.5 }}>{ct?.icon} {destaque.client||'—'}</div>
-                      <div style={{ color:T.textSec, fontFamily:FONT, fontSize:10, marginTop:1 }}>👤 {destaque.driver||'Sem motorista'} · {destaque.nInterno||'—'}</div>
-                    </div>
-                  )
-                })()
-              ) : (
-                cardsHoje.length===0 ? (
-                  <p style={{ color:T.textMuted, fontSize:11, fontFamily:FONT, margin:0 }}>Nenhum serviço para hoje.</p>
-                ) : cardsHoje.map(c=>{
-                  const atrasado = atrasados.some(a=>a.id===c.id)
-                  const statusColor = atrasado ? T.perigo : c.status==='aguardando_validacao' ? T.laranja : c.status==='em_execucao' ? T.info : T.textMuted
-                  const statusLabel = atrasado ? 'Atrasado' : c.status==='aguardando_validacao' ? 'Aguard. validação' : c.status==='em_execucao' ? 'Em execução' : c.status==='confirmado' ? 'Confirmado' : (c.status||'—')
-                  return (
-                    <div key={c.id} onClick={()=>{setEditCard(c);setModal('card')}}
-                      style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, padding:'6px 9px', marginBottom:6, borderRadius:8, cursor:'pointer', background:T.surfaceAlt }}>
-                      <div style={{ minWidth:0 }}>
-                        <div style={{ color:T.text, fontWeight:700, fontSize:10.5, fontFamily:FONT }}>{c.client||'—'}</div>
-                        <div style={{ color:T.textMuted, fontSize:9.5, fontFamily:FONT }}>{c.driver||c.transportadoraNome||'Sem motorista'}</div>
-                      </div>
-                      <span style={{ color:statusColor, fontWeight:700, fontSize:9.5, fontFamily:FONT, flexShrink:0, whiteSpace:'nowrap' }}>{statusLabel}</span>
-                    </div>
-                  )
-                })
-              )}
-            </div>
-          </div>
-
           {/* Central de Ações — resume validação/NF/atribuição/solicitações num só lugar (achado #7 do diagnóstico) */}
             <div style={{ background:T.surface, borderRadius:14, border:`1px solid ${T.border}`, padding:'12px 14px', flexShrink:0 }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
@@ -787,6 +737,7 @@ export function FrotasView() {
                     ['resumo',  'Resumo',      null],
                     ['sol',     'Solicitações', pending||null],
                     ['val',     'Validação',    (totalValidacao+totalNF)||null],
+                    ['vivo',    'Ao vivo',      null],
                   ].map(([k,l,badge])=>(
                     <button key={k} onClick={()=>setPainelTab(k)}
                       style={{ flex:1, padding:'8px 4px', border:'none', borderBottom:`2px solid ${painelTab===k?T.laranja:'transparent'}`, background:'transparent', cursor:'pointer', fontFamily:FONT, fontWeight:painelTab===k?700:500, fontSize:10, color:painelTab===k?T.laranja:T.textMuted, display:'flex', alignItems:'center', justifyContent:'center', gap:4, transition:'all .1s' }}>
@@ -850,7 +801,7 @@ export function FrotasView() {
                             <span style={{ background:'rgba(255,255,255,.3)', color:'white', borderRadius:10, padding:'0 6px', fontSize:9, fontWeight:800 }}>{nfPendentes.length}</span>
                           </div>
                           {nfPendentes.map(c=>(
-                            <div key={c.id} onClick={()=>{setEditCard(c);setModal('card')}}
+                            <div key={c.id} onClick={()=>setReviewValidacao(c)}
                               style={{ border:`2px solid ${T.perigo}`, borderRadius:T.rSm, padding:'9px 11px', marginBottom:7, background:T.perigoLight, cursor:'pointer' }}>
                               <div style={{ color:T.text, fontWeight:700, fontSize:11, fontFamily:FONT, marginBottom:2 }}>{c.client||'—'}</div>
                               <div style={{ color:T.textMuted, fontSize:10, fontFamily:FONT }}>{getSubtypeLabel(c.type,c.subtype)} · {fmt(c.startDate)}</div>
@@ -909,6 +860,56 @@ export function FrotasView() {
 
                       {validacoes.length===0&&semExecutorApp.length===0&&nfPendentes.length===0&&(
                         <p style={{ color:T.textMuted, fontSize:11, fontFamily:FONT, margin:0 }}>Nenhum serviço aguardando.</p>
+                      )}
+                    </>
+                  )}
+
+                  {/* Ao vivo — ticker "em destaque" (troca a cada 3.5s) alternando com a lista de
+                      hoje (troca a cada 7s). Vive dentro da mesma área de rolagem das outras abas,
+                      então nunca invade o espaço fixo da Central de Ações/menu de abas. */}
+                  {painelTab==='vivo'&&(
+                    <>
+                      <div style={{ display:'flex', justifyContent:'flex-end', gap:8, alignItems:'center', marginBottom:9 }}>
+                        <button onClick={()=>setMapModal(true)} title="Ver mapa" style={{ background:'none', border:'none', color:T.textMuted, fontSize:14, cursor:'pointer', padding:0 }}>🗺</button>
+                        <div style={{ display:'flex', gap:4 }}>
+                          {[0,1].map(i=>(
+                            <div key={i} onClick={()=>setRodapeSlide(i)} style={{ width:6, height:6, borderRadius:'50%', cursor:'pointer', background:rodapeSlide===i?T.laranja:T.border }}/>
+                          ))}
+                        </div>
+                      </div>
+                      {rodapeSlide===0 ? (
+                        cardsHoje.length===0 ? (
+                          <p style={{ color:T.textMuted, fontSize:11, fontFamily:FONT, margin:0 }}>Nenhum serviço para hoje.</p>
+                        ) : (() => {
+                          const destaque = cardsHoje[destaqueIdx] || cardsHoje[0]
+                          const ct = CARD_TYPES[destaque.type]
+                          return (
+                            <div onClick={()=>{setEditCard(destaque);setModal('card')}}
+                              style={{ background:T.laranjaXLight, border:`1px solid ${T.laranja}30`, borderRadius:10, padding:'9px 11px', cursor:'pointer' }}>
+                              <div style={{ color:T.laranja, fontFamily:FONT, fontWeight:800, fontSize:9, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:3 }}>🔶 Em destaque agora</div>
+                              <div style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:11.5 }}>{ct?.icon} {destaque.client||'—'}</div>
+                              <div style={{ color:T.textSec, fontFamily:FONT, fontSize:10, marginTop:1 }}>👤 {destaque.driver||'Sem motorista'} · {destaque.nInterno||'—'}</div>
+                            </div>
+                          )
+                        })()
+                      ) : (
+                        cardsHoje.length===0 ? (
+                          <p style={{ color:T.textMuted, fontSize:11, fontFamily:FONT, margin:0 }}>Nenhum serviço para hoje.</p>
+                        ) : cardsHoje.map(c=>{
+                          const atrasado = atrasados.some(a=>a.id===c.id)
+                          const statusColor = atrasado ? T.perigo : c.status==='aguardando_validacao' ? T.laranja : c.status==='em_execucao' ? T.info : T.textMuted
+                          const statusLabel = atrasado ? 'Atrasado' : c.status==='aguardando_validacao' ? 'Aguard. validação' : c.status==='em_execucao' ? 'Em execução' : c.status==='confirmado' ? 'Confirmado' : (c.status||'—')
+                          return (
+                            <div key={c.id} onClick={()=>{setEditCard(c);setModal('card')}}
+                              style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, padding:'6px 9px', marginBottom:6, borderRadius:8, cursor:'pointer', background:T.surfaceAlt }}>
+                              <div style={{ minWidth:0 }}>
+                                <div style={{ color:T.text, fontWeight:700, fontSize:10.5, fontFamily:FONT }}>{c.client||'—'}</div>
+                                <div style={{ color:T.textMuted, fontSize:9.5, fontFamily:FONT }}>{c.driver||c.transportadoraNome||'Sem motorista'}</div>
+                              </div>
+                              <span style={{ color:statusColor, fontWeight:700, fontSize:9.5, fontFamily:FONT, flexShrink:0, whiteSpace:'nowrap' }}>{statusLabel}</span>
+                            </div>
+                          )
+                        })
                       )}
                     </>
                   )}
