@@ -514,13 +514,13 @@ export function FrotasView() {
       <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}} ::-webkit-scrollbar{width:5px;height:5px} ::-webkit-scrollbar-track{background:${T.bg}} ::-webkit-scrollbar-thumb{background:${T.borderMid};border-radius:10px}`}</style>
 
       {/* HEADER */}
-      <div style={{ background:'rgba(255,255,255,.9)', backdropFilter:'blur(8px)', borderBottom:'1px solid rgba(26,22,18,.06)', padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:56, flexShrink:0 }}>
+      <div style={{ background:'rgba(255,255,255,.9)', backdropFilter:'blur(8px)', borderBottom:'1px solid rgba(26,22,18,.06)', padding:'0 22px', display:'flex', alignItems:'center', justifyContent:'space-between', height:60, flexShrink:0 }}>
         <div style={{ display:'flex', alignItems:'center', gap:14 }}>
-          <MillsLogo height={30}/>
-          <div style={{ width:1, height:26, background:T.border }}/>
+          <MillsLogo height={18}/>
+          <div style={{ width:1, height:24, background:T.border }}/>
           <div>
-            <div style={{ color:T.text, fontFamily:'Barlow Condensed,IBM Plex Sans,sans-serif', fontWeight:700, fontSize:14, letterSpacing:'0.04em', lineHeight:1.1 }}>GESTÃO DE FROTAS</div>
-            <div style={{ color:T.textMuted, fontFamily:'IBM Plex Sans,sans-serif', fontSize:9, letterSpacing:'0.12em', textTransform:'uppercase' }}>Logística · Operações de Campo</div>
+            <div style={{ color:T.text, fontFamily:FONT, fontWeight:800, fontSize:14, lineHeight:1.2 }}>Gestão de Frotas</div>
+            <div style={{ color:T.textMuted, fontFamily:FONT, fontSize:10 }}>Operações de campo · ao vivo</div>
           </div>
         </div>
         <div style={{ display:'flex', gap:7, alignItems:'center' }}>
@@ -663,7 +663,7 @@ export function FrotasView() {
           {/* "Em destaque agora" saiu daqui — na Proposta D validada esse ticker vive
               só no card "Ao vivo" da coluna lateral (destaqueIdx é reaproveitado lá). */}
           {view==='semana' && calendarCollapsed ? (
-            <div style={{ background:T.surface, border:BORDER_SUBTLE, borderRadius:14, padding:'14px 16px', display:'flex', justifyContent:'space-between', alignItems:'center', boxShadow:SHADOW_CARD }}>
+            <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:'14px 16px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
               <span style={{ fontSize:12, color:T.textSec, fontWeight:700, fontFamily:FONT }}>
                 Calendário recolhido — {cards.filter(c=>c.startDate>=weekDays[0]&&c.startDate<=weekDays[6]&&c.status!=='cancelado').length} serviço(s) nesta semana
               </span>
@@ -684,14 +684,14 @@ export function FrotasView() {
         {/* ── Faixa de 4 KPIs (Proposta D validada) ──────────────────────────── */}
     <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8, padding:'0 20px 8px', flexShrink:0 }}>
       {[
-        {l:'Serviços ativos',       v:cardsAtivos.length,  c:T.laranja,  bg:T.laranjaLight},
-        {l:'Atrasados',             v:atrasados.length,    c:T.perigo,   bg:T.perigoLight},
-        {l:'Atribuídos',            v:atribuidos.length,   c:T.info,     bg:T.infoLight},
-        {l:'Rotas otimizáveis',     v:conflicts.length,    c:'#B8860B',  bg:T.amareloLight},
+        {l:'Serviços ativos',       v:cardsAtivos.length,  c:T.laranja},
+        {l:'Atrasados',             v:atrasados.length,    c:T.perigo},
+        {l:'Atribuídos',            v:atribuidos.length,   c:T.info},
+        {l:'Rotas otimizáveis',     v:conflicts.length,    c:'#B8860B'},
       ].map(s=>(
-        <div key={s.l} style={{ background:s.bg, border:BORDER_SUBTLE, borderRadius:14, padding:'10px 12px', boxShadow:SHADOW_CARD }}>
-          <div style={{ color:s.c, fontFamily:'Barlow Condensed,IBM Plex Sans,sans-serif', fontWeight:800, fontSize:22, lineHeight:1, letterSpacing:'-.02em' }}>{s.v}</div>
-          <div style={{ color:T.textSec, fontSize:9, fontFamily:FONT, fontWeight:600, letterSpacing:'-.005em' }}>{s.l}</div>
+        <div key={s.l} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:'10px 12px' }}>
+          <div style={{ color:s.c, fontFamily:FONT, fontWeight:800, fontSize:20, lineHeight:1, marginBottom:2 }}>{s.v}</div>
+          <div style={{ color:T.textSec, fontSize:10.5, fontFamily:FONT, fontWeight:700 }}>{s.l}</div>
         </div>
       ))}
     </div>
@@ -699,17 +699,19 @@ export function FrotasView() {
     <div style={{ flex:'0 0 36%', display:'grid', gridTemplateColumns:'1fr 310px', gap:10, padding:'0 20px 14px', minHeight:0, overflow:'hidden' }}>
           {/* "Ao vivo" (Proposta D validada) — alterna a cada 7s entre o ticker "em
               destaque" (1 serviço, troca a cada 3.5s) e a lista de serviços de hoje. */}
-          <div style={{ background:T.surface, borderRadius:18, border:BORDER_SUBTLE, boxShadow:SHADOW_CARD, overflow:'hidden', display:'flex', flexDirection:'column' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'9px 13px', borderBottom:`1px solid ${T.border}`, flexShrink:0 }}>
+          <div style={{ background:T.surface, borderRadius:14, border:`1px solid ${T.border}`, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 14px 0', flexShrink:0 }}>
               <span style={{ color:T.text, fontFamily:FONT, fontWeight:800, fontSize:11 }}>Ao vivo</span>
-              <div style={{ display:'flex', gap:5, alignItems:'center' }}>
-                <button onClick={()=>setMapModal(true)} title="Ver mapa" style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}`, fontSize:11, padding:'3px 9px' }}>🗺 Mapa</button>
-                {[0,1].map(i=>(
-                  <div key={i} onClick={()=>setRodapeSlide(i)} style={{ width:6, height:6, borderRadius:'50%', cursor:'pointer', background:rodapeSlide===i?T.laranja:T.border }}/>
-                ))}
+              <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                <button onClick={()=>setMapModal(true)} title="Ver mapa" style={{ background:'none', border:'none', color:T.textMuted, fontSize:14, cursor:'pointer', padding:0 }}>🗺</button>
+                <div style={{ display:'flex', gap:4 }}>
+                  {[0,1].map(i=>(
+                    <div key={i} onClick={()=>setRodapeSlide(i)} style={{ width:6, height:6, borderRadius:'50%', cursor:'pointer', background:rodapeSlide===i?T.laranja:T.border }}/>
+                  ))}
+                </div>
               </div>
             </div>
-            <div style={{ flex:1, overflowY:'auto', padding:12 }}>
+            <div style={{ flex:1, overflowY:'auto', padding:'9px 14px 12px' }}>
               {rodapeSlide===0 ? (
                 cardsHoje.length===0 ? (
                   <p style={{ color:T.textMuted, fontSize:11, fontFamily:FONT, margin:0 }}>Nenhum serviço para hoje.</p>
@@ -718,7 +720,7 @@ export function FrotasView() {
                   const ct = CARD_TYPES[destaque.type]
                   return (
                     <div onClick={()=>{setEditCard(destaque);setModal('card')}}
-                      style={{ background:T.laranjaXLight, border:`1px solid ${T.laranja}30`, borderRadius:T.rSm, padding:'9px 11px', cursor:'pointer' }}>
+                      style={{ background:T.laranjaXLight, border:`1px solid ${T.laranja}30`, borderRadius:10, padding:'9px 11px', cursor:'pointer' }}>
                       <div style={{ color:T.laranja, fontFamily:FONT, fontWeight:800, fontSize:9, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:3 }}>🔶 Em destaque agora</div>
                       <div style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:11.5 }}>{ct?.icon} {destaque.client||'—'}</div>
                       <div style={{ color:T.textSec, fontFamily:FONT, fontSize:10, marginTop:1 }}>👤 {destaque.driver||'Sem motorista'} · {destaque.nInterno||'—'}</div>
@@ -749,7 +751,7 @@ export function FrotasView() {
 
           <div style={{ display:'flex', flexDirection:'column', gap:10, minHeight:0, overflow:'hidden' }}>
             {/* Central de Ações — resume validação/NF/atribuição/solicitações num só lugar (achado #7 do diagnóstico) */}
-            <div style={{ background:T.surface, borderRadius:16, border:BORDER_SUBTLE, boxShadow:SHADOW_CARD, padding:'12px 14px', flexShrink:0 }}>
+            <div style={{ background:T.surface, borderRadius:14, border:`1px solid ${T.border}`, padding:'12px 14px', flexShrink:0 }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
                 <span style={{ color:T.verde, fontWeight:800, fontSize:11.5, fontFamily:FONT }}>Central de ações</span>
                 <div style={{ display:'flex', alignItems:'center', gap:6 }}>
@@ -917,7 +919,7 @@ export function FrotasView() {
 
         {/* Overlay "Central de ações" expandida — lista completa priorizada, cada item resolve reaproveitando o fluxo já existente */}
         {centralExpanded && (
-          <div style={{ position:'absolute', top:8, right:20, bottom:14, width:'56%', minWidth:360, background:T.surface, borderRadius:16, boxShadow:'0 24px 60px rgba(26,22,18,.28)', border:BORDER_SUBTLE, zIndex:30, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+          <div style={{ position:'absolute', top:8, right:20, bottom:14, width:'56%', minWidth:360, background:T.surface, borderRadius:16, boxShadow:'0 24px 60px rgba(26,22,18,.28)', border:`1px solid ${T.border}`, zIndex:30, overflow:'hidden', display:'flex', flexDirection:'column' }}>
             <div style={{ background:T.verde, padding:'14px 20px', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
               <div>
                 <div style={{ color:'#fff', fontWeight:800, fontSize:14, fontFamily:FONT }}>Central de ações</div>
@@ -929,7 +931,7 @@ export function FrotasView() {
               {centralAcoes.length===0 ? (
                 <p style={{ color:T.textMuted, fontSize:12, fontFamily:FONT }}>Nenhuma ação pendente 🎉</p>
               ) : centralAcoes.map(a=>(
-                <div key={a.id} style={{ background:T.surface, border:BORDER_SUBTLE, borderRadius:12, padding:'12px 15px', marginBottom:9, display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, boxShadow:SHADOW_CARD }}>
+                <div key={a.id} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:12, padding:'12px 15px', marginBottom:9, display:'flex', justifyContent:'space-between', alignItems:'center', gap:10 }}>
                   <div style={{ minWidth:0 }}>
                     <div style={{ color:T.text, fontWeight:700, fontSize:12.5, fontFamily:FONT }}>{a.title}</div>
                     <div style={{ color:T.textMuted, fontSize:10.5, fontFamily:FONT }}>{a.sub}</div>
