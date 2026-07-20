@@ -63,7 +63,7 @@ export function LoginScreen() {
 
   return (
     <div style={{ minHeight:'100vh', background:T.verde, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:FONT, position:'relative', overflow:'hidden' }}>
-      <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet"/>
+      <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
       {/* Pattern mills */}
       <svg style={{ position:'absolute', bottom:0, left:0, right:0, width:'100%', height:40, overflow:'hidden' }} viewBox="0 0 640 40" preserveAspectRatio="xMidYMax slice">
         {bars}

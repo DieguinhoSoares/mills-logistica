@@ -1,5 +1,6 @@
 // ─── MILLS BRAND — Manual da Marca Abril 2021 ────────────────────────────────
-// Fonte: Nunito (Google Fonts) — arredondada, próxima ao lettering mills
+// Fonte: IBM Plex Sans — unificada em todo o app (antes dividida entre
+// Nunito no login/UI e IBM Plex Sans/Barlow Condensed no resto).
 // Laranja: Pantone 021 C | #F37021 | Verde escuro: Pantone 2217 C | #004042
 
 export const T = {
@@ -47,7 +48,7 @@ export const T = {
 export const SHADOW_CARD = '0 1px 2px rgba(26,22,18,.04), 0 8px 24px -8px rgba(26,22,18,.06)'
 export const BORDER_SUBTLE = '1px solid rgba(26,22,18,.05)'
 
-export const FONT = "'Nunito', 'IBM Plex Sans', sans-serif"
+export const FONT = "'IBM Plex Sans', 'Nunito', sans-serif"
 
 export const CARD_TYPES = {
   guindauto:         { label:'Guindauto / Campo',     color:'#004042', bg:'#E0EEEE', icon:'🏗️', short:'GUINDAUTO'  },
@@ -176,21 +177,21 @@ export const WD_SHORT    = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom']
 export const LS = {
   display:'block', color:'#9E9590', fontSize:10, fontWeight:800,
   letterSpacing:'0.1em', textTransform:'uppercase',
-  marginBottom:5, fontFamily:"'Nunito', sans-serif",
+  marginBottom:5, fontFamily:FONT,
 }
 export const IS = {
   width:'100%', background:'#FAF8F5', border:'1px solid #E2DDD6',
   borderRadius:8, padding:'9px 12px', color:'#1A1612',
-  fontSize:13, fontFamily:"'Nunito', sans-serif",
+  fontSize:13, fontFamily:FONT,
   boxSizing:'border-box', outline:'none',
 }
 export const BS = {
   padding:'9px 18px', borderRadius:10, border:'none',
   cursor:'pointer', fontSize:12,
-  fontFamily:"'Nunito', sans-serif", fontWeight:800,
+  fontFamily:FONT, fontWeight:800,
 }
 export const NB = {
   background:'#FFFFFF', border:'1px solid #E2DDD6', borderRadius:8,
   color:'#6B6258', padding:'5px 12px', cursor:'pointer',
-  fontSize:15, fontFamily:"'Nunito', sans-serif", fontWeight:700,
+  fontSize:15, fontFamily:FONT, fontWeight:700,
 }
