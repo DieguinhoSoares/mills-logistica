@@ -139,6 +139,16 @@ export function FrotasView() {
   // visíveis de uma vez) vs. detalhados (340px/linha, mais fácil de ler
   // cada serviço sem precisar rolar dentro do dia).
   const [calCompact,   setCalCompact]   = useState(false)
+  // Recolher/expandir calendário — troca a grade semanal completa por uma
+  // barra compacta ("Calendário recolhido — N serviços"), pra abrir espaço
+  // pra Central de Ações quando o time só quer ver a fila de pendências.
+  // Estado local, não persiste entre sessões.
+  const [calendarCollapsed, setCalendarCollapsed] = useState(false)
+  // Painel "Central de Ações" — resume validação/NF/atribuição/solicitações
+  // (hoje espalhados em badges soltos) numa lista única priorizada. "Expandir"
+  // abre um overlay com a lista completa; cada item resolve reaproveitando os
+  // fluxos que já existem (abas Resumo/Solicitações/Validação, modais atuais).
+  const [centralExpanded, setCentralExpanded] = useState(false)
   // Faixa "Em destaque agora" — alterna 1 serviço do dia a cada 10s, com
   // barra de progresso. Reinicia o índice se a lista mudar de tamanho
   // (evita apontar pra um item que não existe mais depois de uma edição).
@@ -380,6 +390,18 @@ export function FrotasView() {
   const totalValidacao = validacoes.length + semExecutorApp.length
   const totalNF        = nfPendentes.length
 
+  // Central de Ações — consolida em uma lista só o que hoje aparece espalhado
+  // em badges soltos pela tela (validação, NF, atribuição, solicitações).
+  // Cada item resolve reaproveitando o fluxo que já existe (troca de aba do
+  // painel lateral) — não duplica nenhuma lógica de clique/modal.
+  const centralAcoes = [
+    { id:'validar',   title:'Validar serviços concluídos', sub:`${validacoes.length} aguardando conferência`,        count:validacoes.length,     badgeBg:T.laranja, badgeColor:'#fff',   onResolve:()=>{setActiveTab('agenda');setPainelTab('val')} },
+    { id:'nf',        title:'Confirmar NF emitida',        sub:`${nfPendentes.length} movimentação(ões) pendente(s)`,count:nfPendentes.length,    badgeBg:T.perigo,  badgeColor:'#fff',   onResolve:()=>{setActiveTab('agenda');setPainelTab('val')} },
+    { id:'atribuir',  title:'Atribuir motorista',          sub:`${semExecutorApp.length} serviço(s) sem executor`,   count:semExecutorApp.length, badgeBg:T.amarelo, badgeColor:T.text,   onResolve:()=>{setActiveTab('agenda');setPainelTab('val')} },
+    { id:'solicitar', title:'Responder solicitações',      sub:`${pending} nova(s) do time solicitante`,             count:pending,                badgeBg:T.info,    badgeColor:'#fff',   onResolve:()=>{setActiveTab('agenda');setPainelTab('sol')} },
+  ].filter(a => a.count > 0)
+  const totalAcoes = centralAcoes.reduce((s,a)=>s+a.count, 0)
+
   const relatedRequest = editCard ? findRelatedPendingRequest(editCard, requests) : null
 
   const handleValidarCard = async (card) => {
@@ -568,7 +590,8 @@ export function FrotasView() {
       )}
 
       {/* AGENDA TAB */}
-      {activeTab==='agenda'&&<>
+      {activeTab==='agenda'&&(
+      <div style={{ position:'relative', flex:1, display:'flex', flexDirection:'column', overflow:'hidden', minHeight:0 }}>
         <div style={{ flex:'1 1 62%', overflow:'hidden', padding:'12px 20px 6px', display:'flex', flexDirection:'column', minHeight:0 }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10, flexShrink:0 }}>
             <div style={{ display:'flex', alignItems:'center', gap:8 }}>
@@ -580,6 +603,7 @@ export function FrotasView() {
                 {view==='ano'&&`${yr}`}
               </h2>
               {view==='semana'&&<button onClick={()=>setBaseDate(todayStr())} style={{ ...NB, fontSize:10, padding:'3px 8px', letterSpacing:'0.04em' }}>HOJE</button>}
+              {view==='semana'&&<button onClick={()=>setCalendarCollapsed(c=>!c)} style={{ ...NB, fontSize:10, padding:'3px 8px' }}>{calendarCollapsed?'▾ Expandir calendário':'▴ Recolher calendário'}</button>}
             </div>
             <div style={{ display:'flex', gap:7, alignItems:'center' }}>
               {/* Campo de busca */}
@@ -659,13 +683,22 @@ export function FrotasView() {
               </div>
             )
           })()}
-          <AnimatePresence mode="wait">
-            <motion.div key={view} initial={{ opacity:0, y:5 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-5 }} transition={{ duration:.1 }} style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-              {view==='semana'&&<WeekView cards={cards} baseDate={baseDate} conflicts={conflicts} onEdit={c=>{setEditCard(c);setModal('card');}} onAddCard={d=>{setDefaultDate(d);setEditCard(null);setModal('card');}} onMoveCard={handleMoveCard} compact={calCompact}/>}
-              {view==='mes'&&<MonthView cards={cards} year={yr} month={mo} conflicts={conflicts} onEdit={c=>{setEditCard(c);setModal('card');}} onAddCard={d=>{setDefaultDate(d);setEditCard(null);setModal('card');}} onMoveCard={handleMoveCard}/>}
-              {view==='ano'&&<div style={{ overflow:'auto', flex:1 }}><YearView cards={cards} year={yr} onMonthClick={m=>{setMo(m);setView('mes');}}/></div>}
-            </motion.div>
-          </AnimatePresence>
+          {view==='semana' && calendarCollapsed ? (
+            <div style={{ background:T.surface, border:BORDER_SUBTLE, borderRadius:14, padding:'14px 16px', display:'flex', justifyContent:'space-between', alignItems:'center', boxShadow:SHADOW_CARD }}>
+              <span style={{ fontSize:12, color:T.textSec, fontWeight:700, fontFamily:FONT }}>
+                Calendário recolhido — {cards.filter(c=>c.startDate>=weekDays[0]&&c.startDate<=weekDays[6]&&c.status!=='cancelado').length} serviço(s) nesta semana
+              </span>
+              <button onClick={()=>setCalendarCollapsed(false)} style={{ background:T.laranjaLight, color:T.laranja, border:'none', borderRadius:8, padding:'6px 12px', fontSize:11, fontWeight:800, fontFamily:FONT, cursor:'pointer' }}>Expandir calendário</button>
+            </div>
+          ) : (
+            <AnimatePresence mode="wait">
+              <motion.div key={view} initial={{ opacity:0, y:5 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-5 }} transition={{ duration:.1 }} style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+                {view==='semana'&&<WeekView cards={cards} baseDate={baseDate} conflicts={conflicts} onEdit={c=>{setEditCard(c);setModal('card');}} onAddCard={d=>{setDefaultDate(d);setEditCard(null);setModal('card');}} onMoveCard={handleMoveCard} compact={calCompact}/>}
+                {view==='mes'&&<MonthView cards={cards} year={yr} month={mo} conflicts={conflicts} onEdit={c=>{setEditCard(c);setModal('card');}} onAddCard={d=>{setDefaultDate(d);setEditCard(null);setModal('card');}} onMoveCard={handleMoveCard}/>}
+                {view==='ano'&&<div style={{ overflow:'auto', flex:1 }}><YearView cards={cards} year={yr} onMonthClick={m=>{setMo(m);setView('mes');}}/></div>}
+              </motion.div>
+            </AnimatePresence>
+          )}
         </div>
 
         {/* Bottom: Mapa maior + KPIs + solicitações rápidas */}
@@ -736,6 +769,36 @@ export function FrotasView() {
               )}
             </div>
           </div>
+
+          <div style={{ display:'flex', flexDirection:'column', gap:10, minHeight:0, overflow:'hidden' }}>
+            {/* Central de Ações — resume validação/NF/atribuição/solicitações num só lugar (achado #7 do diagnóstico) */}
+            <div style={{ background:T.surface, borderRadius:16, border:BORDER_SUBTLE, boxShadow:SHADOW_CARD, padding:'12px 14px', flexShrink:0 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                <span style={{ color:T.verde, fontWeight:800, fontSize:11.5, fontFamily:FONT }}>Central de ações</span>
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  {totalAcoes>0 && <span style={{ background:T.laranja, color:'#fff', borderRadius:20, padding:'2px 8px', fontSize:10, fontWeight:800, fontFamily:FONT }}>{totalAcoes}</span>}
+                  {centralAcoes.length>2 && (
+                    <button onClick={()=>setCentralExpanded(true)} style={{ background:T.verdeLight, color:T.verde, border:'none', borderRadius:7, padding:'4px 9px', fontSize:10, fontWeight:800, fontFamily:FONT, cursor:'pointer' }}>Expandir</button>
+                  )}
+                </div>
+              </div>
+              <div style={{ color:T.textMuted, fontSize:9.5, fontFamily:FONT, marginBottom:9 }}>Prioriza validações, NFs e solicitações num só lugar</div>
+              {centralAcoes.length===0 ? (
+                <div style={{ color:T.textMuted, fontSize:11, fontFamily:FONT }}>Nenhuma ação pendente 🎉</div>
+              ) : (
+                <div style={{ display:'flex', flexDirection:'column', gap:7 }}>
+                  {centralAcoes.slice(0,2).map(a=>(
+                    <div key={a.id} onClick={a.onResolve} style={{ background:T.surfaceAlt, borderRadius:10, padding:'8px 10px', display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, cursor:'pointer' }}>
+                      <div style={{ minWidth:0 }}>
+                        <div style={{ color:T.text, fontWeight:700, fontSize:11, fontFamily:FONT }}>{a.title}</div>
+                        <div style={{ color:T.textMuted, fontSize:9.5, fontFamily:FONT }}>{a.sub}</div>
+                      </div>
+                      <span style={{ background:a.badgeBg, color:a.badgeColor, borderRadius:20, padding:'2px 8px', fontSize:10, fontWeight:800, fontFamily:FONT, flexShrink:0 }}>{a.count}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
           {/* PAINEL ÚNICO com abas: Resumo / Solicitações / Validação — 100% da altura agora */}
           <div style={{ background:T.surface, borderRadius:18, border:BORDER_SUBTLE, boxShadow:SHADOW_CARD, overflow:'hidden', display:'flex', flexDirection:'column' }}>
@@ -873,7 +936,38 @@ export function FrotasView() {
                 </div>
               </div>
             </div>
-          </>}
+          </div>
+
+        {/* Overlay "Central de ações" expandida — lista completa priorizada, cada item resolve reaproveitando o fluxo já existente */}
+        {centralExpanded && (
+          <div style={{ position:'absolute', top:8, right:20, bottom:14, width:'56%', minWidth:360, background:T.surface, borderRadius:16, boxShadow:'0 24px 60px rgba(26,22,18,.28)', border:BORDER_SUBTLE, zIndex:30, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+            <div style={{ background:T.verde, padding:'14px 20px', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
+              <div>
+                <div style={{ color:'#fff', fontWeight:800, fontSize:14, fontFamily:FONT }}>Central de ações</div>
+                <div style={{ color:'rgba(255,255,255,.6)', fontSize:10.5, fontFamily:FONT }}>Validações, NFs, atribuição e solicitações — priorizado</div>
+              </div>
+              <button onClick={()=>setCentralExpanded(false)} style={{ background:'rgba(255,255,255,.15)', color:'#fff', border:'none', borderRadius:8, padding:'7px 14px', fontSize:11.5, fontWeight:800, fontFamily:FONT, cursor:'pointer' }}>✕ Recolher</button>
+            </div>
+            <div style={{ padding:'16px 20px', overflow:'auto', flex:1 }}>
+              {centralAcoes.length===0 ? (
+                <p style={{ color:T.textMuted, fontSize:12, fontFamily:FONT }}>Nenhuma ação pendente 🎉</p>
+              ) : centralAcoes.map(a=>(
+                <div key={a.id} style={{ background:T.surface, border:BORDER_SUBTLE, borderRadius:12, padding:'12px 15px', marginBottom:9, display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, boxShadow:SHADOW_CARD }}>
+                  <div style={{ minWidth:0 }}>
+                    <div style={{ color:T.text, fontWeight:700, fontSize:12.5, fontFamily:FONT }}>{a.title}</div>
+                    <div style={{ color:T.textMuted, fontSize:10.5, fontFamily:FONT }}>{a.sub}</div>
+                  </div>
+                  <div style={{ display:'flex', alignItems:'center', gap:10, flexShrink:0 }}>
+                    <span style={{ background:a.badgeBg, color:a.badgeColor, borderRadius:20, padding:'3px 10px', fontSize:11, fontWeight:800, fontFamily:FONT }}>{a.count}</span>
+                    <button onClick={()=>{a.onResolve();setCentralExpanded(false)}} style={{ background:T.laranja, color:'#fff', border:'none', borderRadius:8, padding:'6px 13px', fontSize:11, fontWeight:800, fontFamily:FONT, cursor:'pointer', whiteSpace:'nowrap' }}>Resolver</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+      )}
 
       {/* REQUESTS TAB */}
       {activeTab==='requests'&&(
