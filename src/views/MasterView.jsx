@@ -23,6 +23,44 @@ const PERFIS = [
 ]
 
 
+// Extraído do card inline que existia na aba Usuários — reaproveita exatamente
+// a mesma lógica de aprovação (approveUser/refuseUser), só muda a apresentação
+// pra modal, pra poder ser aberto a partir da Fila unificada ("Definir perfil").
+function UserRoleModal({ user, role, onSelectRole, onApprove, onRefuse, onClose }) {
+  const [saving, setSaving] = useState(false)
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.55)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)' }}
+      onClick={e => e.target===e.currentTarget && !saving && onClose()}>
+      <motion.div initial={{ scale:.95, opacity:0 }} animate={{ scale:1, opacity:1 }}
+        style={{ background:T.surface, borderRadius:16, padding:26, width:460, boxShadow:SHADOW_CARD, border:BORDER_SUBTLE }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:14 }}>
+          <div>
+            <h3 style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:16, margin:0 }}>Definir perfil de acesso</h3>
+            <div style={{ color:T.textMuted, fontFamily:FONT, fontSize:11, marginTop:3 }}>{user.name} · {user.email} · {user.unit||'—'}</div>
+          </div>
+          <button onClick={onClose} disabled={saving} style={{ background:'none', border:'none', color:T.textMuted, fontSize:22, cursor:saving?'default':'pointer' }}>×</button>
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:18 }}>
+          {PERFIS.map(([v,l]) => (
+            <div key={v} onClick={()=>onSelectRole(v)}
+              style={{ border:`2px solid ${role===v?T.laranja:T.border}`, borderRadius:T.r, padding:'9px 12px', cursor:'pointer', textAlign:'center', background:role===v?T.laranjaLight:T.surfaceAlt, transition:'all .12s' }}>
+              <div style={{ color:T.text, fontFamily:FONT, fontSize:11.5, fontWeight:role===v?800:500 }}>{l}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+          <button onClick={async()=>{setSaving(true);await onRefuse();setSaving(false)}} disabled={saving}
+            style={{ ...BS, background:T.perigoLight, color:T.perigo, border:`1px solid ${T.perigo}40`, fontSize:11, fontWeight:700 }}>❌ Recusar cadastro</button>
+          <button onClick={async()=>{setSaving(true);await onApprove();setSaving(false)}} disabled={!role||saving}
+            style={{ ...BS, background:role?T.verde:T.borderMid, color:'white', fontSize:11, fontWeight:700, opacity:role?1:0.5 }}>
+            {saving?'⏳...':'✅ Aprovar acesso'}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
 function CancelCardModal({ card, onConfirm, onClose }) {
   const [reason, setReason] = useState('')
   const [saving, setSaving] = useState(false)
@@ -70,6 +108,7 @@ export function MasterView({ simClients = [] }) {
   const [cancelModal,   setCancelModal]   = useState(null)
   const [approvingRole, setApprovingRole] = useState({})
   const [approvalModal, setApprovalModal] = useState(null)
+  const [roleModalUser, setRoleModalUser] = useState(null) // usuário pendente aberto via "Definir perfil" na Fila unificada
   const [messaging,     setMessaging]     = useState(null)
   const [filterAprov,   setFilterAprov]   = useState('todos')
   const [waPhone,       setWaPhone]       = useState('')
@@ -157,15 +196,59 @@ export function MasterView({ simClients = [] }) {
   const acceptedCards  = cardsAtivos.filter(c => c.status==='confirmado' || c.status==='aceito')
   const { falhas, marcarResolvida } = useFalhasSilenciosas()
 
-  const TABS = [
-    { id:'kpis',      label:'📊 Indicadores', badge: null },
-    { id:'config',    label:'⚙️ Config',       badge: null },
-    { id:'map',       label:'🗺 Mapa',          badge: null },
-    { id:'requests',  label:'📥 Solicitações', badge: pending || null },
-    { id:'aprovacao', label:'📋 Aprovações',   badge: pendingAprov || null },
-    { id:'servicos',  label:'🚫 Serviços',     badge: acceptedCards?.length || null },
-    { id:'usuarios',  label:'👥 Usuários',     badge: pendingUsers.length || null },
-    { id:'falhas',    label:'⚠️ Falhas',       badge: falhas.length || null },
+  // Fila unificada — combina aprovações gerenciais pendentes, cadastros aguardando
+  // perfil, falhas silenciosas e serviços aceitos sem motorista numa lista única
+  // priorizada (achado #11 do diagnóstico: "fluxos de aprovação fragmentados").
+  // Cada item resolve abrindo o MESMO modal/fluxo que já existe hoje — não duplica
+  // nenhuma lógica de aprovação/recusa, só agrega visualmente.
+  const acceptedSemMotorista = acceptedCards.filter(c => !c.driverId && !c.driver)
+  const acoesUnificadas = sortByUrgency([
+    ...mgrReqs.filter(r => ['pendente_supervisor','pendente_gerente'].includes(r.status)).map(r => ({
+      id:`aprov-${r.id}`, tag:'Aprovação', tagBg:T.infoLight, tagColor:T.info,
+      title:`${r.subtype?getSubtypeLabel(r.type,r.subtype):(CARD_TYPES[r.type]?.label||'Solicitação')} — ${r.clientName||r.requesterName||'—'}`,
+      sub:`Aguardando ${r.status==='pendente_supervisor'?'Supervisor':'Gerência'} · ${r.unit||'—'}`,
+      urgency:r.urgency||'medio', desiredDate:r.desiredDate,
+      action:'Revisar', onAction:()=>setApprovalModal(r),
+    })),
+    ...pendingUsers.map(u => ({
+      id:`cad-${u.id}`, tag:'Cadastro', tagBg:'#FFF8E1', tagColor:'#B8860B',
+      title:`${u.name} — acesso pendente`,
+      sub:`Solicitou perfil ${PERFIS.find(([v])=>v===u.role)?.[1]||u.role||'—'} · ${u.unit||'—'}`,
+      urgency:'medio', desiredDate:null,
+      action:'Definir perfil', onAction:()=>setRoleModalUser(u),
+    })),
+    ...falhas.map(f => ({
+      id:`falha-${f.id}`, tag:'Falha', tagBg:T.perigoLight, tagColor:T.perigo,
+      title:f.mensagem||'Notificação não entregue',
+      sub:f.contexto||'—',
+      urgency:'alto', desiredDate:null,
+      action:'Ver detalhes', onAction:()=>setTab('falhas'),
+    })),
+    ...acceptedSemMotorista.map(c => ({
+      id:`cancel-${c.id}`, tag:'Cancelamento', tagBg:'#F0EDE8', tagColor:T.textSec,
+      title:`Serviço aceito sem motorista — ${c.client||'—'}`,
+      sub:`${CARD_TYPES[c.type]?.label||'—'} · ${fmt(c.startDate)}`,
+      urgency:'baixo', desiredDate:c.startDate,
+      action:'Resolver', onAction:()=>setTab('servicos'),
+    })),
+  ], 'desiredDate')
+  const totalFila = acoesUnificadas.length
+
+  // Navegação lateral agrupada — substitui as 8 abas soltas no header
+  // (achado #10 do diagnóstico: "oito abas apertadas, tende a truncar").
+  const masterGroups = [
+    { label:'Operação', items:[
+      { id:'kpis',     label:'📊 Indicadores' },
+      { id:'map',      label:'🗺 Mapa' },
+      { id:'requests', label:'📥 Solicitações', badge: pending||null },
+    ]},
+    { label:'Ações pendentes', items:[
+      { id:'fila', label:'🔔 Fila unificada', badge: totalFila||null, highlight:true },
+    ]},
+    { label:'Sistema', items:[
+      { id:'usuarios', label:'👥 Usuários', badge: pendingUsers.length||null },
+      { id:'config',   label:'⚙️ Configurações' },
+    ]},
   ]
 
   const handleCancelCard = async (card, reason) => {
@@ -286,6 +369,11 @@ export function MasterView({ simClients = [] }) {
         message={`Excluir o serviço de ${deleteTarget?.client||'este card'}? Esta ação não pode ser desfeita.`}
         confirmLabel="🗑 Excluir" onConfirm={()=>{deleteCard(deleteTarget.id);setDeleteTarget(null)}} onCancel={()=>setDeleteTarget(null)}/>
       {approvalModal && <ApprovalModal req={approvalModal} profile={profile} simClients={simClients} onApprove={handleMasterApprove} onRefuse={handleMasterRefuse} onClose={()=>setApprovalModal(null)}/>}
+      {roleModalUser && <UserRoleModal user={roleModalUser} role={approvingRole[roleModalUser.id]}
+        onSelectRole={v=>setApprovingRole(p=>({...p,[roleModalUser.id]:v}))}
+        onApprove={async()=>{ await handleApproveUser(roleModalUser.id); setRoleModalUser(null) }}
+        onRefuse={async()=>{ await refuseUser(roleModalUser.id); addToast('Cadastro recusado.','info'); setRoleModalUser(null) }}
+        onClose={()=>setRoleModalUser(null)}/>}
       {messaging && <MessageThread requestId={messaging} profile={profile} onClose={()=>setMessaging(null)}/>}
 
       <div style={{ background:T.verde, padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:56, flexShrink:0, boxShadow:T.shadowMd }}>
@@ -302,14 +390,6 @@ export function MasterView({ simClients = [] }) {
             <div style={{ width:6, height:6, borderRadius:'50%', background:T.verdeMint }}/>
             <span style={{ color:T.verdeMint, fontSize:9, fontWeight:700, letterSpacing:'0.06em' }}>LIVE</span>
           </div>
-          {TABS.map(t => (
-            <button key={t.id} onClick={()=>setTab(t.id)}
-              style={{ padding:'5px 14px', borderRadius:T.r, border:'none', cursor:'pointer', fontFamily:FONT, fontWeight:700, fontSize:11, transition:'all .15s', position:'relative',
-                background:tab===t.id?T.laranja:'rgba(255,255,255,0.12)', color:tab===t.id?'white':'rgba(255,255,255,0.7)' }}>
-              {t.label}
-              {t.badge > 0 && <span style={{ position:'absolute', top:-4, right:-4, background:T.perigo, color:'white', borderRadius:20, fontSize:9, fontWeight:700, padding:'0 5px', fontFamily:FONT }}>{t.badge}</span>}
-            </button>
-          ))}
           <NotificationBell notifications={notifications} unreadCount={unreadCount} onMarkAllRead={markAllRead} onMarkRead={markRead} onDelete={deleteNotification} onEnablePush={enablePush} onDisablePush={disablePush}/>
           <button onClick={()=>setExportModal(true)} style={{ ...BS, background:T.verdeLight, color:T.verde, border:`1px solid ${T.verde}40`, fontSize:11, fontWeight:700 }}>📊 Relatório</button>
           <button onClick={()=>setEmissoesModal(true)} style={{ ...BS, background:T.verdeLight, color:T.verde, border:`1px solid ${T.verde}40`, fontSize:11, fontWeight:700 }}>🌱 Emissão CO2</button>
@@ -328,7 +408,52 @@ export function MasterView({ simClients = [] }) {
         </div>
       )}
 
-      <div style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+      <div style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'row' }}>
+        {/* Navegação lateral agrupada — substitui as 8 abas soltas no header (achado #10 do diagnóstico) */}
+        <div style={{ width:190, flexShrink:0, background:T.verde, padding:'18px 12px', display:'flex', flexDirection:'column', gap:18, overflowY:'auto' }}>
+          {masterGroups.map(g=>(
+            <div key={g.label}>
+              <div style={{ color:'rgba(255,255,255,.4)', fontSize:9, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.08em', padding:'0 8px', marginBottom:6, fontFamily:FONT }}>{g.label}</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                {g.items.map(it=>(
+                  <button key={it.id} onClick={()=>setTab(it.id)}
+                    style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:6, padding:'8px 10px', borderRadius:9, border:'none', cursor:'pointer', fontFamily:FONT, fontWeight:700, fontSize:11.5, textAlign:'left', whiteSpace:'nowrap',
+                      background: tab===it.id ? T.laranja : (it.highlight ? 'rgba(243,112,33,.18)' : 'rgba(255,255,255,.06)'),
+                      color: tab===it.id ? '#fff' : (it.highlight ? '#FFD9BE' : 'rgba(255,255,255,.85)') }}>
+                    <span>{it.label}</span>
+                    {it.badge>0 && <span style={{ background:'#D32F2F', color:'#fff', borderRadius:20, padding:'1px 7px', fontSize:9.5, fontWeight:700, fontFamily:FONT }}>{it.badge}</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column', minWidth:0 }}>
+        {tab==='fila' && (
+          <div style={{ flex:1, overflow:'auto', padding:'20px 24px' }}>
+            <h3 style={{ fontFamily:FONT, fontWeight:800, fontSize:16, color:T.text, margin:'0 0 2px' }}>Ações pendentes</h3>
+            <p style={{ fontSize:11.5, color:T.textMuted, margin:'0 0 16px', fontFamily:FONT }}>Aprovações, cadastros, falhas e serviços a cancelar — uma fila única priorizada.</p>
+            {acoesUnificadas.length===0 ? (
+              <div style={{ textAlign:'center', padding:'40px 0', color:T.textMuted, fontFamily:FONT }}>
+                <div style={{ fontSize:44, marginBottom:10 }}>✅</div>
+                <p style={{ fontWeight:700, fontSize:16 }}>Tudo em dia!</p>
+              </div>
+            ) : acoesUnificadas.map(au=>(
+              <div key={au.id} style={{ background:T.surface, border:BORDER_SUBTLE, borderRadius:14, boxShadow:SHADOW_CARD, padding:'13px 16px', marginBottom:9, display:'flex', justifyContent:'space-between', alignItems:'center', gap:12 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:12, minWidth:0 }}>
+                  <span style={{ background:au.tagBg, color:au.tagColor, borderRadius:9, padding:'6px 8px', fontSize:10, fontWeight:800, fontFamily:FONT, flexShrink:0, whiteSpace:'nowrap' }}>{au.tag}</span>
+                  <div style={{ minWidth:0 }}>
+                    <div style={{ fontWeight:700, fontSize:12.5, color:T.text, fontFamily:FONT, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{au.title}</div>
+                    <div style={{ fontSize:10.5, color:T.textMuted, fontFamily:FONT }}>{au.sub}</div>
+                  </div>
+                </div>
+                <button onClick={au.onAction} style={{ background:T.laranja, color:'#fff', border:'none', borderRadius:9, padding:'6px 14px', fontSize:11, fontWeight:800, fontFamily:FONT, cursor:'pointer', whiteSpace:'nowrap', flexShrink:0 }}>{au.action}</button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {tab==='kpis' && <KPIView cards={cards} requests={requests} simClients={simClients}
           onNavigateToAprovacoes={()=>{ setTab('aprovacao'); setFilterAprov('todos') }}/>}
 
@@ -702,6 +827,7 @@ export function MasterView({ simClients = [] }) {
             )}
           </div>
         )}
+        </div>
       </div>
 
       <div style={{ background:T.surface, borderTop:`1px solid ${T.border}`, padding:'5px 20px', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
