@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { T, FONT, BS, IS, LS } from '../lib/constants'
 import { fmt, todayStr, getWeekDays } from '../lib/utils'
-import { montarLinhaRelatorio } from '../lib/emissoes'
+import { montarLinhaRelatorio, diagnosticarLacunasEmissao } from '../lib/emissoes'
 
 // Exportação em Excel do relatório de emissão de carbono — enviado ao time
 // de Meio Ambiente da Mills para divulgação externa ao mercado. Colunas no
@@ -18,7 +18,8 @@ export function EmissoesExportModal({ cards, simClients, onClose, onRunMigration
     c.status === 'concluido' && c.startDate && c.startDate >= dateFrom && c.startDate <= dateTo
   )
   const linhas = concluidos.map(c => montarLinhaRelatorio(c, simClients))
-  const semDado = linhas.filter(l => l.semDadoSuficiente).length
+  const diagnostico = diagnosticarLacunasEmissao(concluidos, simClients)
+  const semDado = diagnostico.total
 
   const handleExport = async () => {
     setErro('')
@@ -66,17 +67,27 @@ export function EmissoesExportModal({ cards, simClients, onClose, onRunMigration
         <div style={{ marginTop:14, padding:'10px 12px', background:T.surfaceAlt, borderRadius:T.rSm, fontFamily:FONT, fontSize:11, color:T.textSec }}>
           {linhas.length} serviço(s) concluído(s) no período.
           {semDado > 0 && (
-            <div style={{ color:T.perigo, fontWeight:700, marginTop:4 }}>
-              ⚠️ {semDado} sem km ou consumo médio cadastrado — aparecem no arquivo com "—", não são inventados.
+            <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:4 }}>
+              <div style={{ color:T.perigo, fontWeight:700 }}>
+                ⚠️ {semDado} sem dado suficiente — aparecem no arquivo com "—", não são inventados:
+              </div>
+              {diagnostico.recuperavelPorMigracao.length > 0 && (
+                <div style={{ paddingLeft:14 }}>• {diagnostico.recuperavelPorMigracao.length} sem km, mas com origem/destino — <strong>recuperável</strong> pela migração abaixo</div>
+              )}
+              {diagnostico.semOrigemDestino.length > 0 && (
+                <div style={{ paddingLeft:14 }}>• {diagnostico.semOrigemDestino.length} sem km e sem origem/destino — precisa abrir o card e corrigir manualmente</div>
+              )}
+              {diagnostico.semConsumoModelo.length > 0 && (
+                <div style={{ paddingLeft:14 }}>• {diagnostico.semConsumoModelo.length} com km, mas sem consumo médio cadastrado pro veículo/modelo — não é sobre km, precisa cadastrar o consumo desse veículo</div>
+              )}
             </div>
           )}
         </div>
 
-        {semDado > 0 && onRunMigration && (
+        {diagnostico.recuperavelPorMigracao.length > 0 && onRunMigration && (
           <div style={{ marginTop:10, padding:'10px 12px', background:T.amareloLight, borderRadius:T.rSm }}>
             <div style={{ fontFamily:FONT, fontSize:10, color:'#8A6D00', marginBottom:6 }}>
-              Serviços concluídos antes da correção de {new Date().toLocaleDateString('pt-BR')} não têm km salvo.
-              Isso recalcula usando a origem/destino que o card já tem — é seguro rodar mais de uma vez.
+              {diagnostico.recuperavelPorMigracao.length} serviço(s) têm origem/destino salvos mas não têm km — a migração recalcula usando esses dados. É seguro rodar mais de uma vez.
             </div>
             <button onClick={onRunMigration} disabled={migrating}
               style={{ ...BS, background:T.amarelo, color:'#8A6D00', fontWeight:700, fontSize:11, width:'100%' }}>
