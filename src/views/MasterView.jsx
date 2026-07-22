@@ -363,7 +363,7 @@ export function MasterView({ simClients = [] }) {
 
       {exportModal && <ExportModal cards={cards} onClose={()=>setExportModal(false)}/>}
       {emissoesModal && <EmissoesExportModal cards={cards} simClients={simClients} onClose={()=>setEmissoesModal(false)}
-        onRunMigration={handleKmMigration} migrating={kmMigrating} migrateLog={kmMigrateLog} migrateProgress={kmProgress}/>}
+        onRunMigration={handleKmMigration} migrating={kmMigrating} migrateLog={kmMigrateLog} migrateProgress={kmProgress} addToast={addToast}/>}
       {cancelModal && <CancelCardModal card={cancelModal} onConfirm={r=>handleCancelCard(cancelModal,r)} onClose={()=>setCancelModal(null)}/>}
       <ConfirmModal open={!!deleteTarget} danger title="Excluir serviço"
         message={`Excluir o serviço de ${deleteTarget?.client||'este card'}? Esta ação não pode ser desfeita.`}
