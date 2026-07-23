@@ -241,6 +241,7 @@ export function MasterView({ simClients = [] }) {
       { id:'kpis',     label:'📊 Indicadores' },
       { id:'map',      label:'🗺 Mapa' },
       { id:'requests', label:'📥 Solicitações', badge: pending||null },
+      { id:'servicos', label:'🚫 Cancelar Serviço', badge: acceptedCards.length||null },
     ]},
     { label:'Ações pendentes', items:[
       { id:'fila', label:'🔔 Fila unificada', badge: totalFila||null, highlight:true },
