@@ -17,7 +17,7 @@ import { todayStr } from '../lib/utils'
 import { ClientInput, MunicipioInput } from '../components/UI'
 
 const SUBTYPES_EMBARQUE       = ['troca_tecnica','sinistro','garantia']
-const SUBTYPES_OFICINA        = ['garantia']
+const SUBTYPES_OFICINA        = ['garantia','sinistro']
 const SUBTYPES_MAQUINA_RESERVA = ['troca_tecnica','sinistro','garantia']
 // Rollout às vezes tem máquina de retorno (troca de fato), às vezes não (a
 // máquina antiga já foi baixada/vendida antes, só entra a nova) — por isso
@@ -704,7 +704,7 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
             <motion.div initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:'auto' }} exit={{ opacity:0, height:0 }}
               style={{ marginBottom:14, padding:'12px 14px', background:T.infoLight, borderRadius:T.r, border:`1px solid ${errors.destinoOficina?T.perigo:T.info}40` }}>
               <label style={{ ...LS, color:errors.destinoOficina?T.perigo:T.info }}>
-                🔧 Destino da máquina em garantia <span style={{ color:T.perigo }}>*</span>
+                🔧 Destino da máquina <span style={{ color:T.perigo }}>*</span>
               </label>
               <div style={{ display:'flex', gap:10, marginTop:8 }}>
                 {[['mills','🏭 Oficina Mills'],['concessionaria','🏢 Concessionária']].map(([v,l])=>(
