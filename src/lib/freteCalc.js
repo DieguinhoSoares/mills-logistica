@@ -172,11 +172,11 @@ export const PESO_GRUPO = {
   // ainda ESTIMADO por interpolação, não é ficha técnica exata por m³.
   'Caminhão Basculante 6x4 / 14 m³':           13.6,  // = Volvo VM-330 (âncora real)
   'Caminhão Basculante 6x4 / 16 m³':           14.6,  // interpolado (média das 2 âncoras)
-  'Caminhão Basculante 6x4 / 20 m³':           15.5,  // = Mercedes AXOR-4144 (âncora real)
+  'Caminhão Basculante 6x4 / 20 m³':           15.5,  // Fonte: desenho de projeto do caminhão comprado pela Mills — Mercedes AXOR 4144 Basculante, tara 15,5t (2026-07)
   'Caminhão Basculante 8x4 / 22 m³':           17.0,  // estimado — eixo extra (8x4) sobre a âncora AXOR-4144
   'Caminhão Comboio 4x2 / 6 m³':               11.0,  // estimado — chassi menor (4x2) que o Comboio 6x4
   'Caminhão Comboio 6x4 / 10 m³':              13.5,  // Fonte: mills.com.br (Volvo VM-270/VM-290, ambos 13,5t)
-  'Caminhão Pipa 6X4 / 20 m³':                 15.5,  // Fonte: desenho de projeto do caminhão comprado pela Mills — Volvo VM 270 6x4 Pipa 20m³, tara 15,5t (2026-07, substitui estimativa antiga do mills.com.br)
+  'Caminhão Pipa 6X4 / 20 m³':                 11.0,  // Fonte: desenho de projeto do caminhão comprado pela Mills — Volvo VM 270 6x4 Pipa 20m³, tara 11t (2026-07). Corrige atribuição errada anterior (peso do Basculante Axor 4144, não deste)
   'Caminhão Plataforma 6x4 / 11mt':            13.6,  // estimado = mesmo chassi do Basculante (Volvo VM-330); sem peso/dimensão publicado
   // Trator Agrícola — Fonte: deere.com.br (ficha técnica oficial do fabricante).
   // Peso "base sem lastro" quando disponível; senão, o lastro máximo informado
@@ -243,11 +243,11 @@ const LARGURA_GRUPO = {
   // Caminhão Basculante — largura padrão de via (todos os portes ficam na faixa legal de 2,60m)
   'Caminhão Basculante 6x4 / 14 m³':           2.55,  // estimado
   'Caminhão Basculante 6x4 / 16 m³':           2.60,  // Fonte: mills.com.br — Volvo VM-330 e Mercedes AXOR-4144 Basculante, ambos 2,60m
-  'Caminhão Basculante 6x4 / 20 m³':           2.60,  // idem
+  'Caminhão Basculante 6x4 / 20 m³':           2.598, // Fonte: desenho de projeto do caminhão comprado pela Mills — Mercedes AXOR 4144 Basculante (2026-07)
   'Caminhão Basculante 8x4 / 22 m³':           2.60,  // estimado (largura de via legal, não muda com m³)
   'Caminhão Comboio 4x2 / 6 m³':               2.60,  // estimado
   'Caminhão Comboio 6x4 / 10 m³':              2.60,  // Fonte: mills.com.br (Volvo VM-270/VM-290)
-  'Caminhão Pipa 6X4 / 20 m³':                 2.60,  // Fonte: desenho de projeto do caminhão comprado pela Mills — Volvo VM 270 6x4 Pipa 20m³, 2.598m (2026-07)
+  'Caminhão Pipa 6X4 / 20 m³':                 2.60,  // estimado — o desenho real do Volvo VM 270 6x4 Pipa 20m³ (2026-07) só tem vista lateral, sem largura
   'Caminhão Plataforma 6x4 / 11mt':            2.60,  // estimado = mesmo chassi do Basculante (Volvo VM-330)
   'Trator Agrícola 220 a 230 CV':               2.50,  // JD 7M 230 — largura não publicada, estimado por classe (mesma faixa do 8270R eixo curto)
   'Trator Agrícola 250 a 270 CV':               3.01,  // JD 8270R — Fonte: deere.com.br (eixo traseiro longo, config. mais larga: 2,438–3,010m)
@@ -315,11 +315,11 @@ const COMPRIMENTO_GRUPO = {
   'Mini Compactador 1,5 t':                    2.80,  // estimado, Cat CB1.8
   'Caminhão Basculante 6x4 / 14 m³':           7.50,  // estimado — Volvo VM-330 (menor âncora)
   'Caminhão Basculante 6x4 / 16 m³':           7.78,  // Fonte: mills.com.br — média Volvo VM-330 (8,00m) + Mercedes AXOR-4144 (7,56m)
-  'Caminhão Basculante 6x4 / 20 m³':           7.56,  // Fonte: mills.com.br (Mercedes AXOR-4144)
+  'Caminhão Basculante 6x4 / 20 m³':           7.56,  // Fonte: desenho de projeto do caminhão comprado pela Mills — Mercedes AXOR 4144 Basculante (2026-07)
   'Caminhão Basculante 8x4 / 22 m³':           11.00, // estimado — eixo extra alonga o chassi
   'Caminhão Comboio 4x2 / 6 m³':               8.50,  // estimado
   'Caminhão Comboio 6x4 / 10 m³':              9.95,  // Fonte: mills.com.br (Volvo VM-270/VM-290, ambos 9,95m)
-  'Caminhão Pipa 6X4 / 20 m³':                 7.56,  // Fonte: desenho de projeto do caminhão comprado pela Mills — Volvo VM 270 6x4 Pipa 20m³ (2026-07). Corrige valor antigo de 9,89m (era de outro Pipa genérico do mills.com.br, não o modelo real comprado)
+  'Caminhão Pipa 6X4 / 20 m³':                 9.889, // Fonte: desenho de projeto do caminhão comprado pela Mills — Volvo VM 270 6x4 Pipa 20m³, tanque cilíndrico (2026-07)
   'Caminhão Plataforma 6x4 / 11mt':            8.00,  // estimado = mesmo chassi do Basculante (Volvo VM-330)
   'Trator Agrícola 220 a 230 CV':               5.824, // JD 7M 230 — Fonte: deere.com.br (comprimento total)
   'Trator Agrícola 250 a 270 CV':               6.043, // JD 8270R — Fonte: deere.com.br (comprimento total)
