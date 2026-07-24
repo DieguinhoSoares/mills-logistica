@@ -176,7 +176,7 @@ export const PESO_GRUPO = {
   'Caminhão Basculante 8x4 / 22 m³':           17.0,  // estimado — eixo extra (8x4) sobre a âncora AXOR-4144
   'Caminhão Comboio 4x2 / 6 m³':               11.0,  // estimado — chassi menor (4x2) que o Comboio 6x4
   'Caminhão Comboio 6x4 / 10 m³':              13.5,  // Fonte: mills.com.br (Volvo VM-270/VM-290, ambos 13,5t)
-  'Caminhão Pipa 6X4 / 20 m³':                 15.3,  // Fonte: mills.com.br (Volvo VM-270 Pipa 15,3t; Mercedes Atego 2730 15,3t — idêntico)
+  'Caminhão Pipa 6X4 / 20 m³':                 15.5,  // Fonte: desenho de projeto do caminhão comprado pela Mills — Volvo VM 270 6x4 Pipa 20m³, tara 15,5t (2026-07, substitui estimativa antiga do mills.com.br)
   'Caminhão Plataforma 6x4 / 11mt':            13.6,  // estimado = mesmo chassi do Basculante (Volvo VM-330); sem peso/dimensão publicado
   // Trator Agrícola — Fonte: deere.com.br (ficha técnica oficial do fabricante).
   // Peso "base sem lastro" quando disponível; senão, o lastro máximo informado
@@ -247,7 +247,7 @@ const LARGURA_GRUPO = {
   'Caminhão Basculante 8x4 / 22 m³':           2.60,  // estimado (largura de via legal, não muda com m³)
   'Caminhão Comboio 4x2 / 6 m³':               2.60,  // estimado
   'Caminhão Comboio 6x4 / 10 m³':              2.60,  // Fonte: mills.com.br (Volvo VM-270/VM-290)
-  'Caminhão Pipa 6X4 / 20 m³':                 2.60,  // Fonte: mills.com.br (Volvo VM-270 Pipa; Mercedes Atego 2730)
+  'Caminhão Pipa 6X4 / 20 m³':                 2.60,  // Fonte: desenho de projeto do caminhão comprado pela Mills — Volvo VM 270 6x4 Pipa 20m³, 2.598m (2026-07)
   'Caminhão Plataforma 6x4 / 11mt':            2.60,  // estimado = mesmo chassi do Basculante (Volvo VM-330)
   'Trator Agrícola 220 a 230 CV':               2.50,  // JD 7M 230 — largura não publicada, estimado por classe (mesma faixa do 8270R eixo curto)
   'Trator Agrícola 250 a 270 CV':               3.01,  // JD 8270R — Fonte: deere.com.br (eixo traseiro longo, config. mais larga: 2,438–3,010m)
@@ -319,7 +319,7 @@ const COMPRIMENTO_GRUPO = {
   'Caminhão Basculante 8x4 / 22 m³':           11.00, // estimado — eixo extra alonga o chassi
   'Caminhão Comboio 4x2 / 6 m³':               8.50,  // estimado
   'Caminhão Comboio 6x4 / 10 m³':              9.95,  // Fonte: mills.com.br (Volvo VM-270/VM-290, ambos 9,95m)
-  'Caminhão Pipa 6X4 / 20 m³':                 9.89,  // Fonte: mills.com.br (Volvo VM-270 Pipa 9,89m; Mercedes Atego 2730 9,89m — idêntico)
+  'Caminhão Pipa 6X4 / 20 m³':                 7.56,  // Fonte: desenho de projeto do caminhão comprado pela Mills — Volvo VM 270 6x4 Pipa 20m³ (2026-07). Corrige valor antigo de 9,89m (era de outro Pipa genérico do mills.com.br, não o modelo real comprado)
   'Caminhão Plataforma 6x4 / 11mt':            8.00,  // estimado = mesmo chassi do Basculante (Volvo VM-330)
   'Trator Agrícola 220 a 230 CV':               5.824, // JD 7M 230 — Fonte: deere.com.br (comprimento total)
   'Trator Agrícola 250 a 270 CV':               6.043, // JD 8270R — Fonte: deere.com.br (comprimento total)
