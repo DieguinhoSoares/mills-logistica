@@ -31,6 +31,12 @@ function ValidacaoModal({ card, nfInput, onNfInputChange, onConfirmarNF, onValid
   const [saving, setSaving] = useState(false)
   const [fotoAmpliada, setFotoAmpliada] = useState(false)
   const precisaNF = SUBTYPES_NF.includes(card.subtype) && !card.nfConfirmada
+  // "Validar e Encerrar" só faz sentido pra card que o motorista já concluiu de
+  // verdade (aguardando_validacao). Abrir esse popup pra só confirmar NF de um
+  // serviço ainda em andamento (ex.: "confirmado") não pode expor esse botão —
+  // clicar nele marcaria o serviço como concluído antes da hora, tirando ele
+  // da agenda ativa sem o serviço ter realmente acontecido.
+  const podeEncerrar = card.status === 'aguardando_validacao'
 
   const handleValidar = async () => {
     setSaving(true)
@@ -98,12 +104,19 @@ function ValidacaoModal({ card, nfInput, onNfInputChange, onConfirmarNF, onValid
           <div style={{ marginBottom:14, color:T.verde, fontSize:12, fontFamily:FONT, fontWeight:700 }}>📄 NF {card.numeroNF} confirmada</div>
         ))}
 
+        {!podeEncerrar && (
+          <div style={{ marginBottom:14, padding:'10px 12px', background:T.infoLight, borderRadius:T.r, color:T.info, fontFamily:FONT, fontSize:11, fontWeight:600 }}>
+            ℹ️ Este serviço ainda não foi concluído pelo motorista — aqui você só confirma a NF. A opção de encerrar aparece quando o serviço estiver "aguardando validação".
+          </div>
+        )}
         <div style={{ display:'flex', gap:10 }}>
           <button onClick={onClose} disabled={saving} style={{ ...BS, flex:1, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>Fechar</button>
-          <button onClick={handleValidar} disabled={precisaNF||saving}
-            style={{ ...BS, flex:2, background:(precisaNF||saving)?T.textMuted:T.verde, color:'white', fontWeight:700, cursor:(precisaNF||saving)?'not-allowed':'pointer', opacity:(precisaNF||saving)?0.6:1 }}>
-            {saving ? '⏳ Validando...' : '✅ Validar e Encerrar Serviço'}
-          </button>
+          {podeEncerrar && (
+            <button onClick={handleValidar} disabled={precisaNF||saving}
+              style={{ ...BS, flex:2, background:(precisaNF||saving)?T.textMuted:T.verde, color:'white', fontWeight:700, cursor:(precisaNF||saving)?'not-allowed':'pointer', opacity:(precisaNF||saving)?0.6:1 }}>
+              {saving ? '⏳ Validando...' : '✅ Validar e Encerrar Serviço'}
+            </button>
+          )}
         </div>
       </motion.div>
 
