@@ -157,6 +157,36 @@ export function montarLinhaRelatorio(card, simClients) {
 }
 
 // Agrega um conjunto de cards concluídos num resumo — usado no KPIView e MasterView.
+// Diagnóstico das lacunas de dado — "sem dado suficiente" pode acontecer por
+// motivos bem diferentes, que pedem ações diferentes:
+// 1. Sem km, mas COM origem/destino → a migração "Recalcular km" resolve
+// 2. Sem km E sem origem/destino → a migração não tem de onde calcular,
+//    precisa de correção manual (abrir o card e confirmar origem/destino)
+// 3. TEM km, mas falta consumo médio do veículo/modelo → não é sobre km
+//    nenhum, é sobre cadastrar o consumo daquele veículo/modelo específico
+export function diagnosticarLacunasEmissao(cards, simClients) {
+  const concluidos = cards.filter(c => c.status === 'concluido')
+  const recuperavelPorMigracao = []
+  const semOrigemDestino = []
+  const semConsumoModelo = []
+
+  for (const card of concluidos) {
+    const calc = calcularEmissaoCard(card, simClients)
+    if (!calc.semDadoSuficiente) continue
+    if (!card.km) {
+      if (card.originCity && card.destCity) recuperavelPorMigracao.push(card)
+      else semOrigemDestino.push(card)
+    } else {
+      semConsumoModelo.push(card)
+    }
+  }
+
+  return {
+    total: recuperavelPorMigracao.length + semOrigemDestino.length + semConsumoModelo.length,
+    recuperavelPorMigracao, semOrigemDestino, semConsumoModelo,
+  }
+}
+
 export function resumirEmissoes(cards, simClients) {
   const linhas = cards
     .filter(c => c.status === 'concluido')

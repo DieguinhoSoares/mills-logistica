@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calcularEmissaoCard, calcularEscopo, buscarCep, montarLinhaRelatorio, resumirEmissoes } from './emissoes'
+import { calcularEmissaoCard, calcularEscopo, buscarCep, montarLinhaRelatorio, resumirEmissoes, diagnosticarLacunasEmissao } from './emissoes'
 
 // Casos abaixo replicam EXATAMENTE as 10 linhas da planilha de exemplo
 // fornecida pela Mills — servem tanto de teste quanto de documentação viva
@@ -137,5 +137,33 @@ describe('diasAtras — bug de fuso horário corrigido (todayStr/diasAtras)', ()
     const trintaAtras = new Date(diasAtras(30)+'T12:00:00')
     const diffDias = Math.round((hoje - trintaAtras) / 86400000)
     expect(diffDias).toBe(30)
+  })
+})
+
+describe('diagnosticarLacunasEmissao — separa as 3 causas reais de "sem dado suficiente"', () => {
+  it('classifica corretamente as 3 categorias distintas', () => {
+    const cards = [
+      // recuperável: sem km, mas com origem/destino
+      { id:'1', status:'concluido', km:null, originCity:'Sumaré', destCity:'Assis', veiculoId:'truck' },
+      // sem origem/destino: não recuperável pela migração
+      { id:'2', status:'concluido', km:null, originCity:'', destCity:'', veiculoId:'truck' },
+      // tem km, mas sem consumo médio pro veículo (modelo desconhecido)
+      { id:'3', status:'concluido', km:100, originCity:'Sumaré', destCity:'Assis', veiculoId:'frete_rodando', nInterno:'XYZ00000' },
+      // válido — não deve entrar em nenhuma categoria de lacuna
+      { id:'4', status:'concluido', km:100, originCity:'Sumaré', destCity:'Assis', veiculoId:'truck' },
+      // não concluído — ignorado inteiramente
+      { id:'5', status:'em_execucao', km:null, originCity:'', destCity:'', veiculoId:'truck' },
+    ]
+    const d = diagnosticarLacunasEmissao(cards, [])
+    expect(d.recuperavelPorMigracao.map(c=>c.id)).toEqual(['1'])
+    expect(d.semOrigemDestino.map(c=>c.id)).toEqual(['2'])
+    expect(d.semConsumoModelo.map(c=>c.id)).toEqual(['3'])
+    expect(d.total).toBe(3)
+  })
+
+  it('sem nenhuma lacuna, todas as listas ficam vazias', () => {
+    const cards = [{ id:'1', status:'concluido', km:100, originCity:'Sumaré', destCity:'Assis', veiculoId:'truck' }]
+    const d = diagnosticarLacunasEmissao(cards, [])
+    expect(d.total).toBe(0)
   })
 })
