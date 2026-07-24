@@ -174,9 +174,9 @@ export const PESO_GRUPO = {
   // âncoras (mais m³ de caçamba → chassi mais robusto → mais pesado vazio) —
   // ainda ESTIMADO por interpolação, não é ficha técnica exata por m³.
   'Caminhão Basculante 6x4 / 14 m³':           13.6,  // = Volvo VM-330 (âncora real)
-  'Caminhão Basculante 6x4 / 16 m³':           14.6,  // interpolado (média das 2 âncoras)
+  'Caminhão Basculante 6x4 / 16 m³':           15.5,  // pior caso real do grupo — Axor 4144 e Mercedes 3344K com caçamba basculante AIZ (tara 15,5t, desenho de projeto 2026-07); os Volvo VM do mesmo grupo são mais leves (13,6t)
   'Caminhão Basculante 6x4 / 20 m³':           15.5,  // Fonte: desenho de projeto do caminhão comprado pela Mills — Mercedes AXOR 4144 Basculante, tara 15,5t (2026-07)
-  'Caminhão Basculante 8x4 / 22 m³':           17.0,  // estimado — eixo extra (8x4) sobre a âncora AXOR-4144
+  'Caminhão Basculante 8x4 / 22 m³':           18.0,  // estimado — AROCS 4851/FMX540 8x4 com caçamba basculante AIZ 22m³: âncora Axor 4144 AIZ (15,5t) + 2º eixo dianteiro (~1,4t) + caçamba maior (~1t)
   'Caminhão Comboio 4x2 / 6 m³':               11.0,  // estimado — chassi menor (4x2) que o Comboio 6x4
   'Caminhão Comboio 6x4 / 10 m³':              13.5,  // Fonte: mills.com.br (Volvo VM-270/VM-290, ambos 13,5t)
   'Caminhão Pipa 6X4 / 20 m³':                 11.0,  // Fonte: desenho de projeto do caminhão comprado pela Mills — Volvo VM 270 6x4 Pipa 20m³, tara 11t (2026-07). Corrige atribuição errada anterior (peso do Basculante Axor 4144, não deste)
@@ -250,7 +250,7 @@ const LARGURA_GRUPO = {
   'Caminhão Basculante 6x4 / 14 m³':           2.55,  // estimado
   'Caminhão Basculante 6x4 / 16 m³':           2.60,  // Fonte: mills.com.br — Volvo VM-330 e Mercedes AXOR-4144 Basculante, ambos 2,60m
   'Caminhão Basculante 6x4 / 20 m³':           2.598, // Fonte: desenho de projeto do caminhão comprado pela Mills — Mercedes AXOR 4144 Basculante (2026-07)
-  'Caminhão Basculante 8x4 / 22 m³':           2.60,  // estimado (largura de via legal, não muda com m³)
+  'Caminhão Basculante 8x4 / 22 m³':           2.60,  // caçamba basculante AIZ = mesma família do Axor 4144 (2,598m no desenho de projeto); arredondado pra via legal
   'Caminhão Comboio 4x2 / 6 m³':               2.60,  // estimado
   'Caminhão Comboio 6x4 / 10 m³':              2.60,  // Fonte: mills.com.br (Volvo VM-270/VM-290)
   'Caminhão Pipa 6X4 / 20 m³':                 2.60,  // estimado — o desenho real do Volvo VM 270 6x4 Pipa 20m³ (2026-07) só tem vista lateral, sem largura
@@ -323,9 +323,9 @@ const COMPRIMENTO_GRUPO = {
   'Mini Compactador Tandem 2 a 3 t / Liso':    3.00,  // estimado
   'Mini Compactador 1,5 t':                    2.80,  // estimado, Cat CB1.8
   'Caminhão Basculante 6x4 / 14 m³':           7.50,  // estimado — Volvo VM-330 (menor âncora)
-  'Caminhão Basculante 6x4 / 16 m³':           7.78,  // Fonte: mills.com.br — média Volvo VM-330 (8,00m) + Mercedes AXOR-4144 (7,56m)
+  'Caminhão Basculante 6x4 / 16 m³':           8.00,  // pior caso do grupo — Volvo VM-330 (8,00m); Axor 4144 e 3344K com caçamba AIZ têm 7,56m (desenho de projeto 2026-07)
   'Caminhão Basculante 6x4 / 20 m³':           7.56,  // Fonte: desenho de projeto do caminhão comprado pela Mills — Mercedes AXOR 4144 Basculante (2026-07)
-  'Caminhão Basculante 8x4 / 22 m³':           11.00, // estimado — eixo extra alonga o chassi
+  'Caminhão Basculante 8x4 / 22 m³':           9.40,  // estimado — AROCS 4851/FMX540 8x4 com caçamba AIZ: âncora Axor 4144 (7,56m) + 2º eixo dianteiro/entre-eixos maior (~1,8m); corrige chute anterior de 11m que superdimensionava
   'Caminhão Comboio 4x2 / 6 m³':               8.50,  // estimado
   'Caminhão Comboio 6x4 / 10 m³':              9.95,  // Fonte: mills.com.br (Volvo VM-270/VM-290, ambos 9,95m)
   'Caminhão Pipa 6X4 / 20 m³':                 9.889, // Fonte: desenho de projeto do caminhão comprado pela Mills — Volvo VM 270 6x4 Pipa 20m³, tanque cilíndrico (2026-07)
