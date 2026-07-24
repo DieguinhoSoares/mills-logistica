@@ -459,6 +459,18 @@ const DIMENSOES_MODELO = {
   'BOBCAT|S650':             { peso:3.8,  largura:1.83, comprimento:3.63  },
   'BOBCAT|S450':             { peso:2.2,  largura:1.45, comprimento:3.17  },
   'CATERPILLAR|226B':        { peso:2.6,  largura:1.53, comprimento:3.23  },
+  // ── Mini Escavadeira — Fonte: lâmina técnica oficial New Holland (2026-07)
+  'NEWHOLLAND|E35D':         { peso:3.4,  largura:1.58, comprimento:5.01  },
+  // Caterpillar 303,5 (outro modelo real da frota nessa categoria) ainda sem
+  // comprimento confiável — só achamos peso (3,5t) e largura (1,78m) via
+  // LECTURA Specs; até achar a lâmina oficial Caterpillar, essa máquina usa
+  // o fallback por faixa de peso (PESO_GRUPO "Mini Escavadeira 3 t").
+  // Escavadeira Anfíbia 20t (Caterpillar 320 ANFIBIA, 6 ativos reais) e
+  // Escavadeira de Pneus 23-26t (Caterpillar M324D2, 1 ativo real) também
+  // seguem sem cadastro exato — dados de peso/comprimento parciais e sem
+  // fonte oficial Caterpillar (ver conversa de 2026-07 para o que já foi
+  // levantado: base Cat 320D2 pesa 21,7-22,3t; versão anfíbia com
+  // flutuadores de revenda pesa ~35t PBT, mas largura não confirmada).
   // ── Rolo Compactador ──
   'CATERPILLAR|CS54':        { peso:10.6, largura:2.30, comprimento:5.85  },
   'CATERPILLAR|CS10GC':      { peso:12.0, largura:2.30, comprimento:5.70  },
