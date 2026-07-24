@@ -118,6 +118,7 @@ const GRUPO_VEICULO = {
   'Caminhão Pipa 6X4 / 20 m³':                 'prancha3',
   'Caminhão Plataforma 6x4 / 11mt':            'prancha3',
   'Caminhão Betoneira 8 m³':                   'prancha3',
+  'Caminhão Guindauto 45t':                    'prancha3',
   // Trator Agrícola — 3 de 9 faixas confirmadas com ficha técnica real do
   // fabricante (John Deere), 2026-07. Cobre 121 de 158 ativos dessa família.
   'Trator Agrícola 220 a 230 CV':               'truck',    // JD 7M 230: 9,2t
@@ -180,6 +181,7 @@ export const PESO_GRUPO = {
   'Caminhão Pipa 6X4 / 20 m³':                 11.0,  // Fonte: desenho de projeto do caminhão comprado pela Mills — Volvo VM 270 6x4 Pipa 20m³, tara 11t (2026-07). Corrige atribuição errada anterior (peso do Basculante Axor 4144, não deste)
   'Caminhão Plataforma 6x4 / 11mt':            13.6,  // estimado = mesmo chassi do Basculante (Volvo VM-330); sem peso/dimensão publicado
   'Caminhão Betoneira 8 m³':                   11.55, // Mercedes Atego 2730 curto + balão Aizi — tara do conjunto vazio 11,4-11,7t (2026-07), usando o meio da faixa
+  'Caminhão Guindauto 45t':                    13.5,  // Volvo VM 290 6x4 + guindauto Aizi AIZC 45T — tara total estimada do conjunto (2026-07)
   // Trator Agrícola — Fonte: deere.com.br (ficha técnica oficial do fabricante).
   // Peso "base sem lastro" quando disponível; senão, o lastro máximo informado
   // (ver nota em cada linha) — ainda não é a ficha exata da Mills, mas é dado
@@ -252,6 +254,7 @@ const LARGURA_GRUPO = {
   'Caminhão Pipa 6X4 / 20 m³':                 2.60,  // estimado — o desenho real do Volvo VM 270 6x4 Pipa 20m³ (2026-07) só tem vista lateral, sem largura
   'Caminhão Plataforma 6x4 / 11mt':            2.60,  // estimado = mesmo chassi do Basculante (Volvo VM-330)
   'Caminhão Betoneira 8 m³':                   2.485, // Fonte: Mercedes Atego 2730 curto + balão Aizi (2026-07)
+  'Caminhão Guindauto 45t':                    2.60,  // estimado — mesmo chassi Volvo VM da família (VM-270/290), largura de via legal; sem ficha exata do conjunto com guindauto Aizi AIZC 45T
   'Trator Agrícola 220 a 230 CV':               2.50,  // JD 7M 230 — largura não publicada, estimado por classe (mesma faixa do 8270R eixo curto)
   'Trator Agrícola 250 a 270 CV':               3.01,  // JD 8270R — Fonte: deere.com.br (eixo traseiro longo, config. mais larga: 2,438–3,010m)
   'Trator Agrícola 140 a 159 CV':               2.65,  // JD 6150J — Fonte: deere.com.br (bitola traseira máxima, usada como proxy de largura total)
@@ -325,6 +328,7 @@ const COMPRIMENTO_GRUPO = {
   'Caminhão Pipa 6X4 / 20 m³':                 9.889, // Fonte: desenho de projeto do caminhão comprado pela Mills — Volvo VM 270 6x4 Pipa 20m³, tanque cilíndrico (2026-07)
   'Caminhão Plataforma 6x4 / 11mt':            8.00,  // estimado = mesmo chassi do Basculante (Volvo VM-330)
   'Caminhão Betoneira 8 m³':                   7.685, // Fonte: Mercedes Atego 2730 curto + balão Aizi (2026-07)
+  'Caminhão Guindauto 45t':                    9.95,  // estimado — mesmo chassi Volvo VM-290 já cadastrado no Comboio 6x4/10m³; entre-eixos recomendado p/ guindauto Aizi AIZC 45T é 4.800-5.150mm, mas sem desenho do conjunto pra confirmar o comprimento total exato
   'Trator Agrícola 220 a 230 CV':               5.824, // JD 7M 230 — Fonte: deere.com.br (comprimento total)
   'Trator Agrícola 250 a 270 CV':               6.043, // JD 8270R — Fonte: deere.com.br (comprimento total)
   'Trator Agrícola 140 a 159 CV':               4.969, // JD 6150J — Fonte: deere.com.br (comprimento máximo com pesos/contrapesos frontais)
@@ -353,6 +357,7 @@ const FORCA_PRANCHA = new Set([
   'Caminhão Pipa 6X4 / 20 m³',
   'Caminhão Plataforma 6x4 / 11mt',
   'Caminhão Betoneira 8 m³',
+  'Caminhão Guindauto 45t',
 ])
 
 // ── BUSCA GRUPO DE MODELO NO CSV SIM ─────────────────────────
