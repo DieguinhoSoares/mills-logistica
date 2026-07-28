@@ -193,7 +193,11 @@ export function MasterView({ simClients = [] }) {
   // cardsAtivos: base pra todos os contadores do Master — exclui cancelado e concluído
   const cardsAtivos    = cards.filter(c => !['concluido','cancelado'].includes(c.status))
   // acceptedCards: cards aceitos/confirmados ativos — exibidos na seção "Cancelar Serviço Aceito"
-  const acceptedCards  = cardsAtivos.filter(c => c.status==='confirmado' || c.status==='aceito')
+  // Bug corrigido em 2026-07: 'aceito' nunca é status de CARD (só existe em 'requests');
+  // o filtro antigo escondia cards em 'em_execucao'/'aguardando_validacao' — ou seja, todo
+  // serviço já em andamento ficava sem opção de cancelar aqui. cardsAtivos já exclui
+  // concluído/cancelado, então usamos ela direto (todo card não-terminal é "aceito").
+  const acceptedCards  = cardsAtivos
   const { falhas, marcarResolvida } = useFalhasSilenciosas()
 
   // Fila unificada — combina aprovações gerenciais pendentes, cadastros aguardando
