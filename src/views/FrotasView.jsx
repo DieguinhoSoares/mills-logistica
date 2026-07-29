@@ -475,7 +475,7 @@ export function FrotasView() {
     }
   }
 
-  const handleAssignConfirm = async ({ driverId, driverName, transportadoraNome, transportadoraCnpj, date, note, veiculoId, veiculoLabel, freteEstimado, freteSugerido, km }) => {
+  const handleAssignConfirm = async ({ driverId, driverName, transportadoraNome, transportadoraCnpj, date, dateEnd, note, veiculoId, veiculoLabel, freteEstimado, freteSugerido, km }) => {
     const { req, id, webhook } = assignModal
     const motorista = driverName || transportadoraNome || ''
     try {
@@ -495,7 +495,11 @@ export function FrotasView() {
         plantaObra:req.clientName||'', nInterno:req.nInterno||'', machine:req.machine||'',
         urgency:req.urgency||'medio', origin:req.origin||'', destination:req.destination||'',
         originCity:req.originCityName||'', destCity:req.destCityName||'',
-        startDate:date, endDate:req.desiredDateEnd||date, driver:motorista, driverId:driverId||'',
+        // dateEnd vem do AssignDriverModal, já ajustado pra nunca ficar antes de
+        // `date` (bug real: endDate travado no desiredDateEnd original da
+        // solicitação fazia o card sumir da agenda quando só a data de execução
+        // era alterada — nenhum dia bate num intervalo com fim < início).
+        startDate:date, endDate:(dateEnd&&dateEnd>=date)?dateEnd:date, driver:motorista, driverId:driverId||'',
         transportadoraNome:transportadoraNome||'', transportadoraCnpj:transportadoraCnpj||'',
         unit:req.unit||profile?.unit||'', notes:req.description||'', description:req.description||'',
         requestId:id, requesterId:req.requesterId||'', status:'confirmado',

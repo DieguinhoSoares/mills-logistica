@@ -19,14 +19,37 @@ export function AssignDriverModal({ req, drivers, simClients, cards, onConfirm, 
   // mesmo motorista/solicitação, já que é uma criação nova (addDoc) sem ID.
   const [saving,setSaving]=useState(false)
   const [transpCnpj,setTranspCnpj]=useState('')
+  // Duração original do serviço (em dias), preservada quando a data de execução
+  // muda. Bug real corrigido aqui: antes, o fim (endDate do card) ficava travado
+  // no desiredDateEnd da solicitação original e nunca acompanhava a mudança da
+  // data de execução — se o analista adiantava/atrasava a data sem que o fim
+  // seguisse junto, o card nascia com fim ANTES do início. Nenhum dia da agenda
+  // bate nesse intervalo invertido (ver cardsForDay em lib/utils.js), então o
+  // card simplesmente sumia da semana, sem nenhum erro visível.
+  const spanDias = (() => {
+    if (!req?.desiredDate || !req?.desiredDateEnd) return 0
+    const diff = Math.round((new Date(req.desiredDateEnd) - new Date(req.desiredDate)) / 86400000)
+    return diff > 0 ? diff : 0
+  })()
+  const somaDias = (isoDate, dias) => {
+    const d = new Date(isoDate)
+    d.setDate(d.getDate() + dias)
+    return d.toISOString().split('T')[0]
+  }
   const [date,setDate]=useState(req?.desiredDate||todayStr())
+  const [dateEnd,setDateEnd]=useState(somaDias(req?.desiredDate||todayStr(), spanDias))
+  const [dateError,setDateError]=useState('')
+  const handleDateChange = (novaData) => {
+    setDate(novaData)
+    setDateEnd(somaDias(novaData, spanDias)) // mantém a mesma duração ao mover a data
+    setDateError('')
+  }
   const [note,setNote]=useState('')
   // Captura o que o FreteEstimativa está mostrando de fato — inclusive quando
   // o analista troca o veículo manualmente. Sem isso, a escolha feita ali
   // nunca chegava a este componente e era descartada ao confirmar.
   const [frete,setFrete]=useState(null)
   const selectedDriver=drivers.find(d=>d.id===driverId)
-  const dateEnd = req?.desiredDateEnd || date
   // Verifica se o motorista selecionado já tem outro serviço ativo em data sobreposta
   const conflitos = (cards||[]).filter(c =>
     c.driverId === driverId &&
@@ -37,11 +60,14 @@ export function AssignDriverModal({ req, drivers, simClients, cards, onConfirm, 
   )
   const handleConfirm=async()=>{
     if (saving) return // trava extra — ignora cliques repetidos mesmo se o disabled do botão não pegar a tempo
+    // Alerta pra não repetir o bug real: fim antes do início faz o card sumir
+    // da agenda sem nenhum erro visível (nenhum dia bate no intervalo invertido).
+    if (dateEnd < date) { setDateError('A data final não pode ser anterior à data de execução — o serviço não apareceria na agenda.'); return }
     setSaving(true)
     const freteInfo = { veiculoId:frete?.veiculoId||'', veiculoLabel:frete?.veiculoLabel||'', freteEstimado:frete?.valorEstimado??null, freteSugerido:!!frete?.sugerido, km:frete?.km??null }
     try {
-      if(execType==='transportadora'){await onConfirm({driverId:'',driverName:'',transportadoraNome:transpNome,transportadoraCnpj:transpCnpj,date,note,...freteInfo})}
-      else{await onConfirm({driverId,driverName:selectedDriver?.name||'',transportadoraNome:'',transportadoraCnpj:'',date,note,...freteInfo})}
+      if(execType==='transportadora'){await onConfirm({driverId:'',driverName:'',transportadoraNome:transpNome,transportadoraCnpj:transpCnpj,date,dateEnd,note,...freteInfo})}
+      else{await onConfirm({driverId,driverName:selectedDriver?.name||'',transportadoraNome:'',transportadoraCnpj:'',date,dateEnd,note,...freteInfo})}
     } finally {
       setSaving(false) // se o modal já fechou (sucesso), isso é inofensivo — só importa quando dá erro e o modal continua aberto
     }
@@ -89,7 +115,19 @@ export function AssignDriverModal({ req, drivers, simClients, cards, onConfirm, 
             <div><label style={LS}>Nome da Transportadora <span style={{ color:T.perigo }}>*</span></label><input value={transpNome} onChange={e=>setTranspNome(e.target.value)} placeholder="Ex: Hengel Transportes" style={IS}/></div>
             <div><label style={LS}>CNPJ</label><input value={transpCnpj} onChange={e=>setTranspCnpj(e.target.value)} placeholder="00.000.000/0001-00" style={IS}/></div>
           </>)}
-          <div><label style={LS}>Data de execução</label><input type="date" value={date} onChange={e=>setDate(e.target.value)} style={IS}/></div>
+          <div style={{ display:'flex', gap:10 }}>
+            <div style={{ flex:1 }}>
+              <label style={LS}>Data de execução</label>
+              <input type="date" value={date} onChange={e=>handleDateChange(e.target.value)} style={IS}/>
+            </div>
+            {spanDias>0&&(
+              <div style={{ flex:1 }}>
+                <label style={LS}>Data final</label>
+                <input type="date" value={dateEnd} min={date} onChange={e=>{setDateEnd(e.target.value);setDateError('')}} style={IS}/>
+              </div>
+            )}
+          </div>
+          {dateError&&<div style={{ color:T.perigo, fontSize:11, fontFamily:FONT, fontWeight:700 }}>⚠ {dateError}</div>}
           <div><label style={LS}>Observação para o solicitante</label><textarea value={note} onChange={e=>setNote(e.target.value)} placeholder="Ex: Motorista confirmado, saída às 07h..." style={{ ...IS, height:68, resize:'vertical' }}/></div>
         </div>
         <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:20 }}>
