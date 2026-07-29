@@ -480,7 +480,17 @@ export function FrotasView() {
     const motorista = driverName || transportadoraNome || ''
     try {
       await respondRequest(id,'aceito',note||`Motorista: ${motorista} · Data: ${date}`,webhook)
+      // Reaproveita o card já existente pra essa solicitação, se houver (comum
+      // quando o solicitante reabre um serviço cancelado e ele volta pra Frotas
+      // aceitar de novo) — sem isso, cada aceite criava um card NOVO via addDoc,
+      // deixando o antigo (às vezes ainda cancelado) órfão na agenda pro analista
+      // ter que limpar manualmente toda vez. Prioriza um card cancelado (é o
+      // cenário de reabertura); na ausência, reaproveita qualquer outro card já
+      // ligado a essa solicitação em vez de duplicar.
+      const cardExistente = cards.find(c => c.requestId === id && c.status === 'cancelado')
+        || cards.find(c => c.requestId === id)
       await saveCard({
+        ...(cardExistente ? { id: cardExistente.id } : {}),
         type:req.type, subtype:req.subtype||'', client:req.clientName||req.requesterName||'',
         plantaObra:req.clientName||'', nInterno:req.nInterno||'', machine:req.machine||'',
         urgency:req.urgency||'medio', origin:req.origin||'', destination:req.destination||'',
@@ -489,6 +499,9 @@ export function FrotasView() {
         transportadoraNome:transportadoraNome||'', transportadoraCnpj:transportadoraCnpj||'',
         unit:req.unit||profile?.unit||'', notes:req.description||'', description:req.description||'',
         requestId:id, requesterId:req.requesterId||'', status:'confirmado',
+        // Limpa os campos de cancelamento — senão o card reaproveitado ficava
+        // "confirmado" mas ainda carregando motivo/data de um cancelamento antigo.
+        cancelReason:null, cancelledAt:null, cancelledBy:null,
         // Veículo/frete definidos na tela de aceite (FreteEstimativa), incluindo
         // eventual override manual do analista — antes isso nunca era salvo.
         veiculoId:veiculoId||'', veiculoLabel:veiculoLabel||'',

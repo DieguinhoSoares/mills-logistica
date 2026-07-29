@@ -418,7 +418,10 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
                 style={{ ...BS, background:T.perigo, color:'white', fontWeight:700, fontSize:11 }}>
                 🗑 Remover da agenda
               </button>
-              <button onClick={()=>onSubmit({ ...initialData, status:'em_dia', cancelReason:null, cancelledAt:null, cancelledBy:null })}
+              {/* 'em_dia' não é um status reconhecido em nenhum outro lugar do sistema
+                  (badges de status, filtros de card ativo) — corrigido pra 'confirmado',
+                  o mesmo status usado quando a Frotas aceita/atribui um serviço. */}
+              <button onClick={()=>onSubmit({ ...initialData, status:'confirmado', cancelReason:null, cancelledAt:null, cancelledBy:null })}
                 style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}`, fontWeight:700, fontSize:11 }}>
                 ♻️ Reabrir serviço
               </button>
