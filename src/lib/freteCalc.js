@@ -645,13 +645,15 @@ export function selecionarVeiculoPorPeso(grupos) {
     if (peso === undefined) temGrupoDesconhecido = true
     return acc + (peso ?? PESO_FALLBACK_CONSERVADOR)
   }, 0)
+  // Bitrem 9 eixos nunca aparece aqui — a regra dele é por-máquina individual
+  // (ver cabeNoBitrem9 em resolverVeiculoTransporte), e essa função só soma peso
+  // por categoria/faixa, sem detalhe de cada máquina pra validar o porte L60F/924K.
   let veiculoId = null
   if      (pesoTotal <= 3.5)  veiculoId = '3/4'
   else if (pesoTotal <= 13)   veiculoId = 'truck'
   else if (pesoTotal <= 17)   veiculoId = 'bitruck'
   else if (pesoTotal <= 32)   veiculoId = 'prancha3'
-  else if (pesoTotal <= 40.5) veiculoId = 'prancha4'
-  else                        veiculoId = 'bitrem9'
+  else                        veiculoId = 'prancha4'
   return {
     veiculoId,
     pesoTotal: Math.round(pesoTotal * 10) / 10,
@@ -685,6 +687,26 @@ const ORDEM_VEICULOS = ['3/4','truck','bitruck','prancha3','prancha4','bitrem9']
 function cabeNoVeiculo(veiculoId, peso, largura, comprimento) {
   const v = VEICULOS.find(x => x.id === veiculoId)
   return peso <= v.carga && largura <= v.larg && comprimento <= v.comp
+}
+
+// ── BITREM 9 EIXOS — regra especial por-máquina (2026-07, confirmado com a
+// operação) ──────────────────────────────────────────────────────────────
+// A carreta de 25m é BIPARTIDA — diferente de todo o resto do sistema (que só
+// olha peso/largura/comprimento SOMADOS), o Bitrem tem um teto por máquina
+// individual: nada maior que o porte da Volvo L60F / Cat 924K (as duas
+// carregadeiras de pneus de maior porte nessa faixa) pode embarcar nele, nem
+// sozinha — uma máquina acima desse porte vai sempre de prancha 4 eixos (ou
+// precisa dividir viagem), mesmo que caiba nas 50t/25m nominais do veículo.
+// Dentro do porte L60F/924K, o teto é de 4 unidades por sentido da viagem.
+const BITREM9_LIMITE_UNIDADE = { peso:11.6, comprimento:7.61, largura:2.60 } // Volvo L60F (11,6t/7,27m) / Cat 924K (11,5t/7,61m)
+const BITREM9_MAX_UNIDADES = 4
+function cabeNoBitrem9(itensIda, itensVolta) {
+  const excedePorte = (it) => it.peso > BITREM9_LIMITE_UNIDADE.peso
+    || it.comprimento > BITREM9_LIMITE_UNIDADE.comprimento
+    || it.largura > BITREM9_LIMITE_UNIDADE.largura
+  if (itensIda.some(excedePorte) || itensVolta.some(excedePorte)) return false
+  if (itensIda.length > BITREM9_MAX_UNIDADES || itensVolta.length > BITREM9_MAX_UNIDADES) return false
+  return true
 }
 
 // Resolve peso/largura/comprimento de UMA máquina (mesma cascata de sempre:
@@ -777,13 +799,20 @@ export function resolverVeiculoTransporte(
       const d = resolverDimensaoUnica(n, simClients)
       acc.peso        += d.peso
       acc.comprimento += d.comprimento
-      acc.larguras.push({ grupo:d.grupo, largura:d.largura, larguraSemLamina:d.larguraSemLamina, forcaPrancha:d.forcaPrancha, fonte:d.fonte })
+      const item = { grupo:d.grupo, peso:d.peso, largura:d.largura, comprimento:d.comprimento, larguraSemLamina:d.larguraSemLamina, forcaPrancha:d.forcaPrancha, fonte:d.fonte }
+      acc.larguras.push(item)
+      acc.itens.push(item)
       return acc
-    }, { peso:0, comprimento:0, larguras:[] })
+    }, { peso:0, comprimento:0, larguras:[], itens:[] })
 
   const idaCalc   = calcDimensoes(nInternosIda)
   const voltaCalc = calcDimensoes(nInternosVolta)
   const todasLarguras = [...idaCalc.larguras, ...voltaCalc.larguras]
+  // Checagem por-máquina do Bitrem 9 eixos (ver cabeNoBitrem9 acima) — usada
+  // no lugar de cabeNoVeiculo() sempre que o cascade de veículos avalia o id
+  // 'bitrem9', porque a regra dele não é sobre totais somados.
+  const cabeNoVeiculoOuBitrem = (id, peso, largura, comprimento) =>
+    id === 'bitrem9' ? cabeNoBitrem9(idaCalc.itens, voltaCalc.itens) : cabeNoVeiculo(id, peso, largura, comprimento)
   // true quando pelo menos 1 máquina não foi reconhecida (nem modelo exato,
   // nem grupo/faixa de peso) — o peso usado pra ela foi "chutado" (10,5t
   // conservador). Nesses casos a sugestão de veículo não é confiável e
@@ -818,7 +847,9 @@ export function resolverVeiculoTransporte(
     // Escolhe o veículo mais econômico que comporta peso + largura + comprimento juntos.
     // AET é sempre solicitada pela Mills, então largura acima de 2,60m nunca bloqueia —
     // só determina QUAL veículo é necessário (bitruck/prancha alargam até 3,20m com AET).
-    veiculoId = ORDEM_VEICULOS.find(id => cabeNoVeiculo(id, pesoMax, larguraMax, comprimentoMax))
+    // Bitrem 9 eixos usa checagem própria por-máquina (cabeNoVeiculoOuBitrem), não a
+    // soma de peso/largura/comprimento — ver regra em cabeNoBitrem9.
+    veiculoId = ORDEM_VEICULOS.find(id => cabeNoVeiculoOuBitrem(id, pesoMax, larguraMax, comprimentoMax))
   }
 
   // Nenhum veículo padrão comporta peso+largura+comprimento simultaneamente.
@@ -827,12 +858,15 @@ export function resolverVeiculoTransporte(
   // prancha4 (ambas têm 3,20m), não há ganho nenhum em pagar mais caro só
   // por causa da largura. Sinaliza largura/comprimento excedidos sobre o
   // veículo realmente escolhido, não sobre a prancha4 fixa.
+  // Bitrem 9 eixos NUNCA é o fallback final — ele só serve pra combinar várias
+  // máquinas até o porte L60F/924K (regra própria acima); uma carga que nem
+  // largura+comprimento padrão resolve precisa mesmo da prancha4 (ou dividir).
   let larguraExcedida = false, comprimentoExcedido = false
   if (!veiculoId) {
-    veiculoId = ORDEM_VEICULOS.find(id => {
+    veiculoId = ORDEM_VEICULOS.filter(id => id !== 'bitrem9').find(id => {
       const v = VEICULOS.find(x => x.id === id)
       return pesoMax <= v.carga && comprimentoMax <= v.comp
-    }) || 'bitrem9'
+    }) || 'prancha4'
     const vEscolhido = VEICULOS.find(v => v.id === veiculoId)
     larguraExcedida     = larguraMax > vEscolhido.larg
     comprimentoExcedido = comprimentoMax > vEscolhido.comp
@@ -841,10 +875,14 @@ export function resolverVeiculoTransporte(
   // Se desmontar a(s) lâmina(s) resolveria (cabe em veículo mais barato), sinaliza a
   // sugestão de economia — substitui, na largura máxima, apenas os grupos com lâmina
   // pelo valor sem lâmina, mantendo a largura normal das demais máquinas da carga.
-  // Peso excede a capacidade do MAIOR veículo disponível (bitrem9, 50t desde 2026-07,
-  // antes era a prancha4 a 40,5t) — carga precisa ser dividida em mais de uma viagem.
-  const maiorCap = Math.max(...VEICULOS.filter(v=>v.carga!=null).map(v=>v.carga))
-  const pesoExcedido = pesoMax > maiorCap
+  // Peso excede a capacidade da maior prancha "normal" (prancha4, 40,5t) — carga
+  // precisa ser dividida em mais de uma viagem. Bitrem 9 eixos NÃO conta pra esse
+  // teto: ele não é uma prancha "maior" de uso geral, só serve pro cenário
+  // específico de combinar até 4 máquinas do porte L60F/924K (regra própria acima)
+  // — se cabeNoBitrem9 já aprovou o veículo, a viagem cabe em 1 só, mesmo pesando
+  // mais que 40,5t.
+  const prancha4Cap = VEICULOS.find(v=>v.id==='prancha4')?.carga || 40.5
+  const pesoExcedido = veiculoId === 'bitrem9' ? false : pesoMax > prancha4Cap
 
   let sugestaoDesmontagem = null
   if (gruposComLamina.length > 0) {
@@ -852,7 +890,12 @@ export function resolverVeiculoTransporte(
       if (x.fonte === 'modelo') return x.larguraSemLamina !== undefined ? x.larguraSemLamina : x.largura
       return REQUER_DESMONTAGEM_LAMINA.has(x.grupo) ? (LARGURA_SEM_LAMINA_GRUPO[x.grupo] || x.largura) : x.largura
     }))
-    const veiculoSemLamina = ORDEM_VEICULOS.find(id => cabeNoVeiculo(id, pesoMax, larguraMaxSemLamina, comprimentoMax))
+    // Bitrem 9 eixos fica de fora — máquinas com lâmina desmontável (tratores de
+    // esteira) estão bem acima do porte L60F/924K, então nunca se qualificam pra
+    // ele mesmo sem a checagem por-item (ver cabeNoBitrem9); exclui aqui pra não
+    // arriscar sugerir um veículo que a regra de porte nunca aprovaria de verdade.
+    const veiculoSemLamina = ORDEM_VEICULOS.filter(id => id !== 'bitrem9')
+      .find(id => cabeNoVeiculo(id, pesoMax, larguraMaxSemLamina, comprimentoMax))
     // Sugestão quando: (a) cabe em veículo mais barato, OU
     // (b) mesmo veículo mas sem largura excedida (desmontar resolve o AET/largura)
     const idxSemLamina = ORDEM_VEICULOS.indexOf(veiculoSemLamina)
@@ -1094,7 +1137,11 @@ export async function analisarRotaComParadas({ origemCidade, origemUf, paradas, 
     const prancha3 = VEICULOS.find(v=>v.id==='prancha3')
     veiculoId = (pesoMax <= prancha3.carga && comprimentoMax <= prancha3.comp) ? 'prancha3' : 'prancha4'
   } else {
-    veiculoId = ORDEM_VEICULOS.find(id => cabeNoVeiculo(id, pesoMax, larguraMax, comprimentoMax)) || 'bitrem9'
+    // Bitrem 9 eixos fica de fora aqui — a regra dele é por-máquina individual
+    // (ver cabeNoBitrem9), e essa função só rastreia peso/largura/comprimento
+    // agregados por trecho, sem o detalhe de cada item pra validar o porte.
+    veiculoId = ORDEM_VEICULOS.filter(id => id !== 'bitrem9')
+      .find(id => cabeNoVeiculo(id, pesoMax, larguraMax, comprimentoMax)) || 'prancha4'
   }
 
   // ── 4. Distâncias: rota real (todas as pernas) vs rota direta (origem→última) ──

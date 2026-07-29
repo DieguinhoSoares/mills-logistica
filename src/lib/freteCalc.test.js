@@ -205,6 +205,40 @@ describe('resolverVeiculoTransporte — categorias sempre rebocadas (Conjunto Ca
   })
 })
 
+// ── Bitrem 9 eixos — regra especial por-máquina (carreta bipartida, 2026-07) ──
+describe('resolverVeiculoTransporte — Bitrem 9 eixos (porte L60F/924K, máx. 4 unidades)', () => {
+  it('4x Volvo L60F (11,6t cada) vai de Bitrem — 46,4t excede a prancha4 (40,5t) mas está dentro do porte', () => {
+    const ids = ['MNA10001', 'MNA10002', 'MNA10003', 'MNA10004']
+    const machineModelos = {}
+    ids.forEach(id => { machineModelos[id] = { fabricante: 'VOLVO', modelo: 'L60F' } })
+    const res = resolverVeiculoTransporte(ids, [], [{ machineModelos }])
+    expect(res.veiculoId).toBe('bitrem9')
+    expect(res.pesoExcedido).toBe(false)
+  })
+
+  it('5x Volvo L60F excede o teto de 4 unidades do Bitrem — cai pra prancha4 com pesoExcedido', () => {
+    const ids = ['MNA11001', 'MNA11002', 'MNA11003', 'MNA11004', 'MNA11005']
+    const machineModelos = {}
+    ids.forEach(id => { machineModelos[id] = { fabricante: 'VOLVO', modelo: 'L60F' } })
+    const res = resolverVeiculoTransporte(ids, [], [{ machineModelos }])
+    expect(res.veiculoId).not.toBe('bitrem9')
+    expect(res.pesoExcedido).toBe(true)
+  })
+
+  it('3x Cat 930K (13,1t, acima do porte L60F/924K) nunca vai de Bitrem, mesmo com peso total dentro de 50t', () => {
+    const ids = ['MNA12001', 'MNA12002', 'MNA12003']
+    const machineModelos = {}
+    ids.forEach(id => { machineModelos[id] = { fabricante: 'CATERPILLAR', modelo: '930K' } })
+    const res = resolverVeiculoTransporte(ids, [], [{ machineModelos }])
+    // peso total 39,3t < 50t (caberia no Bitrem por peso), mas cada 930K
+    // individualmente (13,1t) já é maior que o porte L60F/924K (11,6t) —
+    // regra é por-máquina, não pela soma. Comprimento somado (22,83m)
+    // também excede a prancha4 (17m), então fica sinalizado.
+    expect(res.veiculoId).not.toBe('bitrem9')
+    expect(res.comprimentoExcedido).toBe(true)
+  })
+})
+
 describe('resolverVeiculoTransporte — Trator Agrícola (dados reais deere.com.br)', () => {
   it('JD 7M 230 (220-230cv, 9,2t) cabe no Truck', () => {
     const g = [{ machineGroups: { 'MNA08001': 'Trator Agrícola 220 a 230 CV' } }]
