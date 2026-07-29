@@ -9,15 +9,20 @@
 // ── TABELA DE TARIFAS HENGEL — Reajustada 2026 ──────────────
 // Frete ida: valor fixo (≤100km) ou R$/km (>100km)
 // Fonte: Planilha Tabela Reajustada — coluna SP
+// Bitrem 9 eixos adicionado em 2026-07 — novo veículo na Tabela Reajustada
+// (25m de área útil, 2,60m de largura, 50t de carga útil). Sem diária
+// negociada até o momento (não consta na planilha de diárias) — DIARIAS
+// não tem entrada pra ele, então valorDiaria fica 0 se alguém pedir diária
+// pra esse veículo (guard em `DIARIAS[veiculoId]`, ver linha ~1216).
 const TABELA = [
-  { min:0,    max:50,       fixo:true,  '3/4':739.77,  truck:1143.29, bitruck:1291.23, prancha3:1315.27, prancha4:1587.97 },
-  { min:51,   max:100,      fixo:true,  '3/4':1143.29, truck:1681.29, bitruck:2017.56, prancha3:2072.81, prancha4:2479.44 },
-  { min:101,  max:250,      fixo:false, '3/4':9.75,    truck:13.04,   bitruck:15.38,   prancha3:17.23,   prancha4:21.32   },
-  { min:251,  max:500,      fixo:false, '3/4':8.91,    truck:11.43,   bitruck:14.06,   prancha3:15.94,   prancha4:19.32   },
-  { min:501,  max:1000,     fixo:false, '3/4':8.16,    truck:11.01,   bitruck:13.17,   prancha3:15.15,   prancha4:18.42   },
-  { min:1001, max:2000,     fixo:false, '3/4':7.97,    truck:10.71,   bitruck:12.89,   prancha3:14.59,   prancha4:17.73   },
-  { min:2001, max:3000,     fixo:false, '3/4':7.89,    truck:10.68,   bitruck:12.72,   prancha3:14.48,   prancha4:17.56   },
-  { min:3001, max:Infinity, fixo:false, '3/4':7.95,    truck:10.64,   bitruck:12.67,   prancha3:14.41,   prancha4:17.51   },
+  { min:0,    max:50,       fixo:true,  '3/4':739.73,  truck:1143.22, bitruck:1291.17, prancha3:1315.19, prancha4:1587.88, bitrem9:2512.62 },
+  { min:51,   max:100,      fixo:true,  '3/4':1143.22, truck:1681.21, bitruck:2017.45, prancha3:2072.70, prancha4:2479.71, bitrem9:3828.05 },
+  { min:101,  max:250,      fixo:false, '3/4':9.75,    truck:13.04,   bitruck:15.38,   prancha3:17.24,   prancha4:21.32,   bitrem9:31.60   },
+  { min:251,  max:500,      fixo:false, '3/4':8.91,    truck:11.42,   bitruck:14.06,   prancha3:15.95,   prancha4:19.32,   bitrem9:28.29   },
+  { min:501,  max:1000,     fixo:false, '3/4':8.16,    truck:11.01,   bitruck:13.17,   prancha3:15.15,   prancha4:18.42,   bitrem9:27.08   },
+  { min:1001, max:2000,     fixo:false, '3/4':7.97,    truck:10.71,   bitruck:12.89,   prancha3:14.59,   prancha4:17.72,   bitrem9:26.16   },
+  { min:2001, max:3000,     fixo:false, '3/4':7.89,    truck:10.68,   bitruck:12.72,   prancha3:14.48,   prancha4:17.56,   bitrem9:25.98   },
+  { min:3001, max:Infinity, fixo:false, '3/4':7.95,    truck:10.64,   bitruck:12.67,   prancha3:14.41,   prancha4:17.51,   bitrem9:25.89   },
 ]
 
 // ── DIÁRIAS — valores 2026 ────────────────────────────────────
@@ -45,6 +50,7 @@ export const VEICULOS = [
   { id:'bitruck',  label:'Caminhão Bi-truck',       carga:17,   comp:10, larg:3.20, eixos:4 },
   { id:'prancha3', label:'Carreta Prancha 3 eixos', carga:32,   comp:15, larg:3.20, eixos:6 },
   { id:'prancha4', label:'Carreta Prancha 4 eixos', carga:40.5, comp:17, larg:3.20, eixos:7 },
+  { id:'bitrem9',  label:'Carreta Bitrem 9 eixos',  carga:50,   comp:25, larg:2.60, eixos:9 },
   // Frete Rodando: a máquina roda pela estrada por conta própria (autopropelida),
   // sem nenhum veículo carregando — não tem peso/dimensão de carga porque não
   // é carga embarcada. Sempre escolhido manualmente pelo analista (nunca
@@ -644,7 +650,8 @@ export function selecionarVeiculoPorPeso(grupos) {
   else if (pesoTotal <= 13)   veiculoId = 'truck'
   else if (pesoTotal <= 17)   veiculoId = 'bitruck'
   else if (pesoTotal <= 32)   veiculoId = 'prancha3'
-  else                        veiculoId = 'prancha4'
+  else if (pesoTotal <= 40.5) veiculoId = 'prancha4'
+  else                        veiculoId = 'bitrem9'
   return {
     veiculoId,
     pesoTotal: Math.round(pesoTotal * 10) / 10,
@@ -671,7 +678,7 @@ export function selecionarVeiculoPorPeso(grupos) {
  */
 // Ordem dos veículos do mais barato/leve ao mais caro/pesado — usada para
 // escolher sempre a opção mais econômica que ainda comporta a carga.
-const ORDEM_VEICULOS = ['3/4','truck','bitruck','prancha3','prancha4']
+const ORDEM_VEICULOS = ['3/4','truck','bitruck','prancha3','prancha4','bitrem9']
 
 // Testa se um conjunto de máquinas (peso somado, largura máxima, comprimento
 // somado) cabe em um veículo específico, nas três dimensões.
@@ -825,7 +832,7 @@ export function resolverVeiculoTransporte(
     veiculoId = ORDEM_VEICULOS.find(id => {
       const v = VEICULOS.find(x => x.id === id)
       return pesoMax <= v.carga && comprimentoMax <= v.comp
-    }) || 'prancha4'
+    }) || 'bitrem9'
     const vEscolhido = VEICULOS.find(v => v.id === veiculoId)
     larguraExcedida     = larguraMax > vEscolhido.larg
     comprimentoExcedido = comprimentoMax > vEscolhido.comp
@@ -834,9 +841,10 @@ export function resolverVeiculoTransporte(
   // Se desmontar a(s) lâmina(s) resolveria (cabe em veículo mais barato), sinaliza a
   // sugestão de economia — substitui, na largura máxima, apenas os grupos com lâmina
   // pelo valor sem lâmina, mantendo a largura normal das demais máquinas da carga.
-  // Peso excede a capacidade da maior prancha disponível — carga precisa ser dividida
-  const prancha4Cap = VEICULOS.find(v=>v.id==='prancha4')?.carga || 40.5
-  const pesoExcedido = pesoMax > prancha4Cap
+  // Peso excede a capacidade do MAIOR veículo disponível (bitrem9, 50t desde 2026-07,
+  // antes era a prancha4 a 40,5t) — carga precisa ser dividida em mais de uma viagem.
+  const maiorCap = Math.max(...VEICULOS.filter(v=>v.carga!=null).map(v=>v.carga))
+  const pesoExcedido = pesoMax > maiorCap
 
   let sugestaoDesmontagem = null
   if (gruposComLamina.length > 0) {
@@ -1086,7 +1094,7 @@ export async function analisarRotaComParadas({ origemCidade, origemUf, paradas, 
     const prancha3 = VEICULOS.find(v=>v.id==='prancha3')
     veiculoId = (pesoMax <= prancha3.carga && comprimentoMax <= prancha3.comp) ? 'prancha3' : 'prancha4'
   } else {
-    veiculoId = ORDEM_VEICULOS.find(id => cabeNoVeiculo(id, pesoMax, larguraMax, comprimentoMax)) || 'prancha4'
+    veiculoId = ORDEM_VEICULOS.find(id => cabeNoVeiculo(id, pesoMax, larguraMax, comprimentoMax)) || 'bitrem9'
   }
 
   // ── 4. Distâncias: rota real (todas as pernas) vs rota direta (origem→última) ──

@@ -36,14 +36,14 @@ describe('calcularFrete — Guindauto (R$6,00/km, sem ajuste de estado)', () => 
 })
 
 describe('calcularFrete — Hengel/estimativa (tarifa cheia, retorno 30%)', () => {
-  it('faixa fixa ≤50km: truck = R$1.143,29', () => {
+  it('faixa fixa ≤50km: truck = R$1.143,22', () => {
     const r = calcularFrete({ km: 40, veiculoId: 'truck' })
-    expect(r.valorIda).toBe(1143.29)
-    expect(r.valorRetorno).toBe(Math.round(1143.29 * 0.30 * 100) / 100)
+    expect(r.valorIda).toBe(1143.22)
+    expect(r.valorRetorno).toBe(Math.round(1143.22 * 0.30 * 100) / 100)
   })
-  it('faixa fixa 51–100km: prancha3 = R$2.072,81', () => {
+  it('faixa fixa 51–100km: prancha3 = R$2.072,70', () => {
     const r = calcularFrete({ km: 80, veiculoId: 'prancha3' })
-    expect(r.valorIda).toBe(2072.81)
+    expect(r.valorIda).toBe(2072.70)
   })
   it('faixa por km 101–250: bitruck = km × 15,38', () => {
     const r = calcularFrete({ km: 200, veiculoId: 'bitruck' })
