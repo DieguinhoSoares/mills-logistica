@@ -329,7 +329,12 @@ function ServicoCard({ card, index, onUpdateStatus }) {
             {[
               ['📅 Data',       `${fmt(card.startDate)}${card.endDate && card.endDate < todayStr() && !['concluido','cancelado'].includes(card.status) ? ' 🚨' : ''}`],
               ['⚡ Urgência',   `${ug?.icon} ${ug?.label}`],
-              ['🔧 Máquina',    card.machine||'—'],
+              // card.machine só existe quando o serviço tem equipamento reserva
+              // (troca_tecnica/sinistro/garantia/rollout-com-retorno) — pra todo o
+              // resto, fica vazio mesmo com nInterno preenchido. Cai pra nInterno
+              // aqui pra também corrigir cards antigos já salvos sem `machine`
+              // (a correção na gravação só vale pra serviços novos).
+              ['🔧 Máquina',    card.machine||card.nInterno||'—'],
               ['🔢 N° Interno', card.nInterno||'—'],
             ].map(([l,v]) => (
               <div key={l}>
