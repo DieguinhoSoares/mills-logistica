@@ -235,6 +235,12 @@ export function FrotasView() {
       driverId:    f.transportadoraNome ? '' : (f.driverId !== undefined ? f.driverId : editCard?.driverId || ''),
       client:          f.clientName || f.client || '',
       plantaObra:      f.clientName || f.plantaObra || '',
+      // Mesma correção do fluxo de solicitação (SolicitanteView): "machine" só
+      // vinha de nInternosReserva (equipamento reserva), caindo num f.machine
+      // que nenhum campo do formulário preenche — cards criados direto pela
+      // Frotas (fora do fluxo de solicitação) ficavam sempre com "Máquina"
+      // em branco na tela do motorista, mesmo tipos de serviço com máquina só.
+      machine:         f.nInternosReserva?.length ? f.nInternosReserva.join(', ') : (f.nInterno || f.machine || editCard?.machine || ''),
       // Preservar estado de confirmação de NF — não apagar ao editar
       nfConfirmada:    f.nfConfirmada    ?? editCard?.nfConfirmada    ?? false,
       nfConfirmadaPor: f.nfConfirmadaPor ?? editCard?.nfConfirmadaPor ?? '',

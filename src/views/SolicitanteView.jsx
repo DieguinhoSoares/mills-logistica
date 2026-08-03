@@ -42,7 +42,14 @@ export function SolicitanteView({ simClients }) {
 
   const handleSubmit = async form => {
     const grupo = buscarGrupoModelo(form.nInternos || (form.nInterno ? [form.nInterno] : []), simClients)
-    const machineLabel = form.nInternosReserva.length > 0 ? form.nInternosReserva.join(', ') : form.machine||''
+    // machine é o campo que a tela do motorista mostra como "Máquina". Antes só
+    // olhava pra nInternosReserva (equipamento enviado ao cliente, usado em
+    // troca_tecnica/sinistro/garantia/rollout-com-retorno) e caía num
+    // form.machine morto — nenhum campo do formulário nunca escreve nele. Pra
+    // qualquer outro tipo de serviço (a maioria), a máquina do serviço fica só
+    // em nInternos e "Máquina" aparecia sempre em branco pro motorista, mesmo
+    // com o N° Interno preenchido corretamente.
+    const machineLabel = form.nInternosReserva.length > 0 ? form.nInternosReserva.join(', ') : (form.nInternos.join(', ') || form.machine || '')
     try {
       // O RequestForm já passa form.id quando é um reenvio (initialData.id).
       // Não precisa mais de lógica extra aqui — submitRequest detecta pelo form.id.
