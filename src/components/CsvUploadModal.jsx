@@ -27,14 +27,24 @@ export function CsvUploadModal({ onLoaded, onClose }) {
         setCount(clients.length)
         setPreview(clients.slice(0,4))
         setClients(clients)
-        setStatus('done')
-        onLoaded(clients)
+        // Antes chamava onLoaded (setDoc SEM merge, substitui a base SIM
+        // inteira pra todos os usuários) direto aqui, assim que o parse
+        // terminava — um arquivo errado (export antigo, aba errada, CSV
+        // truncado) sobrescrevia a base de produção sem chance de conferir
+        // antes. Agora só mostra a prévia/diagnóstico e espera confirmação
+        // explícita (botão abaixo) antes de aplicar de verdade.
+        setStatus('preview')
       } catch(err) {
         setStatus('error')
         console.error('CSV parse error:', err)
       }
     }
     reader.readAsText(file, 'utf-8')
+  }
+
+  const handleConfirmar = () => {
+    onLoaded(clients)
+    setStatus('done')
   }
 
   return (
@@ -68,10 +78,10 @@ export function CsvUploadModal({ onLoaded, onClose }) {
 
         {status==='loading' && <div style={{ textAlign:'center', color:T.textSec, fontFamily:'IBM Plex Sans,sans-serif', fontSize:13 }}>⏳ Processando...</div>}
 
-        {status==='done' && <>
-          <div style={{ padding:'10px 14px', background:T.verdeLight, borderRadius:T.r, border:`1px solid ${T.verde}30`, marginBottom:12 }}>
-            <div style={{ color:T.verde, fontWeight:700, fontSize:13, fontFamily:'IBM Plex Sans,sans-serif' }}>✅ {count} registros carregados!</div>
-            <div style={{ color:T.textSec, fontSize:11, fontFamily:'IBM Plex Sans,sans-serif', marginTop:3 }}>Base sincronizada para todos os usuários.</div>
+        {status==='preview' && <>
+          <div style={{ padding:'10px 14px', background:T.amareloLight, borderRadius:T.r, border:`1px solid ${T.amarelo}40`, marginBottom:12 }}>
+            <div style={{ color:'#B8860B', fontWeight:700, fontSize:13, fontFamily:'IBM Plex Sans,sans-serif' }}>📋 {count} registros lidos — ainda NÃO aplicado</div>
+            <div style={{ color:T.textSec, fontSize:11, fontFamily:'IBM Plex Sans,sans-serif', marginTop:3 }}>Confira a prévia e a busca abaixo. Confirmar substitui a base SIM inteira pra todos os usuários — sem volta fácil.</div>
           </div>
           {preview.length > 0 && (
             <div style={{ marginBottom:12 }}>
@@ -87,13 +97,20 @@ export function CsvUploadModal({ onLoaded, onClose }) {
           )}
         </>}
 
+        {status==='done' && (
+          <div style={{ padding:'10px 14px', background:T.verdeLight, borderRadius:T.r, border:`1px solid ${T.verde}30`, marginBottom:12 }}>
+            <div style={{ color:T.verde, fontWeight:700, fontSize:13, fontFamily:'IBM Plex Sans,sans-serif' }}>✅ {count} registros aplicados!</div>
+            <div style={{ color:T.textSec, fontSize:11, fontFamily:'IBM Plex Sans,sans-serif', marginTop:3 }}>Base sincronizada para todos os usuários.</div>
+          </div>
+        )}
+
         {status==='error' && <div style={{ padding:'10px 14px', background:T.perigoLight, borderRadius:T.r, marginBottom:12 }}>
           <div style={{ color:T.perigo, fontWeight:700, fontSize:13, fontFamily:'IBM Plex Sans,sans-serif' }}>❌ Erro ao processar. Verifique o formato do arquivo.</div>
           <div style={{ color:T.textSec, fontSize:11, fontFamily:'IBM Plex Sans,sans-serif', marginTop:4 }}>Certifique-se que o arquivo usa ; como separador e encoding UTF-8.</div>
         </div>}
 
         {/* Busca de diagnóstico — verificar se cliente específico foi importado */}
-        {status==='done' && clients.length>0 && (
+        {(status==='preview' || status==='done') && clients.length>0 && (
           <div style={{ marginBottom:16 }}>
             <input value={diagQ} onChange={e=>setDiagQ(e.target.value)} placeholder="🔍 Verificar se cliente foi importado..."
               style={{ ...IS, fontSize:11 }}/>
@@ -108,8 +125,15 @@ export function CsvUploadModal({ onLoaded, onClose }) {
           </div>
         )}
 
-        <div style={{ display:'flex', justifyContent:'flex-end' }}>
-          <button onClick={onClose} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>Fechar</button>
+        <div style={{ display:'flex', justifyContent:'flex-end', gap:8 }}>
+          <button onClick={onClose} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>
+            {status==='preview' ? 'Cancelar' : 'Fechar'}
+          </button>
+          {status==='preview' && (
+            <button onClick={handleConfirmar} style={{ ...BS, background:T.laranja, color:'white', fontWeight:700 }}>
+              ✅ Confirmar e aplicar
+            </button>
+          )}
         </div>
       </motion.div>
     </div>

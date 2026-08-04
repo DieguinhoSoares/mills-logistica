@@ -348,14 +348,20 @@ export function FrotasView() {
     try {
       await moveCard(id, ns, ne, reason)
       const card = cards.find(c=>c.id===id)
+      // Cards criados direto pela Frotas (sem requestId) ou cujo request não
+      // tem requesterId não têm ninguém pra notificar — o toast dizia
+      // "solicitante notificado" incondicionalmente, mesmo quando notifyUser
+      // nunca era chamado (nenhuma notificação de verdade saiu).
+      let notificado = false
       if (card?.requestId) {
         const req = requests.find(r=>r.id===card.requestId)
         if (req?.requesterId) {
           await notifyUser(req.requesterId, 'service_rescheduled', '📅 Serviço reagendado', `O serviço de ${card.client} foi reagendado para ${ns}. Motivo: ${reason}`, card.requestId)
           await addDoc(collection(db,'requests',card.requestId,'messages'),{text:`Serviço reagendado para ${ns}. Motivo: ${reason}`,authorId:profile?.uid||'',authorName:profile?.name||'Frotas',authorRole:profile?.role||'frotas',type:'status_change',statusEvent:'reagendado',createdAt:serverTimestamp()})
+          notificado = true
         }
       }
-      addToast('Serviço reagendado — solicitante notificado.','success')
+      addToast(notificado ? 'Serviço reagendado — solicitante notificado.' : 'Serviço reagendado.', 'success')
     } catch (err) {
       console.error('Erro ao reagendar serviço:', err)
       addToast('Erro ao reagendar. Tente novamente.', 'error')
@@ -474,7 +480,16 @@ export function FrotasView() {
       if (linkedCard) {
         await updateDoc(doc(db,'cards',linkedCard.id), { status:'cancelado', cancelReason:reason, cancelledAt:serverTimestamp(), cancelledBy:authorName, updatedAt:serverTimestamp() })
       }
-      addToast('Serviço cancelado — solicitante notificado.','info')
+      // Toast dizia "solicitante notificado" mas notifyUser nunca era chamado
+      // aqui — nenhuma notificação de verdade saía, só o texto dizia que sim.
+      const req = requests.find(r=>r.id===requestId)
+      let notificado = false
+      if (req?.requesterId) {
+        await notifyUser(req.requesterId, 'service_cancelled', '🚫 Serviço cancelado',
+          `O serviço de ${req.machine||req.clientName||'sua solicitação'} foi cancelado. Motivo: ${reason}`, requestId)
+        notificado = true
+      }
+      addToast(notificado ? 'Serviço cancelado — solicitante notificado.' : 'Serviço cancelado.', 'info')
     } catch (err) {
       console.error('Erro ao cancelar solicitação:', err)
       addToast('Erro ao cancelar. Tente novamente.','error')
@@ -1055,7 +1070,7 @@ export function FrotasView() {
         {csvModal&&<CsvUploadModal onLoaded={async clients=>{await uploadClients(clients);setCsvModal(false);addToast(`${clients.length} registros sincronizados para todos os usuários.`,'success');}} onClose={()=>setCsvModal(false)}/>}
         {settingsModal&&<SettingsModal config={config} onSave={saveConfig} onClose={()=>setSettingsModal(false)}/>}
         <ConfirmModal open={!!confirmarConclusao} title="Concluir serviço"
-          message={`Confirmar conclusão de ${confirmarConclusao?.client||'—'}? O solicitante será notificado.`}
+          message={`Confirmar conclusão de ${confirmarConclusao?.client||'—'}?${confirmarConclusao?.requesterId ? ' O solicitante será notificado.' : ''}`}
           confirmLabel="✅ Concluir" onConfirm={()=>{handleValidarCard(confirmarConclusao);setConfirmarConclusao(null)}} onCancel={()=>setConfirmarConclusao(null)}/>
         {mapModal&&(
           <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.35)', zIndex:1500, display:'flex', alignItems:'center', justifyContent:'center' }}
