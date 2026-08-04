@@ -564,7 +564,11 @@ export function MoveModal({ card, targetDate, onConfirm, onCancel }) {
 export function ConfirmModal({ open, title='Confirmar ação', message, confirmLabel='Confirmar', cancelLabel='Cancelar', danger=false, onConfirm, onCancel }) {
   if (!open) return null
   return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.5)', zIndex:3000, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(3px)' }}
+    // zIndex 4000 — acima do maior zIndex de modal já usado no app (3500, ex:
+    // DriversModal) de propósito: uma confirmação precisa SEMPRE renderizar
+    // por cima de quem a chamou, senão fica escondida atrás do modal pai
+    // (invisível/inclicável) quando aberta de dentro de um modal já no topo.
+    <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.5)', zIndex:4000, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(3px)' }}
       onClick={e=>e.target===e.currentTarget&&onCancel()}>
       <div style={{ background:T.surface, borderRadius:T.rLg, padding:'22px 24px', width:380, maxWidth:'92vw', boxShadow:T.shadowLg, border:`1px solid ${T.border}` }}>
         <div style={{ color:T.text, fontFamily:FONT, fontWeight:800, fontSize:15, marginBottom:8 }}>{danger?'⚠️ ':''}{title}</div>

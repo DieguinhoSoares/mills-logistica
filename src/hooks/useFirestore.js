@@ -312,6 +312,14 @@ export async function approveAsSupervisor(id, note, approverName, approverRole) 
       `${req.requesterName} · ${req.machine||''} · ${req.originCityName||''} → ${req.destCityName||''}`, id)
     const msg = `📋 Solicitação aprovada pelo Supervisor — aguarda sua aprovação\nSolicitante: ${req.requesterName||'—'} · ${req.machine||'—'}\nRota: ${req.originCityName||req.origin||'—'} → ${req.destCityName||req.destination||'—'}\n👉 Abrir e aprovar: https://dieguinhosoares.github.io/mills-logistica/`
     enviarWhatsApp(msg)
+  } else {
+    // Guindauto passa por aprovação de Supervisor mas NÃO precisa de Gerente
+    // (needsGerenteApproval só cobre freteMillsInterno/freteCliente) — sem
+    // este aviso, o status virava 'pendente' e a Frotas nunca era notificada,
+    // igual ao ramo já existente em approveAsGerente/submitRequest pra essa
+    // mesma transição de status.
+    await notifyRoles(['frotas'], 'request_ready_for_fleet', '📥 Solicitação pronta para atribuição',
+      fleetReadyMessage(req), id)
   }
 }
 
@@ -658,7 +666,12 @@ export function useManagerialRequests() {
   const [requests, setRequests] = useState([])
   const [loading,  setLoading]  = useState(true)
   useEffect(() => {
-    const q = query(collection(db,'requests'), orderBy('createdAt','desc'))
+    // Sem limit(), este listener baixava a coleção `requests` INTEIRA (todo o
+    // histórico, sem corte) em tempo real toda vez que Gerente/Master abria a
+    // tela — o mesmo problema que a janela de 180 dias do useCards() e o
+    // limit(500) do useRequests() já existem pra evitar, só que esquecido
+    // aqui. Mesmo padrão: os 500 mais recentes, filtrados no cliente.
+    const q = query(collection(db,'requests'), orderBy('createdAt','desc'), limit(500))
     const unsub = onSnapshot(q,
       snap => {
         const all = snap.docs.map(d=>({ id:d.id, ...d.data() }))

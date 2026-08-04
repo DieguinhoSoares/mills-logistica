@@ -416,7 +416,7 @@ export function KPIView({ cards, requests, simClients, onNavigateToAprovacoes })
           value={periodoComparacao==='semana' ? stats.weekCards.length : stats.total}
           icon="📋" color={T.laranja} bg={T.laranjaXLight}
           trend={periodoComparacao==='semana' ? stats.growthPctSemana : stats.growthPct}
-          sub={periodoComparacao==='semana' ? `vs. ${stats.lastWeekCards.length} na semana anterior` : 'Todos os períodos'}
+          sub={periodoComparacao==='semana' ? `vs. ${stats.lastWeekCards.length} na semana anterior` : 'Últimos 180 dias'}
           sparkline={stats.sparklineServicos}/>
         <KPICard title="No Prazo"           value={`${stats.pctOnTime}%`}  icon="✅" color={T.sucesso} bg={T.sucessoLight}  sub={`${stats.onTime}/${stats.totalAtivos} em aberto`}/>
         <KPICard title="Aderência"          value={`${stats.pctAder}%`}    icon="📅" color={T.verde}   bg={T.verdeLight}    sub={`${stats.remanejados} remanejamentos`}/>

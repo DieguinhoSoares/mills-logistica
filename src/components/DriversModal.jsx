@@ -5,6 +5,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { T, FONT, BS, IS, LS, FILIAIS } from '../lib/constants'
+import { ConfirmModal } from './UI'
 
 // ── DriversModal ──────────────────────────────────────────────────────────────
 export function DriversModal({ drivers, onSave, onDelete, onClose, onRotograma, addToast }) {
@@ -12,6 +13,10 @@ export function DriversModal({ drivers, onSave, onDelete, onClose, onRotograma, 
   const [form,setForm]=useState(blank)
   const [editing,setEdit]=useState(null)
   const [saving,setSaving]=useState(false)
+  // Único botão de exclusão do app sem confirmação — um clique errado numa
+  // lista longa apagava o motorista na hora, sem "tem certeza?" nenhum,
+  // diferente de toda outra ação destrutiva já protegida por ConfirmModal.
+  const [deleting,setDeleting]=useState(null)
   const set=(k,v)=>setForm(p=>({...p,[k]:v}))
   const handleSave=async()=>{
     if(!form.name.trim())return
@@ -46,7 +51,7 @@ export function DriversModal({ drivers, onSave, onDelete, onClose, onRotograma, 
                 <div style={{ display:'flex', gap:6 }}>
                   {onRotograma&&<button onClick={()=>onRotograma(d)} style={{ ...BS, background:T.infoLight, color:T.info, border:`1px solid ${T.info}30`, fontSize:10, padding:'4px 10px' }}>🗺 Rotograma</button>}
                   <button onClick={()=>handleEdit(d)} style={{ ...BS, background:T.laranjaLight, color:T.laranja, border:`1px solid ${T.laranja}30`, fontSize:10, padding:'4px 10px' }}>✏️ Editar</button>
-                  <button onClick={()=>onDelete(d.id)} style={{ ...BS, background:T.perigoLight, color:T.perigo, border:`1px solid ${T.perigo}30`, fontSize:10, padding:'4px 10px' }}>🗑</button>
+                  <button onClick={()=>setDeleting(d)} style={{ ...BS, background:T.perigoLight, color:T.perigo, border:`1px solid ${T.perigo}30`, fontSize:10, padding:'4px 10px' }}>🗑</button>
                 </div>
               </div>
             ))}
@@ -78,6 +83,11 @@ export function DriversModal({ drivers, onSave, onDelete, onClose, onRotograma, 
           <div style={{ marginTop:16 }}><button onClick={onClose} style={{ ...BS, width:'100%', background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>Fechar</button></div>
         </div>
       </motion.div>
+      <ConfirmModal open={!!deleting} danger title="Remover motorista"
+        message={`Remover "${deleting?.name}"? Rotogramas já montados pra esse motorista ficam órfãos.`}
+        confirmLabel="🗑 Remover"
+        onConfirm={()=>{onDelete(deleting.id);addToast('Motorista removido.','success');setDeleting(null)}}
+        onCancel={()=>setDeleting(null)}/>
     </div>
   )
 }
