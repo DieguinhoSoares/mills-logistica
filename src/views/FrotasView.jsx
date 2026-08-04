@@ -499,6 +499,14 @@ export function FrotasView() {
         ...(cardExistente ? { id: cardExistente.id } : {}),
         type:req.type, subtype:req.subtype||'', client:req.clientName||req.requesterName||'',
         plantaObra:req.clientName||'', nInterno:req.nInterno||'', machine:req.machine||'',
+        // nInternos/nInternosReserva (arrays brutos) precisam ser copiados aqui,
+        // não só nInterno/machine (strings já achatadas) — MotoristaView lê o
+        // array bruto primeiro (self-heal de card.machine congelado), e a edição
+        // do card (RequestForm/handleSaveCard) também depende desses arrays pra
+        // não começar em branco. Sem isso, todo card criado por este fluxo (o
+        // caminho principal: Frotas aceitando uma solicitação) nunca carregava
+        // essa informação, mesmo com a solicitação original correta.
+        nInternos:req.nInternos||[], nInternosReserva:req.nInternosReserva||[],
         urgency:req.urgency||'medio', origin:req.origin||'', destination:req.destination||'',
         originCity:req.originCityName||'', destCity:req.destCityName||'',
         // dateEnd vem do AssignDriverModal, já ajustado pra nunca ficar antes de
@@ -1030,7 +1038,12 @@ export function FrotasView() {
             type:          pendingCardForm.type,
             machine:       pendingCardForm.machine,
             nInterno:      pendingCardForm.nInterno,
-            nInternos:     pendingCardForm.nInterno ? [pendingCardForm.nInterno] : [],
+            // pendingCardForm.nInternos (array real, já espalhado via ...pendingCardForm
+            // acima) NÃO pode ser sobrescrito aqui envolvendo o nInterno já unido
+            // (string "PCP01234, PCP05678") num array de 1 item só — isso quebra o
+            // reconhecimento de cada máquina individualmente na estimativa de frete
+            // quando o serviço tem 2+ N° internos.
+            nInternos:     pendingCardForm.nInternos?.length ? pendingCardForm.nInternos : (pendingCardForm.nInterno ? [pendingCardForm.nInterno] : []),
           }}
           drivers={drivers}
           simClients={simClients}
