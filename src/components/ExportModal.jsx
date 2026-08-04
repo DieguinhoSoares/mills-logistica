@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { T, FONT, BS, IS, LS } from '../lib/constants'
-import { fmt, todayStr, getWeekDays, diasAtras } from '../lib/utils'
+import { fmt, todayStr, getWeekDays, diasAtras, getMaquinaReserva } from '../lib/utils'
 
 export function ExportModal({ cards, onClose }) {
   const today=todayStr()
@@ -81,7 +81,7 @@ export function ExportModal({ cards, onClose }) {
     const TL={guindauto:'Guindauto',freteMillsInterno:'Frete Mills',freteCliente:'Frete Cliente'}
     const UL={critico:'Crítico',alto:'Alto',medio:'Médio',baixo:'Baixo'}
     const colH=['Data','Dia','Tipo','Subtipo','Cliente / Planta','OM','N° Interno','Máquina','Origem','Destino','Motorista','Unidade','Urgência','Observações']
-    const dRows=filtered.sort((a,b)=>a.startDate.localeCompare(b.startDate)).map(c=>[fmt(c.startDate),WD[new Date(c.startDate+'T12:00:00').getDay()],TL[c.type]||c.type,c.subtype?c.subtype.replace(/_/g,' '):'—',c.client||c.plantaObra||'—',c.om||'—',c.nInterno||'—',c.machine||'—',c.originCity||c.origin||'—',c.destCity||c.destination||'—',c.driver||'—',c.unit||'—',UL[c.urgency]||'—',c.notes||''])
+    const dRows=filtered.sort((a,b)=>a.startDate.localeCompare(b.startDate)).map(c=>[fmt(c.startDate),WD[new Date(c.startDate+'T12:00:00').getDay()],TL[c.type]||c.type,c.subtype?c.subtype.replace(/_/g,' '):'—',c.client||c.plantaObra||'—',c.om||'—',c.nInterno||'—',getMaquinaReserva(c)||'—',c.originCity||c.origin||'—',c.destCity||c.destination||'—',c.driver||'—',c.unit||'—',UL[c.urgency]||'—',c.notes||''])
     const wsD=XLSX.utils.aoa_to_sheet([['Mills Pesados · Relatório Detalhado',...Array(13).fill('')],[`Período: ${fmt(dateFrom)} a ${fmt(dateTo)} · ${filtered.length} serviço(s)`,...Array(13).fill('')],Array(14).fill(''),colH,...dRows])
     wsD['!merges']=[{s:{r:0,c:0},e:{r:0,c:13}},{s:{r:1,c:0},e:{r:1,c:13}}];wsD['A1'].s=hGreen;wsD['A2'].s=subInfo
     colH.forEach((_,i)=>{const ref=XLSX.utils.encode_cell({r:3,c:i});if(wsD[ref])wsD[ref].s=hOrange})

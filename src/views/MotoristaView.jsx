@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { db } from '../lib/firebase'
 import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { T, FONT, CARD_TYPES, URGENCY, SHADOW_CARD, BORDER_SUBTLE } from '../lib/constants'
-import { fmt, todayStr } from '../lib/utils'
+import { fmt, todayStr, getMaquinaReserva } from '../lib/utils'
 import { notifyUser } from '../hooks/useFirestore'
 import { ConfirmModal } from '../components/UI'
 
@@ -230,12 +230,7 @@ function ServicoCard({ card, index, onUpdateStatus }) {
   const origemUF  = card.origin      || ''
   const destinoUF = card.destination || ''
 
-  // Lê direto de nInternosReserva (array bruto, sempre gravado corretamente
-  // desde sempre) em vez de confiar só em card.machine — esse é um campo
-  // derivado que só é recalculado quando o serviço é salvo de novo. Cards
-  // salvos antes da correção do cálculo de `machine` ficam com ele vazio
-  // pra sempre, mesmo já tendo o equipamento reserva certo no array bruto.
-  const maquinaReserva = card.nInternosReserva?.length ? card.nInternosReserva.join(', ') : card.machine
+  const maquinaReserva = getMaquinaReserva(card)
 
   const wazeUrl = `https://waze.com/ul?q=${encodeURIComponent(destino+' '+destinoUF)}&navigate=yes`
   const mapsUrl = `https://www.google.com/maps/dir/${encodeURIComponent(origem+' '+origemUF)}/${encodeURIComponent(destino+' '+destinoUF)}`
@@ -507,8 +502,21 @@ export function MotoristaView({ token }) {
   const cardsSemana= cards.filter(c=>c.startDate>today)
   const cardsAntigos=cards.filter(c=>c.startDate<today&&!['concluido','cancelado'].includes(c.status))
 
-  const rotogramaUrl = rotograma?.paradas?.length>1
-    ? `https://www.google.com/maps/dir/${rotograma.paradas.map(p=>encodeURIComponent(`${p.destino} ${p.destinoUF}`)).join('/')}`
+  // O rotograma grava um snapshot de destino/UF de cada parada no momento em
+  // que ela é adicionada (RotogramaModal). Se o card mudar de destino depois
+  // (reagendamento, edição), esse snapshot fica desatualizado e o motorista
+  // seria navegado pro lugar errado sem nenhum aviso. Resolve pelo card ao
+  // vivo (já carregado em `cards`) sempre que ele ainda existir, caindo pro
+  // snapshot só se o card tiver sido removido.
+  const paradasEfetivas = (rotograma?.paradas||[]).map(p => {
+    const card = cards.find(c=>c.id===p.cardId)
+    return card
+      ? { ...p, destino: card.destCity||card.destination||p.destino, destinoUF: card.destination||p.destinoUF }
+      : p
+  })
+
+  const rotogramaUrl = paradasEfetivas.length>1
+    ? `https://www.google.com/maps/dir/${paradasEfetivas.map(p=>encodeURIComponent(`${p.destino} ${p.destinoUF}`)).join('/')}`
     : null
 
   if (loading) return (
@@ -616,7 +624,7 @@ export function MotoristaView({ token }) {
                     </a>
                   </div>
                 )}
-                {rotograma.paradas?.map((parada,i)=>{
+                {paradasEfetivas.map((parada,i)=>{
                   const card=cards.find(c=>c.id===parada.cardId)
                   if(!card) return null
                   const ct=CARD_TYPES[card.type]

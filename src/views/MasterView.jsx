@@ -117,6 +117,16 @@ export function MasterView({ simClients = [] }) {
   const [tollguruKey,   setTollguruKey]   = useState('')
   const [savedToll,     setSavedToll]     = useState(false)
 
+  // Diferente da API key do WhatsApp (guardada num lugar que o client nunca
+  // lê de volta, por segurança), a do TollGuru é lida direto de `config` pro
+  // badge "✅ configurada" logo abaixo — então o campo precisa carregar o
+  // valor já salvo. Sem isso, o input ficava sempre em branco mesmo com uma
+  // key funcionando, e salvar sem redigitar apagava a key em produção sem
+  // aviso nenhum. Só refaz quando o valor salvo muda (não a cada digitação).
+  useEffect(() => {
+    setTollguruKey(config?.tollguruApikey || '')
+  }, [config?.tollguruApikey])
+
   const backupStatus = useBackupStatus()
 
   useEffect(() => {

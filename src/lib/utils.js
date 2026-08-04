@@ -109,6 +109,14 @@ export function getSubtypeLabel(type, subtype) {
   return list.find(s => s.value === subtype)?.label || subtype
 }
 
+// Equipamento reserva (a máquina que sai/é enviada ao cliente, distinta da
+// que retorna em card.nInterno) — lê o array bruto nInternosReserva primeiro,
+// já que card.machine é uma string achatada calculada uma vez na gravação e
+// pode ficar congelada desatualizada em cards salvos antes de uma correção.
+export function getMaquinaReserva(card) {
+  return card.nInternosReserva?.length ? card.nInternosReserva.join(', ') : (card.machine || '')
+}
+
 export function buildReport(cards, weekDays, conflicts, driverFilter) {
   const filtered = driverFilter ? cards.filter(c => (c.driver||'Sem motorista') === driverFilter) : cards
   const lines = []
