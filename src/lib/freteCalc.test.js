@@ -4,7 +4,7 @@
 // Rodar: npm test
 // ============================================================
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { calcularFrete, selecionarVeiculoPorPeso, resolverVeiculoTransporte, analisarRotaComParadas, getValorIda, otimizarOrdemParadas, DIARIAS, VEICULOS, formatBRL, PESO_GRUPO } from './freteCalc'
+import { calcularFrete, selecionarVeiculoPorPeso, resolverVeiculoTransporte, analisarRotaComParadas, getValorIda, otimizarOrdemParadas, DIARIAS, VEICULOS, formatBRL, PESO_GRUPO, buscarGrupoModelo, buscarFabricanteModelo } from './freteCalc'
 
 describe('calcularFrete — entradas inválidas', () => {
   it('retorna null sem km', () => {
@@ -166,6 +166,31 @@ describe('resolverVeiculoTransporte — reconhecimento de Fabricante+Modelo', ()
     const grupoNaoCatalogado = [{ machineGroups: { 'MNA05000': 'Motoniveladora 12 a 13 t' } }]
     const res = resolverVeiculoTransporte(['MNA05000'], [], grupoNaoCatalogado)
     expect(res.pesoIda).toBeCloseTo(15.0, 1) // faixa "14 a 16 t", não 0
+  })
+})
+
+describe('buscarGrupoModelo/buscarFabricanteModelo — fallback numérico não adivinha entre máquinas diferentes', () => {
+  it('MNA01106 (não cadastrado) x PC1106 (cadastrado) com mesmo sufixo numérico: match exato de PC1106 funciona normalmente', () => {
+    const sim = [{ machineGroups: { 'PC1106': 'Escavadeira de Pneus 23 a 26 t' } }]
+    expect(buscarGrupoModelo(['PC1106'], sim)).toBe('Escavadeira de Pneus 23 a 26 t')
+  })
+
+  it('2 N° internos com prefixos diferentes mas mesmo sufixo numérico (ex: MNA01106 e PC1106) → fallback numérico não escolhe nenhum dos dois (ambíguo)', () => {
+    // Bug real: antes, Object.entries(...).find(...) pegava o primeiro que
+    // encontrasse na ordem de iteração — podia devolver o grupo/peso da
+    // máquina ERRADA silenciosamente. Agora recusa a adivinhar.
+    const sim = [{ machineGroups: {
+      'MNA01106': 'Mini Carregadeira 2 a 3 t',
+      'PC1106':   'Escavadeira de Pneus 23 a 26 t',
+    } }]
+    // Busca por um 3º N° interno que não bate exato com nenhum dos dois,
+    // mas cujo sufixo numérico (1106) colide com ambos.
+    expect(buscarGrupoModelo(['XXX01106'], sim)).toBeNull()
+  })
+
+  it('fallback numérico ainda funciona quando só 1 candidato bate (caso comum: zero à esquerda/prefixo digitado diferente)', () => {
+    const sim = [{ machineModelos: { 'MNA01106': { fabricante:'CATERPILLAR', modelo:'320GC' } } }]
+    expect(buscarFabricanteModelo(['XXX1106'], sim)).toEqual({ fabricante:'CATERPILLAR', modelo:'320GC' })
   })
 })
 
@@ -416,6 +441,19 @@ describe('analisarRotaComParadas — regra dos 10% de desvio', () => {
     const perna1 = calcularFrete({ km:300, veiculoId:res.veiculoId })
     const perna2 = calcularFrete({ km:430, veiculoId:res.veiculoId })
     expect(res.valorSugerido).toBeCloseTo(perna1.valorIda + perna2.valorIda, 2)
+  })
+
+  it('outroEstado=true aplica o adicional de +12% no valor combinado e no separado (bug real: FreteEstimativa mostrava o badge "+12% outro estado" sem o valor de rotaInfo ter esse adicional aplicado)', async () => {
+    const sim = [{ machineModelos: { 'MNA0001': { fabricante:'CATERPILLAR', modelo:'320GC' } } }]
+    const paradas = [
+      { tipo:'preparacao', cidade:'São Paulo',     uf:'SP', nInternos:['MNA0001'] },
+      { tipo:'entrega',    cidade:'Rio de Janeiro', uf:'RJ', nInternos:['MNA0001'] },
+    ]
+    const semAjuste = await analisarRotaComParadas({ origemCidade:'Sumaré', origemUf:'SP', paradas, simClients:sim })
+    const comAjuste = await analisarRotaComParadas({ origemCidade:'Sumaré', origemUf:'SP', paradas, simClients:sim, outroEstado:true })
+    expect(comAjuste.valorCombinado).toBeCloseTo(semAjuste.valorCombinado * 1.12, 2)
+    expect(comAjuste.valorSeparado).toBeCloseTo(semAjuste.valorSeparado * 1.12, 2)
+    expect(comAjuste.valorSugerido).toBeCloseTo(semAjuste.valorSugerido * 1.12, 2)
   })
 })
 

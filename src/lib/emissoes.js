@@ -24,6 +24,12 @@ export const CONSUMO_MEDIO_KM_POR_LITRO = {
   // guindauto e frete_rodando não têm consumo genérico — frete_rodando é
   // resolvido por MODELO específico da máquina (ver CONSUMO_MODELO abaixo),
   // já que é a própria máquina rodando, não um caminhão/carreta genérico.
+  // bitrem9 (Carreta Bitrem 9 eixos, adicionado 2026-07) também não tem
+  // consumo médio confirmado ainda — mesmo gap intencional que as diárias
+  // dele em freteCalc.js/DIARIAS (não consta na planilha usada até agora).
+  // Serviços com esse veículo ficam corretamente sinalizados como
+  // "sem consumo cadastrado" (ver diagnosticarLacunasEmissao) em vez de
+  // contar como 0 na emissão total — quando o número chegar, cadastra aqui.
 }
 
 // Consumo médio POR MODELO — usado quando a máquina roda sozinha (Frete

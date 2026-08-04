@@ -91,7 +91,14 @@ const GRUPO_VEICULO = {
   'Escavadeira de esteiras 30 a 36 t':         'prancha4', // 33,0t
   'Escavadeira de Pneus 23 a 26 t':            'prancha3', // 24,5t
   'Escavadeira Anfíbia 20t':                   'prancha3', // 20,0t
-  'Motoniveladora 14 a 16 t':                  'bitruck',  // 15,0t
+  // Motoniveladora 14 a 16t cabe em bitruck por PESO (15,0t ≤ 17t), mas o
+  // comprimento real (10,01m, ver COMPRIMENTO_GRUPO abaixo) passa 1cm do
+  // limite do bitruck (10m) — cabeNoVeiculo() rejeitaria isso corretamente
+  // se checado por dimensão, mas essa tabela é só peso, então sugeria um
+  // veículo que não comporta a máquina de verdade. Motoniveladora já é uma
+  // das 3 máquinas citadas no comentário de "incidentes reais" em
+  // FreteEstimativa.jsx — corrigido pro próximo porte que realmente cabe.
+  'Motoniveladora 14 a 16 t':                  'prancha3', // 15,0t · 10,01m não cabe no bitruck (10m)
   'Motoniveladora 17 a 18 t':                  'prancha3', // 17,5t
   'Motoniveladora 19 a 20 t':                  'prancha3', // 19,5t
   'Retroescavadeira 7 a 9 t':                  'truck',    // 8,0t
@@ -515,6 +522,22 @@ const DIMENSOES_MODELO = {
   'NEWHOLLAND|T7205':        { peso:10.5, largura:3.03, comprimento:5.02  }, // ⚠️ largura=altura no cadastro Mills, confirmar
 }
 
+// Fallback usado pelas 3 funções de busca por N° interno abaixo: quando não
+// há match exato, tenta achar pelos DÍGITOS do N° interno (ex: MNA01106 →
+// 1106), pra absorver inconsistência de formatação real do CSV (zero à
+// esquerda, prefixo digitado diferente). Só aceita o resultado quando é o
+// ÚNICO valor distinto entre os candidatos — se dois N° internos com
+// prefixos diferentes coincidem no mesmo número (ex: MNA01106 e PC1106, uma
+// mini-carregadeira e uma escavadeira bem diferentes), não dá pra saber qual
+// é o certo, e adivinhar erra o peso/dimensão por uma margem grande. Melhor
+// não achar nada (cai pro próximo fallback) do que arriscar a máquina errada.
+function matchNumericoUnico(entries, nNum, chaveValor = v => v) {
+  const candidatos = entries.filter(([k]) => String(k).replace(/\D/g,'').replace(/^0+/,'') === nNum)
+  if (candidatos.length === 0) return null
+  const valoresUnicos = new Set(candidatos.map(([,v]) => chaveValor(v)))
+  return valoresUnicos.size === 1 ? candidatos[0][1] : null
+}
+
 /**
  * Busca a dimensão exata por Fabricante+Modelo do CSV do SIM. Tenta match
  * exato fabricante+modelo primeiro; se não achar, tenta só pelo modelo
@@ -538,10 +561,7 @@ export function buscarFabricanteModelo(nInternos, simClients) {
       if (!c.machineModelos) continue
       let entry = c.machineModelos[nStr]
       if (!entry) {
-        const found = Object.entries(c.machineModelos).find(([k]) =>
-          String(k).replace(/\D/g, '').replace(/^0+/, '') === nNum
-        )
-        if (found) entry = found[1]
+        entry = matchNumericoUnico(Object.entries(c.machineModelos), nNum, v => `${v.fabricante}|${v.modelo}`)
       }
       if (entry && (entry.fabricante || entry.modelo)) {
         return { fabricante: normalizaModelo(entry.fabricante), modelo: normalizaModelo(entry.modelo) }
@@ -563,10 +583,7 @@ export function buscarDimensaoModelo(nInternos, simClients) {
       if (!c.machineModelos) continue
       let entry = c.machineModelos[nStr]
       if (!entry) {
-        const found = Object.entries(c.machineModelos).find(([k]) =>
-          String(k).replace(/\D/g, '').replace(/^0+/, '') === nNum
-        )
-        if (found) entry = found[1]
+        entry = matchNumericoUnico(Object.entries(c.machineModelos), nNum, v => `${v.fabricante}|${v.modelo}`)
       }
       if (entry && (entry.fabricante || entry.modelo)) {
         const fab = normalizaModelo(entry.fabricante)
@@ -598,10 +615,8 @@ export function buscarGrupoModelo(nInternos, simClients) {
         // Match exato
         if (c.machineGroups[nStr]) return c.machineGroups[nStr]
         // Match numérico (ex: MNA01106 → 1106)
-        const entry = Object.entries(c.machineGroups).find(([k]) =>
-          String(k).replace(/\D/g, '').replace(/^0+/, '') === nNum
-        )
-        if (entry) return entry[1]
+        const grupo = matchNumericoUnico(Object.entries(c.machineGroups), nNum)
+        if (grupo) return grupo
       }
 
       // ── Fallback: N° interno está na lista mas sem grupoModelo ────────────
@@ -1089,7 +1104,7 @@ export function otimizarOrdemParadas(matriz) {
 //     "estão no caminho" — cobra 1 trecho único pela distância DIRETA.
 //   - Desvio > limiteDesvioPct: é desvio de rota de verdade — cobra cada
 //     trecho separadamente pela tabela Hengel, sem desconto (soma simples).
-export async function analisarRotaComParadas({ origemCidade, origemUf, paradas, simClients, limiteDesvioPct = 0.10 }) {
+export async function analisarRotaComParadas({ origemCidade, origemUf, paradas, simClients, limiteDesvioPct = 0.10, outroEstado = false }) {
   if (!paradas?.length) return null
 
   // ── 1. Peso/dimensão de cada máquina mencionada em qualquer parada ──────
@@ -1164,8 +1179,13 @@ export async function analisarRotaComParadas({ origemCidade, origemUf, paradas, 
   // tabela Hengel individualmente, sem nenhum desconto entre elas. Devolve os
   // 2 valores possíveis (não só o sugerido) pra UI permitir override manual
   // do analista sem precisar recalcular nada.
-  const valorCombinado = getValorIda(rotaDireta.km, veiculoId)
-  const valorSeparado  = rotaReal.pernas.reduce((soma, km) => soma + getValorIda(km, veiculoId), 0)
+  // ajuste de +12% outro estado (mesma regra de calcularFrete/`ajuste`) —
+  // faltava aqui: a UI mostrava o badge "+12% outro estado" em cima desse
+  // valor sem o adicional nunca ter sido de fato aplicado, subcobrando toda
+  // rota combinada que saísse de SP.
+  const ajuste = outroEstado ? 1.12 : 1
+  const valorCombinado = getValorIda(rotaDireta.km, veiculoId) * ajuste
+  const valorSeparado  = rotaReal.pernas.reduce((soma, km) => soma + getValorIda(km, veiculoId), 0) * ajuste
   const valorSugerido  = ehDesvio ? valorSeparado : valorCombinado
 
   return {
@@ -1181,6 +1201,7 @@ export async function analisarRotaComParadas({ origemCidade, origemUf, paradas, 
     desvioKm,
     desvioPct: Math.round(desvioPct*1000)/10, // em %, 1 casa decimal
     ehDesvio,   // true = cobrar trechos separados; false = cobrar 1 trecho direto
+    ajuste,
     valorSugerido: Math.round(valorSugerido*100)/100,
     valorCombinado: Math.round(valorCombinado*100)/100,
     valorSeparado: Math.round(valorSeparado*100)/100,

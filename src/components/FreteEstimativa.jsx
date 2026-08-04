@@ -59,7 +59,16 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
   // usuário selecionava um veículo, ou entrava no modo manual, e o efeito
   // re-rodava e resetava tudo sem avisar.
   const userTouched = useRef(false)
-  const requestKey = request?.id || JSON.stringify(request?.nInternos) + JSON.stringify(request?.nInternosReserva)
+  // Pra solicitações sem id ainda (rascunho), o fallback precisa de campos
+  // suficientes pra não colidir entre 2 solicitações diferentes que ainda
+  // não têm nInternos/nInternosReserva preenchidos — sem isso, trocar de uma
+  // pra outra (num futuro fluxo que troque `request` sem desmontar o
+  // componente) podia deixar a escolha manual de veículo/preço de uma
+  // "vazar" pra outra sem o analista perceber.
+  const requestKey = request?.id || JSON.stringify([
+    request?.nInternos, request?.nInternosReserva, request?.originCityName,
+    request?.destCityName, request?.desiredDate, request?.clientName,
+  ])
   useEffect(() => { userTouched.current = false }, [requestKey])
 
   const isGuindauto = request?.type === 'guindauto'
@@ -82,13 +91,17 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
       origemCidade: 'Sumaré', origemUf: 'SP', // base fixa da Mills
       paradas: paradas.map(p => ({ tipo:p.tipo, cidade:p.cidade, uf:p.uf, nInternos:p.nInternos||[] })),
       simClients,
+      outroEstado,
     }).then(res => {
       setRotaInfo(res)
       setVeiculoId(res?.veiculoId || '')
       setSugerido(!res?.temItemNaoIdentificado)
       if (!res?.veiculoId) setModoManual(true)
     }).finally(() => setRotaLoading(false))
-  }, [request?.paradas, simClients])
+    // outroEstado entra nas deps — sem isso, o badge "+12% outro estado"
+    // aparecia na tela sem o valor de rotaInfo ter sido recalculado com o
+    // adicional (ele só é setado por um efeito separado, que roda depois).
+  }, [request?.paradas, simClients, outroEstado])
 
   // ── Seleção de veículo por peso ──────────────────────────────
   // Sempre baseada no peso real das máquinas (lookup SIM).
@@ -284,6 +297,20 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
           <div style={{ color:T.text, fontFamily:FONT, fontWeight:800, fontSize:12, marginBottom:8 }}>
             🗺️ Rota calculada — {request.paradas.length} paradas
           </div>
+          {(() => {
+            const ultima = request.paradas[request.paradas.length - 1]
+            const voltaPraBase = ultima && ultima.cidade?.trim()?.toLowerCase() === 'sumaré' && ultima.uf === 'SP'
+            // analisarRotaComParadas NÃO adiciona volta à base automaticamente
+            // (por design — ver comentário em freteCalc.js) — se o analista
+            // esqueceu de incluir essa parada, a cobrança sugerida acima só
+            // cobre a ida, sem nenhum aviso disso. Não muda o cálculo, só
+            // torna visível que o retorno não está incluso.
+            return !voltaPraBase && (
+              <div style={{ padding:'7px 10px', borderRadius:T.rSm, marginBottom:10, background:T.amareloLight, color:'#B8860B', fontSize:10, fontFamily:FONT, fontWeight:700 }}>
+                ⚠️ A última parada não é a base (Sumaré/SP) — se o motorista precisa voltar, adicione essa parada. A cobrança acima cobre só até "{ultima?.cidade||'—'}".
+              </div>
+            )
+          })()}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10, fontSize:11, fontFamily:FONT }}>
             <div>
               <div style={{ color:T.textMuted, fontSize:9, textTransform:'uppercase' }}>Distância direta</div>
@@ -473,6 +500,15 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
             {diarias > 0 && resultado?.veiculoId && DIARIAS[resultado.veiculoId] && (
               <span style={{ color:T.textMuted, fontSize:10, fontFamily:FONT, marginLeft:8 }}>
                 {formatBRL(DIARIAS[resultado.veiculoId])} × {diarias} = {formatBRL(DIARIAS[resultado.veiculoId] * parseInt(diarias))}
+              </span>
+            )}
+            {/* Bitrem 9 eixos não tem diária negociada ainda (ver comentário em
+                freteCalc.js/DIARIAS) — o total omite a diária de propósito, mas
+                sem aviso nenhum isso parecia um esquecimento pro analista. Só
+                torna visível o que já era intencional, não muda nenhum valor. */}
+            {diarias > 0 && resultado?.veiculoId && !DIARIAS[resultado.veiculoId] && (
+              <span style={{ color:T.amarelo, fontSize:10, fontFamily:FONT, marginLeft:8, fontWeight:700 }}>
+                ⚠️ Diária ainda não negociada para {resultado.veiculoLabel||resultado.veiculoId} — não incluída no total
               </span>
             )}
           </div>
