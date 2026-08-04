@@ -293,9 +293,20 @@ export function useRequests(roleFilter) {
 // só para pegar essas 5 funções, sem nunca usar os dados que ele retornava
 // (item da revisão: "listener fantasma"). Extraídas aqui, GerenteView não
 // precisa mais chamar useRequests() e o listener duplicado desaparece.
+// As 4 funções de aprovação/recusa abaixo checam req.status logo após o
+// getDoc — sem isso, qualquer chamador (o modal já trava pelo cliente, ver
+// GerenteView.jsx `podeDecidir`, mas nada impede uma chamada direta ou uma
+// aba desatualizada) podia reverter uma decisão de uma etapa que não é mais
+// a atual: aprovar de novo algo já recusado, ou um Supervisor "aprovar" uma
+// solicitação que a Gerência já decidiu. Não é uma transação de verdade
+// (ainda dá uma pequena janela de corrida entre 2 aprovações quase
+// simultâneas), mas fecha o caso comum de decisão fora de ordem/repetida.
 export async function approveAsSupervisor(id, note, approverName, approverRole) {
   const snap = await getDoc(doc(db,'requests',id))
   const req  = { id, ...snap.data() }
+  if (req.status !== 'pendente_supervisor') {
+    throw new Error('Esta solicitação não está mais aguardando aprovação do Supervisor (alguém já decidiu, ou ela avançou de etapa).')
+  }
   const logEntry = { step:'supervisor', approver:approverName, role:approverRole, note, at:new Date().toISOString(), action:'approved' }
   const nextStatus = req.needsGerenteApproval ? 'pendente_gerente' : 'pendente'
   await updateDoc(doc(db,'requests',id), {
@@ -326,6 +337,9 @@ export async function approveAsSupervisor(id, note, approverName, approverRole) 
 export async function refuseAsSupervisor(id, note, approverName) {
   const snap = await getDoc(doc(db,'requests',id))
   const req  = { id, ...snap.data() }
+  if (req.status !== 'pendente_supervisor') {
+    throw new Error('Esta solicitação não está mais aguardando aprovação do Supervisor (alguém já decidiu, ou ela avançou de etapa).')
+  }
   const logEntry = { step:'supervisor', approver:approverName, note, at:new Date().toISOString(), action:'refused' }
   await updateDoc(doc(db,'requests',id), {
     status:'recusado', responseNote:note,
@@ -339,6 +353,9 @@ export async function refuseAsSupervisor(id, note, approverName) {
 export async function approveAsGerente(id, note, approverName, approverRole) {
   const snap = await getDoc(doc(db,'requests',id))
   const req  = { id, ...snap.data() }
+  if (req.status !== 'pendente_gerente') {
+    throw new Error('Esta solicitação não está mais aguardando aprovação da Gerência (alguém já decidiu, ou ela avançou de etapa).')
+  }
   const logEntry = { step:'gerente', approver:approverName, role:approverRole, note, at:new Date().toISOString(), action:'approved' }
   await updateDoc(doc(db,'requests',id), {
     status:'pendente',
@@ -356,6 +373,9 @@ export async function approveAsGerente(id, note, approverName, approverRole) {
 export async function refuseAsGerente(id, note, approverName) {
   const snap = await getDoc(doc(db,'requests',id))
   const req  = { id, ...snap.data() }
+  if (req.status !== 'pendente_gerente') {
+    throw new Error('Esta solicitação não está mais aguardando aprovação da Gerência (alguém já decidiu, ou ela avançou de etapa).')
+  }
   const logEntry = { step:'gerente', approver:approverName, note, at:new Date().toISOString(), action:'refused' }
   await updateDoc(doc(db,'requests',id), {
     status:'recusado', responseNote:note,

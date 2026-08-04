@@ -4,7 +4,7 @@ import {
   onAuthStateChanged, signInWithEmailAndPassword,
   createUserWithEmailAndPassword, signOut
 } from 'firebase/auth'
-import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { doc, onSnapshot, setDoc } from 'firebase/firestore'
 import { resetarSenhaApi } from '../lib/vercelApi'
 
 const AuthContext = createContext({})
@@ -16,17 +16,29 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async u => {
+    // profile era um getDoc (leitura única) — um Master bloqueando ou
+    // trocando o perfil/role de alguém (toggleUserStatus/updateUserRole) não
+    // tinha NENHUM efeito em sessões já abertas: App.tsx já trava a tela
+    // certinho quando profile.status==='bloqueado', só que só checava esse
+    // valor uma vez, no login. Trocado pra onSnapshot (mesmo padrão de
+    // useCards/useRequests) — agora um bloqueio/mudança de role aplicado
+    // pelo Master reflete na sessão aberta em tempo real, sem precisar
+    // esperar o usuário deslogar sozinho.
+    let unsubProfile = null
+    const unsubAuth = onAuthStateChanged(auth, u => {
+      if (unsubProfile) { unsubProfile(); unsubProfile = null }
       setUser(u)
       if (u) {
-        const snap = await getDoc(doc(db, 'users', u.uid))
-        setProfile(snap.exists() ? snap.data() : null)
+        unsubProfile = onSnapshot(doc(db, 'users', u.uid),
+          snap => { setProfile(snap.exists() ? snap.data() : null); setLoading(false) },
+          () => { setLoading(false) }
+        )
       } else {
         setProfile(null)
+        setLoading(false)
       }
-      setLoading(false)
     })
-    return unsub
+    return () => { unsubAuth(); if (unsubProfile) unsubProfile() }
   }, [])
 
   const login = (email, password) =>

@@ -37,6 +37,17 @@ function ApprovalModal({ req, profile, onApprove, onRefuse, onClose, isMobile, s
   const ug = URGENCY[req.urgency]
   const isSupervisorStep = req.status === 'pendente_supervisor'
   const stepLabel = profile?.role === 'master' ? 'Master' : isSupervisorStep ? 'Supervisor' : 'Gerente'
+  // Mesma regra já usada em Mobile/DesktopRequestCard pra decidir o rótulo
+  // do botão que abre este modal ("Avaliar" vs "Ver Detalhes") — mas antes
+  // só mudava o RÓTULO: o modal em si sempre deixava Aprovar/Recusar
+  // habilitados, mesmo pra quem clicou em "Ver Detalhes" (etapa errada, ou
+  // solicitação já decidida/recusada por outra pessoa). Qualquer
+  // Supervisor/Gerente conseguia reverter uma decisão que não era da
+  // alçada dele. Agora o modal recalcula a mesma regra e trava a ação.
+  const podeDecidir =
+    (profile?.role==='supervisor' && req.status==='pendente_supervisor') ||
+    (profile?.role==='gerente'    && req.status==='pendente_gerente') ||
+    (profile?.role==='master'     && ['pendente_supervisor','pendente_gerente'].includes(req.status))
 
   const handleApprove = async () => {
     setSaving(true)
@@ -168,32 +179,40 @@ function ApprovalModal({ req, profile, onApprove, onRefuse, onClose, isMobile, s
           </div>
         )}
 
-        <div style={{ marginBottom:14 }}>
-          <label style={LS}>Observação <span style={{ color:T.textMuted, fontWeight:400, fontSize:10 }}>(obrigatório para recusa)</span></label>
-          <textarea value={note} onChange={e=>setNote(e.target.value)}
-            placeholder="Observação para o solicitante..."
-            style={{ ...IS, height:isMobile?70:80, resize:'vertical', marginTop:5 }}/>
-        </div>
+        {podeDecidir ? <>
+          <div style={{ marginBottom:14 }}>
+            <label style={LS}>Observação <span style={{ color:T.textMuted, fontWeight:400, fontSize:10 }}>(obrigatório para recusa)</span></label>
+            <textarea value={note} onChange={e=>setNote(e.target.value)}
+              placeholder="Observação para o solicitante..."
+              style={{ ...IS, height:isMobile?70:80, resize:'vertical', marginTop:5 }}/>
+          </div>
 
-        {error && (
-          <div style={{ marginBottom:10, padding:'9px 12px', background:T.perigoLight, borderRadius:T.r, border:`1px solid ${T.perigo}40` }}>
-            <div style={{ color:T.perigo, fontFamily:FONT, fontSize:11, fontWeight:700 }}>⚠ {error}</div>
+          {error && (
+            <div style={{ marginBottom:10, padding:'9px 12px', background:T.perigoLight, borderRadius:T.r, border:`1px solid ${T.perigo}40` }}>
+              <div style={{ color:T.perigo, fontFamily:FONT, fontSize:11, fontWeight:700 }}>⚠ {error}</div>
+            </div>
+          )}
+
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+            <button onClick={handleRefuse} disabled={saving||!note.trim()}
+              style={{ ...BS, background:note.trim()?T.perigoLight:T.borderMid, color:note.trim()?T.perigo:T.textMuted,
+                border:`1px solid ${note.trim()?T.perigo+'40':T.border}`, fontWeight:700,
+                padding:isMobile?'14px':'8px 16px', fontSize:isMobile?14:12, borderRadius:T.rLg, opacity:note.trim()?1:0.5 }}>
+              ❌ Recusar
+            </button>
+            <button onClick={handleApprove} disabled={saving}
+              style={{ ...BS, background:T.verde, color:'white', fontWeight:700,
+                padding:isMobile?'14px':'8px 16px', fontSize:isMobile?14:12, borderRadius:T.rLg }}>
+              {saving?'⏳...':'✅ Aprovar'}
+            </button>
+          </div>
+        </> : (
+          <div style={{ padding:'12px 14px', background:T.surfaceAlt, borderRadius:T.r, border:`1px solid ${T.border}`, color:T.textMuted, fontFamily:FONT, fontSize:11, lineHeight:1.5 }}>
+            🔒 {['aceito','recusado','cancelado','pendente'].includes(req.status)
+              ? 'Esta solicitação já foi decidida ou já passou dessa etapa — somente consulta.'
+              : 'Esta solicitação não está na sua alçada no momento — somente consulta.'}
           </div>
         )}
-
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-          <button onClick={handleRefuse} disabled={saving||!note.trim()}
-            style={{ ...BS, background:note.trim()?T.perigoLight:T.borderMid, color:note.trim()?T.perigo:T.textMuted,
-              border:`1px solid ${note.trim()?T.perigo+'40':T.border}`, fontWeight:700,
-              padding:isMobile?'14px':'8px 16px', fontSize:isMobile?14:12, borderRadius:T.rLg, opacity:note.trim()?1:0.5 }}>
-            ❌ Recusar
-          </button>
-          <button onClick={handleApprove} disabled={saving}
-            style={{ ...BS, background:T.verde, color:'white', fontWeight:700,
-              padding:isMobile?'14px':'8px 16px', fontSize:isMobile?14:12, borderRadius:T.rLg }}>
-            {saving?'⏳...':'✅ Aprovar'}
-          </button>
-        </div>
 
         {isMobile && (
           <button onClick={onClose} style={{ ...BS, width:'100%', background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}`, marginTop:10, padding:'12px', fontSize:13, borderRadius:T.rLg }}>
