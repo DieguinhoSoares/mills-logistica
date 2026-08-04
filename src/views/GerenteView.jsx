@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
-import { useManagerialRequests, useNotifications, useConfig, approveAsSupervisor, refuseAsSupervisor, approveAsGerente, refuseAsGerente } from '../hooks/useFirestore'
+import { useManagerialRequests, useCards, useNotifications, useConfig, approveAsSupervisor, refuseAsSupervisor, approveAsGerente, refuseAsGerente } from '../hooks/useFirestore'
 import { MillsLogo, NotificationBell, ToastContainer, useToasts } from '../components/UI'
 import { T, FONT, CARD_TYPES, URGENCY, URGENCY_SLA_MS, BS, IS, LS, SHADOW_CARD, BORDER_SUBTLE } from '../lib/constants'
 import { fmt, getSubtypeLabel, sortByUrgency } from '../lib/utils'
@@ -9,6 +9,7 @@ import { db } from '../lib/firebase'
 import { salvarWhatsAppConfig } from '../lib/vercelApi'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
 import { FreteEstimativa } from '../components/FreteEstimativa'
+import { formatBRL } from '../lib/freteCalc'
 
 const STATUS_CONFIG = {
   pendente_supervisor: { label:'⏳ Aguard. Supervisor', color:'#B8860B', bg:'#FFF8E1' },
@@ -29,7 +30,7 @@ function useIsMobile() {
   return mobile
 }
 
-function ApprovalModal({ req, profile, onApprove, onRefuse, onClose, isMobile, simClients }) {
+function ApprovalModal({ req, profile, onApprove, onRefuse, onClose, isMobile, simClients, linkedCard }) {
   const [note,   setNote]   = useState('')
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState('')
@@ -163,6 +164,32 @@ function ApprovalModal({ req, profile, onApprove, onRefuse, onClose, isMobile, s
         </div>
 
         <FreteEstimativa request={req} simClients={simClients} readOnly={true}/>
+
+        {/* Custo real — só existe depois que a Frotas atribui motorista/transportadora
+            (fica salvo no card, não na solicitação). A estimativa acima é sempre a
+            tarifa Hengel padrão, calculada antes de saber quem vai executar; aqui é
+            o valor de verdade, já com desconto de motorista Mills se for o caso. */}
+        {linkedCard?.freteEstimado != null && (
+          <div style={{ background:T.verdeLight, border:`1px solid ${T.verde}40`, borderRadius:T.r, padding:'12px 14px', marginBottom:14 }}>
+            <div style={{ color:T.verde, fontFamily:FONT, fontWeight:800, fontSize:11, marginBottom:8, textTransform:'uppercase', letterSpacing:'0.06em' }}>
+              💰 Custo real (atribuído pela Frotas)
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+              <div>
+                <div style={{ color:T.textMuted, fontSize:9, fontFamily:FONT, textTransform:'uppercase' }}>Executado por</div>
+                <div style={{ color:T.text, fontWeight:700, fontSize:12, fontFamily:FONT }}>{linkedCard.driver||'—'}</div>
+              </div>
+              <div>
+                <div style={{ color:T.textMuted, fontSize:9, fontFamily:FONT, textTransform:'uppercase' }}>Veículo</div>
+                <div style={{ color:T.text, fontWeight:700, fontSize:12, fontFamily:FONT }}>{linkedCard.veiculoLabel||'—'}</div>
+              </div>
+              <div>
+                <div style={{ color:T.textMuted, fontSize:9, fontFamily:FONT, textTransform:'uppercase' }}>Custo</div>
+                <div style={{ color:T.laranja, fontWeight:800, fontSize:15, fontFamily:FONT }}>{formatBRL(linkedCard.freteEstimado)}</div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {req.approvalLog?.length > 0 && (
           <div style={{ marginBottom:14 }}>
@@ -334,6 +361,12 @@ export function GerenteView({ simClients = [] }) {
   // funções standalone importadas direto — não criam mais um listener duplicado
   // e sem uso da coleção 'requests' (ver notas em useFirestore.js).
   const { requests: mgrReqs } = useManagerialRequests()
+  // Custo real (com desconto de motorista Mills, se aplicável) só existe
+  // depois que a Frotas atribui alguém — fica salvo no card, não na
+  // solicitação. Sem isso, quem aprovou nunca tinha como saber quanto o
+  // serviço custou de verdade — só via ao aprovar a estimativa Hengel
+  // padrão, e o valor real ficava invisível pra sempre depois disso.
+  const { cards } = useCards()
   const { notifications, unreadCount, markAllRead, markRead, deleteNotification, enablePush, disablePush } = useNotifications()
   const { config } = useConfig()
   const { toasts, add:addToast, dismiss } = useToasts()
@@ -425,7 +458,7 @@ export function GerenteView({ simClients = [] }) {
     <div style={{ background:T.bgCold, minHeight:'100vh', display:'flex', flexDirection:'column', fontFamily:FONT }}>
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
       <ToastContainer toasts={toasts} onDismiss={dismiss}/>
-      {reviewing && <ApprovalModal req={reviewing} profile={profile} isMobile={true} onApprove={handleApproveFromModal} onRefuse={handleRefuseFromModal} onClose={()=>setReviewing(null)} simClients={simClients}/>}
+      {reviewing && <ApprovalModal req={reviewing} profile={profile} isMobile={true} onApprove={handleApproveFromModal} onRefuse={handleRefuseFromModal} onClose={()=>setReviewing(null)} simClients={simClients} linkedCard={cards.find(c=>c.requestId===reviewing.id)}/>}
 
       {/* Header mobile */}
       <div style={{ background:T.verde, padding:'12px 16px', display:'flex', alignItems:'center', justifyContent:'space-between', boxShadow:T.shadowMd, flexShrink:0 }}>
@@ -553,7 +586,7 @@ export function GerenteView({ simClients = [] }) {
     <div style={{ background:T.bgCold, height:'100vh', display:'flex', flexDirection:'column', overflow:'hidden', fontFamily:FONT }}>
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
       <ToastContainer toasts={toasts} onDismiss={dismiss}/>
-      {reviewing && <ApprovalModal req={reviewing} profile={profile} isMobile={false} onApprove={handleApproveFromModal} onRefuse={handleRefuseFromModal} onClose={()=>setReviewing(null)} simClients={simClients}/>}
+      {reviewing && <ApprovalModal req={reviewing} profile={profile} isMobile={false} onApprove={handleApproveFromModal} onRefuse={handleRefuseFromModal} onClose={()=>setReviewing(null)} simClients={simClients} linkedCard={cards.find(c=>c.requestId===reviewing.id)}/>}
 
       <div style={{ background:T.verde, padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:56, flexShrink:0, boxShadow:T.shadowMd }}>
         <div style={{ display:'flex', alignItems:'center', gap:12 }}>

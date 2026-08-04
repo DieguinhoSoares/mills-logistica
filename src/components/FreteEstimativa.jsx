@@ -21,11 +21,21 @@ import { useState, useEffect, useRef } from 'react'
 import {
   calcularFrete, calcularDistancia, sugerirVeiculo,
   buscarGrupoModelo, selecionarVeiculoPorPeso,
-  resolverVeiculoTransporte, analisarRotaComParadas, VEICULOS, DIARIAS, formatBRL
+  resolverVeiculoTransporte, analisarRotaComParadas, VEICULOS, DIARIAS, MOTORISTAS_MILLS, formatBRL
 } from '../lib/freteCalc'
 import { T, FONT, IS, LS } from '../lib/constants'
 
-export function FreteEstimativa({ request, simClients = [], readOnly = false, isFrotas = false, onChange }) {
+// motorista Mills (Bento/Valdir) com desconto negociado sobre a tabela Hengel
+// — ver MOTORISTAS_MILLS. Comparação por nome porque é isso que chega até
+// aqui (driverName do motorista selecionado no AssignDriverModal); nenhum
+// campo de "é motorista Mills com desconto" existe no cadastro de motoristas.
+function buscarMotoristaMills(driverName) {
+  const nome = String(driverName||'').trim().toLowerCase()
+  if (!nome) return null
+  return MOTORISTAS_MILLS.find(m => m.nome.toLowerCase() === nome) || null
+}
+
+export function FreteEstimativa({ request, simClients = [], readOnly = false, isFrotas = false, driverName = '', onChange }) {
   const [km,           setKm]           = useState('')
   const [kmAuto,       setKmAuto]       = useState(null)
   const [kmLoading,    setKmLoading]    = useState(false)
@@ -226,20 +236,29 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
     })
   }, [request])
 
-  // ── Recalcula estimativa (sempre modo Hengel) ────────────────
+  // motorista Mills com desconto negociado (Bento/Valdir) — só entra em modo
+  // 'mills' quando o veículo já resolvido (peso/dimensão) bate com o veículo
+  // FIXO daquele motorista (Valdir sempre bitruck, Bento sempre prancha3).
+  // Se não bater (carga pede um veículo maior que o caminhão desse motorista
+  // específico), NÃO aplica desconto silenciosamente — mantém tarifa cheia e
+  // avisa, porque essa combinação motorista+veículo não é a que ele dirige.
+  const motoristaMills = buscarMotoristaMills(driverName)
+
+  // ── Recalcula estimativa ──────────────────────────────────────
   useEffect(() => {
     const kmVal = parseFloat(km)
     const vid   = veiculoId || (readOnly ? 'prancha3' : '')
     if (!kmVal || !vid) { setResultado(null); return }
+    const usaMills = motoristaMills && motoristaMills.veiculoId === vid
     const res = calcularFrete({
       km: kmVal, veiculoId: vid,
-      modo: 'estimativa',   // sempre Hengel aqui
+      modo: usaMills ? 'mills' : 'estimativa',
       subtype, outroEstado,
       comEscolta, diarias: parseInt(diarias) || 0,
       isGuindauto, retornoAoPatio,
     })
     setResultado(res)
-  }, [km, veiculoId, subtype, outroEstado, comEscolta, diarias, readOnly, retornoAoPatio])
+  }, [km, veiculoId, subtype, outroEstado, comEscolta, diarias, readOnly, retornoAoPatio, driverName])
 
   // Reporta a seleção atual pro componente pai — inclusive quando o analista
   // troca o veículo manualmente (setSugerido(false) no onChange do <select>
@@ -276,6 +295,11 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
           {outroEstado && !isGuindauto && (
             <span style={{ background:'#FFF3E0', color:'#E65100', borderRadius:20, padding:'2px 10px', fontSize:10, fontWeight:700, fontFamily:FONT }}>
               +12% outro estado
+            </span>
+          )}
+          {resultado?.modo==='mills' && (
+            <span style={{ background:T.verdeLight, color:T.verde, borderRadius:20, padding:'2px 10px', fontSize:10, fontWeight:700, fontFamily:FONT }}>
+              🏢 {motoristaMills.nome} — {Math.round(motoristaMills.desconto*100)}% abaixo Hengel
             </span>
           )}
           {readOnly && (
@@ -457,6 +481,11 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
                   </option>
                 ))}
               </select>
+              {motoristaMills && veiculoId && veiculoId !== motoristaMills.veiculoId && (
+                <div style={{ marginTop:6, padding:'6px 9px', background:T.amareloLight, borderRadius:T.rSm, color:'#B8860B', fontSize:10, fontFamily:FONT, fontWeight:700 }}>
+                  ⚠️ {motoristaMills.nome} dirige {VEICULOS.find(v=>v.id===motoristaMills.veiculoId)?.label} — o veículo desta carga é diferente, então o desconto de motorista Mills não foi aplicado (tarifa cheia abaixo).
+                </div>
+              )}
             </div>
           )}
 

@@ -79,7 +79,8 @@ export function AssignDriverModal({ req, drivers, simClients, cards, onConfirm, 
         style={{ background:T.surface, borderRadius:T.rLg, padding:28, width:540, maxHeight:'92vh', overflowY:'auto', boxShadow:T.shadowLg, border:`2px solid ${T.verde}` }}>
         <h2 style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:20, margin:'0 0 6px' }}>✅ Aceitar Solicitação</h2>
         <p style={{ color:T.textMuted, fontFamily:FONT, fontSize:12, margin:'0 0 4px' }}>Defina a execução para <strong style={{ color:T.laranja }}>{req?.clientName||req?.requesterName}</strong>.</p>
-        <FreteEstimativa request={req} simClients={simClients} onChange={setFrete}/>
+        <FreteEstimativa request={req} simClients={simClients} onChange={setFrete}
+          driverName={execType==='motorista' ? (selectedDriver?.name||'') : ''}/>
         <div style={{ display:'flex', gap:8, marginBottom:16, marginTop:16 }}>
           {[['motorista','👤 Motorista Mills'],['transportadora','🚚 Transportadora Externa']].map(([v,l])=>(
             <div key={v} onClick={()=>setExecType(v)} style={{ flex:1, border:`2px solid ${execType===v?T.laranja:T.border}`, borderRadius:T.r, padding:'9px 12px', cursor:'pointer', textAlign:'center', background:execType===v?T.laranjaLight:T.surfaceAlt }}>
