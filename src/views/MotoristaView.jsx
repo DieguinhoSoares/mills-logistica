@@ -230,6 +230,13 @@ function ServicoCard({ card, index, onUpdateStatus }) {
   const origemUF  = card.origin      || ''
   const destinoUF = card.destination || ''
 
+  // Lê direto de nInternosReserva (array bruto, sempre gravado corretamente
+  // desde sempre) em vez de confiar só em card.machine — esse é um campo
+  // derivado que só é recalculado quando o serviço é salvo de novo. Cards
+  // salvos antes da correção do cálculo de `machine` ficam com ele vazio
+  // pra sempre, mesmo já tendo o equipamento reserva certo no array bruto.
+  const maquinaReserva = card.nInternosReserva?.length ? card.nInternosReserva.join(', ') : card.machine
+
   const wazeUrl = `https://waze.com/ul?q=${encodeURIComponent(destino+' '+destinoUF)}&navigate=yes`
   const mapsUrl = `https://www.google.com/maps/dir/${encodeURIComponent(origem+' '+origemUF)}/${encodeURIComponent(destino+' '+destinoUF)}`
 
@@ -329,13 +336,13 @@ function ServicoCard({ card, index, onUpdateStatus }) {
             {[
               ['📅 Data',       `${fmt(card.startDate)}${card.endDate && card.endDate < todayStr() && !['concluido','cancelado'].includes(card.status) ? ' 🚨' : ''}`],
               ['⚡ Urgência',   `${ug?.icon} ${ug?.label}`],
-              // card.machine só existe (e é DIFERENTE de nInterno) quando o serviço
-              // é uma troca de verdade — duas máquinas físicas envolvidas: uma sai
-              // (equipamento reserva) e outra volta (nInterno). Nesse caso mostra
-              // as duas. Quando não há reserva, é uma única máquina — repetir o
-              // mesmo N° interno como "Máquina" sugeria (errado) que a mesma
-              // máquina saía e voltava, então omite a linha e sobra só N° Interno.
-              ...(card.machine && card.machine !== card.nInterno ? [['🔧 Máquina', card.machine]] : []),
+              // maquinaReserva só existe (e é DIFERENTE de nInterno) quando o
+              // serviço é uma troca de verdade — duas máquinas físicas envolvidas:
+              // uma sai (equipamento reserva) e outra volta (nInterno). Nesse caso
+              // mostra as duas. Quando não há reserva, é uma única máquina —
+              // repetir o mesmo N° interno como "Máquina" sugeria (errado) que a
+              // mesma máquina saía e voltava, então omite a linha e sobra só N° Interno.
+              ...(maquinaReserva && maquinaReserva !== card.nInterno ? [['🔧 Máquina', maquinaReserva]] : []),
               ['🔢 N° Interno', card.nInterno||'—'],
             ].map(([l,v]) => (
               <div key={l}>
