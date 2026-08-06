@@ -276,6 +276,14 @@ export function parseSIMCsv(text, Papa) {
 
     const name     = normName(nameRaw)
     const nInterno = getNInterno(r)
+    // Cliente (dono do contrato) é uma coluna separada de Planta/Obra (o
+    // site/obra específico onde o equipamento está) — quando as duas
+    // existem e são diferentes (ex: Planta/Obra = "Obra Rodovia BR-153",
+    // Cliente = "INFRAINVEST"), a busca por planta/obra em ClientInput só
+    // olhava pro nome agrupado (Planta/Obra tem prioridade, Cliente nunca
+    // aparecia) — quem digitasse o nome do cliente não encontrava a obra
+    // dele. Guarda o Cliente à parte pra também entrar na busca.
+    const clienteNome = (clienteRaw || clienteReservaRaw || '').trim()
 
     // Município e Estado sempre das mesmas colunas, independente da fonte da planta
     const state    = (r['Estado (Planta/Obra)']    || '').trim()
@@ -298,6 +306,7 @@ export function parseSIMCsv(text, Papa) {
     if (!map[name]) {
       map[name] = {
         name:         nameRaw.trim(),
+        cliente:      '',
         state, city,
         segment:      '',
         families:     new Set(),
@@ -318,11 +327,15 @@ export function parseSIMCsv(text, Papa) {
     }
     if (!map[name].state && state) map[name].state = state
     if (!map[name].city  && city)  map[name].city  = city
+    // Só guarda se for diferente do próprio nome (evita "INFRAINVEST · Cliente: INFRAINVEST"
+    // redundante quando Planta/Obra e Cliente já são o mesmo texto)
+    if (!map[name].cliente && clienteNome && normName(clienteNome) !== name) map[name].cliente = clienteNome
   })
 
   const clients = Object.values(map)
     .map(c => ({
       name:      c.name,
+      cliente:   c.cliente,
       state:     c.state,
       city:      c.city,
       segment:   c.segment,

@@ -202,8 +202,13 @@ export function ClientInput({ value, onChange, simClients }) {
     .replace(/[^a-z0-9\s]/g, '')                        // remove pontuação
     .trim()
 
+  // Busca por Planta/Obra (nome exibido) OU por Cliente — o CSV do SIM tem
+  // as duas colunas separadas, e quando ambas existem só a de Planta/Obra
+  // vira o nome agrupado (prioridade em parseSIMCsv). Sem isso, digitar o
+  // nome do cliente (ex: "INFRAINVEST") não encontrava a obra dele quando a
+  // obra tinha um nome de site diferente (ex: "Obra Rodovia BR-153").
   const filtered = search.length>1
-    ? simClients.filter(c => norm(c.name).includes(norm(search))).slice(0,8)
+    ? simClients.filter(c => norm(c.name).includes(norm(search)) || (c.cliente && norm(c.cliente).includes(norm(search)))).slice(0,8)
     : []
 
   const handleBlur = () => {
@@ -231,6 +236,7 @@ export function ClientInput({ value, onChange, simClients }) {
               onMouseEnter={e=>e.currentTarget.style.background=T.laranjaXLight}
               onMouseLeave={e=>e.currentTarget.style.background=T.surface}>
               <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:T.text }}>{c.name}</div>
+              {c.cliente && <div style={{ fontFamily:FONT, fontSize:10, color:T.laranja, fontWeight:600 }}>Cliente: {c.cliente}</div>}
               <div style={{ fontFamily:FONT, fontSize:10, color:T.textMuted }}>
                 {c.city?`${c.city} — `:''}{c.state} · {c.machines} máq.
                 {c.nInternos?.length>0 && <span style={{ color:T.info }}> · N°: {c.nInternos.slice(0,3).join(', ')}</span>}
