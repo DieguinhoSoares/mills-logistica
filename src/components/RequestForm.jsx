@@ -217,6 +217,16 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
   const [step,   setStep]   = useState(1)
+  // Modo do chip Motorista/Transportadora na reatribuição (isCardEdit) —
+  // precisa de estado próprio, não dava pra inferir só de
+  // driverId/transportadoraNome: ao clicar "Transportadora Externa" vindo de
+  // um card com motorista, o clique só limpava driverId (transportadoraNome
+  // continuava vazio até o analista digitar) — com os dois campos vazios, a
+  // lógica antiga (baseada em `!!form.transportadoraNome`) caía de volta pro
+  // fallback de "Motorista Mills" tanto no chip destacado quanto na escolha
+  // de qual campo mostrar. Resultado: clicar no botão não tinha efeito
+  // visível nenhum — parecia que o clique não fazia nada.
+  const [execTypeEdit, setExecTypeEdit] = useState(initial.transportadoraNome ? 'transportadora' : 'motorista')
   // Rastreia, por campo, se há um N° interno "fora do padrão" esperando o
   // clique em "Sim, está correto" — enquanto pendente, esse valor NÃO está
   // na lista ainda. Bloqueamos avançar/enviar até resolver.
@@ -766,11 +776,18 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
             <label style={LS}>👤 Motorista / Transportadora responsável</label>
             <div style={{ display:'flex', gap:8, marginBottom:8, marginTop:4 }}>
               {[['motorista','👤 Motorista Mills'],['transportadora','🚚 Transportadora Externa']].map(([v,l])=>{
-                const ativo = v==='transportadora' ? !!form.transportadoraNome && !form.driverId : !!form.driverId || (!form.transportadoraNome)
+                const ativo = execTypeEdit === v
                 return (
                   <div key={v} onClick={()=>{
-                      if(v==='transportadora') set('driverId','')
-                      else set('transportadoraNome','')
+                      setExecTypeEdit(v)
+                      // Limpa os dois campos do lado que saiu — sem isso, driverName
+                      // ficava com o nome do motorista antigo mesmo depois de trocar
+                      // pra Transportadora Externa (e sem preencher o nome dela
+                      // ainda), e handleSaveCard cai de volta nesse nome como
+                      // fallback (`transportadoraNome || driverName || ...`),
+                      // salvando o motorista antigo mesmo com a troca feita.
+                      if(v==='transportadora') { set('driverId',''); set('driverName','') }
+                      else { set('transportadoraNome',''); set('transportadoraCnpj','') }
                     }}
                     style={{ flex:1, border:`2px solid ${ativo?T.laranja:T.border}`, borderRadius:T.rSm, padding:'7px 10px', cursor:'pointer', textAlign:'center', background:ativo?T.laranjaLight:T.surface }}>
                     <div style={{ color:T.text, fontFamily:FONT, fontSize:11, fontWeight:ativo?800:500 }}>{l}</div>
@@ -778,7 +795,7 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
                 )
               })}
             </div>
-            {!form.transportadoraNome ? (
+            {execTypeEdit==='motorista' ? (
               <select value={form.driverId} onChange={e=>{
                   const d=(drivers||[]).find(x=>x.id===e.target.value)
                   set('driverId',e.target.value); set('driverName',d?.name||''); set('transportadoraNome','')
