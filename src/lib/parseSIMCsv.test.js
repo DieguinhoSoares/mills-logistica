@@ -43,4 +43,33 @@ describe('parseSIMCsv — Cliente capturado separado de Planta/Obra', () => {
     expect(client.name).toBe('INFRAINVEST')
     expect(client.cliente).toBe('')
   })
+
+  // Caso real: PCP01167 (Caterpillar 938K SC, confirmadamente cadastrada no
+  // SIM) não aparecia em nenhum cliente da base carregada — a linha do CSV
+  // não tinha Planta/Obra nem Cliente preenchidos (equipamento parado no
+  // pátio, sem alocação atual), e a linha inteira era descartada antes de
+  // guardar Fabricante/Modelo/Grupo de Modelo. A máquina simplesmente
+  // desaparecia da base, mesmo estando corretamente registrada no SIM.
+  it('sem Planta/Obra e sem Cliente (equipamento no pátio): não descarta a linha — agrupa num cliente sentinela pra manter a máquina pesquisável', () => {
+    const csv = [
+      'grupo;grupo;grupo;grupo',
+      'Nº interno;Fabricante;Modelo;Grupo de modelo',
+      'PCP01167;CATERPILLAR;938K-SC;Pá Carregadeira 15 a 17 t',
+    ].join('\n')
+    const [client] = parseSIMCsv(csv, Papa)
+    expect(client).toBeDefined()
+    expect(client.nInternos).toContain('PCP01167')
+    expect(client.machineModelos['PCP01167']).toEqual({ fabricante:'CATERPILLAR', modelo:'938K-SC' })
+    expect(client.machineGroups['PCP01167']).toBe('Pá Carregadeira 15 a 17 t')
+  })
+
+  it('linha sem Planta/Obra, sem Cliente E sem N° interno: continua descartada (nada pra agrupar nem pesquisar)', () => {
+    const csv = [
+      'grupo;grupo',
+      'Estado (Planta/Obra);Família',
+      'GO;Escavadeira',
+    ].join('\n')
+    const clients = parseSIMCsv(csv, Papa)
+    expect(clients).toEqual([])
+  })
 })

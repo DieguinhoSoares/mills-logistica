@@ -271,11 +271,21 @@ export function parseSIMCsv(text, Papa) {
     const clienteRaw        = (r['Cliente']           || '').trim()
     const clienteReservaRaw = (r['Cliente (reserva)']  || '').trim()
 
-    const nameRaw = plantaRaw || reservaRaw || clienteRaw || clienteReservaRaw
+    const nInterno = getNInterno(r)
+    // Bug real (caso PCP01167): equipamento sem Planta/Obra e sem Cliente
+    // preenchidos no CSV (parado no pátio, sem alocação atual — nenhuma das
+    // 4 colunas de origem tem valor) era descartado ANTES até de guardar
+    // Fabricante/Modelo/Grupo de Modelo — a linha inteira era ignorada por
+    // não ter nome pra agrupar. Resultado: a máquina simplesmente não
+    // entrava na base carregada, mesmo estando corretamente cadastrada no
+    // SIM — e caía como "não reconhecida" no cálculo de frete. Agora, se
+    // não há nome mas há N° interno, agrupa num "cliente" sentinela em vez
+    // de descartar, só pra manter a dimensão/peso pesquisável.
+    const SEM_CLIENTE = '(Sem Planta/Obra ou Cliente — Pátio)'
+    const nameRaw = plantaRaw || reservaRaw || clienteRaw || clienteReservaRaw || (nInterno ? SEM_CLIENTE : '')
     if (!nameRaw) return
 
-    const name     = normName(nameRaw)
-    const nInterno = getNInterno(r)
+    const name = normName(nameRaw)
     // Cliente (dono do contrato) é uma coluna separada de Planta/Obra (o
     // site/obra específico onde o equipamento está) — quando as duas
     // existem e são diferentes (ex: Planta/Obra = "Obra Rodovia BR-153",
