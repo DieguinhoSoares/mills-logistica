@@ -536,10 +536,24 @@ export function useSimClients() {
     const BATCH = 50
     const batches = []
     for (let i = 0; i < clients.length; i += BATCH) batches.push(clients.slice(i, i+BATCH))
+    // Bug real (causa do CSV "não lido por completo"): a ordem antiga
+    // escrevia o doc de metadados (total/batches) PRIMEIRO e só depois os
+    // lotes simClients_0, simClients_1... em sequência. O onSnapshot do
+    // useSimClients escuta justamente esse doc de metadados — assim que ele
+    // confirmava a escrita, o listener já disparava e lia (getDoc, leitura
+    // única) TODOS os N lotes anunciados, mesmo os que ainda não tinham sido
+    // gravados nesse momento (o loop sequencial de escrita ainda estava
+    // rodando). Lotes ainda inexistentes eram simplesmente pulados — base
+    // carregada pela metade, sem erro nenhum visível, e sem novo disparo do
+    // listener depois (ele só escuta o doc de metadados, não os lotes). Como
+    // simClients é a mesma base usada no cálculo de frete, isso também
+    // explica máquinas cadastradas no SIM que apareciam como "não
+    // reconhecidas" logo após uma atualização de base grande.
+    // Fix: grava todos os lotes primeiro (em paralelo) e só atualiza os
+    // metadados por último — quando o listener disparar, todos os lotes já
+    // existem completos no Firestore.
+    await Promise.all(batches.map((b,i) => setDoc(doc(db,'config',`simClients_${i}`), { clients:b, updatedAt:serverTimestamp() })))
     await setDoc(doc(db,'config','simClients'), { total:clients.length, batches:batches.length, updatedAt:serverTimestamp() })
-    for (let i = 0; i < batches.length; i++) {
-      await setDoc(doc(db,'config',`simClients_${i}`), { clients:batches[i], updatedAt:serverTimestamp() })
-    }
   }
   return { simClients, uploadClients }
 }
