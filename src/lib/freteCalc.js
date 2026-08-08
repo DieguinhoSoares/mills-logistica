@@ -1068,6 +1068,27 @@ const ESTADOS_BR = {
 }
 function normTxtUF(s) { return String(s||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim() }
 
+// Descobre a UF de uma cidade brasileira pela base oficial do IBGE — usada
+// quando a solicitação não tem a UF preenchida (card antigo com
+// origin/destination vazio, sem ninguém precisar digitar nada na mão pra
+// corrigir). Fonte AUTORITATIVA (cadastro oficial do governo, não
+// crowd-sourced como o OpenStreetMap/Nominatim — que já causou o bug real
+// de geocodificação sem UF devolvendo uma cidade errada de outro estado).
+// Só resolve quando o nome é INEQUÍVOCO nacionalmente — mais de um
+// município com o mesmo nome em estados diferentes (existem várias cidades
+// "Bom Jesus" Brasil afora, por exemplo) fica sem resolver, pra não
+// arriscar escolher o estado errado.
+async function descobrirUFPorCidade(cidade) {
+  try {
+    const res  = await fetch('https://servicodados.ibge.gov.br/api/v1/localidades/municipios?orderBy=nome')
+    const data = await res.json()
+    const alvo = normTxtUF(cidade)
+    const matches = data.filter(m => normTxtUF(m.nome) === alvo)
+    if (matches.length !== 1) return null
+    return matches[0].microrregiao?.mesorregiao?.UF?.sigla || null
+  } catch { return null }
+}
+
 async function buscarCoordenadas(cidade, uf) {
   // Causa raiz REAL do bug persistir mesmo depois das checagens de estado
   // (texto) e geografia abaixo: a solicitação real em produção estava com a
@@ -1077,17 +1098,16 @@ async function buscarCoordenadas(cidade, uf) {
   // comparando texto, nem geografia: uma coordenada em outro estado
   // qualquer bate "consigo mesma" (é autoconsistente com o que a própria
   // Nominatim diz), então não existe checagem que distinga "cidade errada
-  // mas coerente" de "cidade certa". Antes disso, a versão anterior desse
-  // código nem percebia o problema — montava a URL com "&state=undefined"
-  // (encodeURIComponent(undefined) vira a STRING "undefined") e confiava
-  // cegamente em qualquer coisa que a Nominatim devolvesse pra essa busca
-  // sem filtro de estado nenhum. Mesma filosofia já usada no resto do
-  // sistema pra máquina não reconhecida (ver temItemNaoIdentificado): sem
-  // como confirmar que está certo, não adivinha — recusa geocodificar e
-  // força a tela a pedir km manual.
-  if (!uf) return null
+  // mas coerente" de "cidade certa". Pedir pro aprovador digitar o km na
+  // mão também não é aceitável — não é função dele, e não corrige o dado
+  // pras próximas vezes. Em vez disso, tenta descobrir a UF sozinho pela
+  // base oficial do IBGE (autoconsertável, sem intervenção manual); só cai
+  // pro fluxo de "informe manualmente" se nem isso resolver (nome de cidade
+  // ambíguo entre estados).
+  const ufResolvida = uf || await descobrirUFPorCidade(cidade)
+  if (!ufResolvida) return null
   try {
-    const estado = ESTADOS_BR[uf] || uf
+    const estado = ESTADOS_BR[ufResolvida] || ufResolvida
     const url = `https://nominatim.openstreetmap.org/search?` +
       `city=${encodeURIComponent(cidade)}&state=${encodeURIComponent(estado)}` +
       `&country=Brazil&format=json&limit=1&addressdetails=1`
@@ -1103,17 +1123,17 @@ async function buscarCoordenadas(cidade, uf) {
     // próprio OpenStreetMap, não dá pra detectar só lendo texto). Por isso
     // a validação principal é GEOGRÁFICA: confere se a coordenada devolvida
     // realmente cai dentro (ou perto) da caixa delimitadora real da UF
-    // PEDIDA (sempre existe nesse ponto — a função já retornou null acima
-    // se não tivesse), sem depender do que a Nominatim diz que é.
+    // resolvida (pedida OU descoberta via IBGE acima), sem depender do que
+    // a Nominatim diz que é.
     const estadoRetornado = data[0].address?.state
     if (estadoRetornado && normTxtUF(estadoRetornado) !== normTxtUF(estado)) {
-      console.warn(`[freteCalc] geocodificação de "${cidade}" (${uf}) devolveu estado diferente do pedido: "${estadoRetornado}" — descartando resultado`)
+      console.warn(`[freteCalc] geocodificação de "${cidade}" (${ufResolvida}) devolveu estado diferente do pedido: "${estadoRetornado}" — descartando resultado`)
       return null
     }
     const lat = parseFloat(data[0].lat)
     const lon = parseFloat(data[0].lon)
-    if (coordenadaForaDaUF(lat, lon, uf)) {
-      console.warn(`[freteCalc] geocodificação de "${cidade}" (${uf}) devolveu coordenada fora da UF (lat ${lat}, lon ${lon}) — descartando resultado`)
+    if (coordenadaForaDaUF(lat, lon, ufResolvida)) {
+      console.warn(`[freteCalc] geocodificação de "${cidade}" (${ufResolvida}) devolveu coordenada fora da UF (lat ${lat}, lon ${lon}) — descartando resultado`)
       return null
     }
     return { lat, lon }

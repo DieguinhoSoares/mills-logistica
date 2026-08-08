@@ -619,43 +619,70 @@ describe('calcularDistancia — rejeita geocodificação que devolve estado dife
 // comparar, NENHUMA checagem (nem texto, nem geografia) consegue distinguir
 // "cidade errada" de "cidade certa" — uma coordenada em outro estado
 // qualquer é sempre autoconsistente com o que a própria Nominatim diz que
-// é. A versão anterior desse código nem percebia isso: montava a URL com
-// "&state=undefined" (encodeURIComponent(undefined) vira a STRING
-// "undefined") e confiava cegamente em qualquer coisa que a Nominatim
-// devolvesse. Fix: sem UF, nem tenta geocodificar — mesma filosofia já
-// usada pra máquina não reconhecida (não adivinha, força revisão manual).
+// é. Pedir pro aprovador digitar o km na mão também não resolve nada — não
+// é função dele, e o card fica quebrado pra sempre. Fix: descobre a UF
+// sozinho pela base oficial do IBGE (autoritativa, sem a ambiguidade do
+// OpenStreetMap) — autoconserta o card sem ninguém precisar editar nada.
 describe('calcularDistancia — UF de destino vazia (card sem origin/destination preenchido)', () => {
+  const CANAPOLIS_MG = { lat:-18.7228793, lon:-49.2016329, state:'Minas Gerais' }
+  const ASSIS_SP      = { lat:-22.6620892, lon:-50.4206230, state:'São Paulo' }
+
+  function mockComIBGE({ municipios, destino, kmRota }) {
+    return url => {
+      if (url.includes('servicodados.ibge.gov.br')) {
+        return Promise.resolve({ json: async () => municipios })
+      }
+      if (url.includes('nominatim.openstreetmap.org')) {
+        const c = url.includes('city=Can') ? destino : ASSIS_SP
+        return Promise.resolve({ json: async () => [{ lat:String(c.lat), lon:String(c.lon), address:{ state:c.state } }] })
+      }
+      if (url.includes('router.project-osrm.org')) {
+        return Promise.resolve({ json: async () => ({ routes:[{ distance: kmRota * 1000 }] }) })
+      }
+      return Promise.resolve({ json: async () => ({}) })
+    }
+  }
+
   afterEach(() => { vi.unstubAllGlobals() })
 
-  it('sem UF de destino: nem tenta geocodificar o lado sem UF — recusa em vez de arriscar a cidade errada', async () => {
-    const fetchMock = vi.fn(() => Promise.resolve({ json: async () => [] }))
-    vi.stubGlobal('fetch', fetchMock)
+  it('sem UF de destino, nome de cidade INEQUÍVOCO no IBGE (só 1 "Canápolis" no Brasil): descobre a UF sozinho e calcula certo — sem editar o card nem pedir km manual', async () => {
+    const municipios = [{ nome:'Canápolis', microrregiao:{ mesorregiao:{ UF:{ sigla:'MG' } } } }]
+    vi.stubGlobal('fetch', vi.fn(mockComIBGE({ municipios, destino:CANAPOLIS_MG, kmRota:542 })))
+    const { km } = await calcularDistancia('Assis', 'SP', 'Canápolis', undefined)
+    expect(km).toBe(542)
+  })
+
+  it('sem UF de destino, nome de cidade AMBÍGUO no IBGE (2+ municípios homônimos em estados diferentes): não arrisca escolher — cai pro fluxo de km manual', async () => {
+    const municipios = [
+      { nome:'Bom Jesus', microrregiao:{ mesorregiao:{ UF:{ sigla:'PI' } } } },
+      { nome:'Bom Jesus', microrregiao:{ mesorregiao:{ UF:{ sigla:'RS' } } } },
+    ]
+    vi.stubGlobal('fetch', vi.fn(mockComIBGE({ municipios, destino:CANAPOLIS_MG, kmRota:542 })))
+    const { km } = await calcularDistancia('Assis', 'SP', 'Bom Jesus', undefined)
+    expect(km).toBeNull()
+  })
+
+  it('sem UF de destino e o IBGE não devolve nada útil (falha de rede): cai pro fluxo de km manual, não trava', async () => {
+    vi.stubGlobal('fetch', vi.fn(url => {
+      if (url.includes('servicodados.ibge.gov.br')) return Promise.reject(new Error('offline'))
+      return Promise.resolve({ json: async () => ({}) })
+    }))
     const { km } = await calcularDistancia('Assis', 'SP', 'Canápolis', undefined)
     expect(km).toBeNull()
-    // Só chama a Nominatim pro lado que TEM UF (Assis/SP) — o lado sem UF
-    // (Canápolis, sem destino) nunca gera uma chamada de rede.
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(fetchMock.mock.calls[0][0]).toContain('city=Assis')
   })
 
-  it('sem UF de origem: mesmo comportamento (nem chama a Nominatim pro lado sem UF)', async () => {
-    const fetchMock = vi.fn()
-    vi.stubGlobal('fetch', fetchMock)
-    const { km } = await calcularDistancia('Assis', undefined, 'Canápolis', 'MG')
-    expect(km).toBeNull()
-  })
-
-  it('com as duas UFs preenchidas: geocodifica normalmente (sem regressão)', async () => {
-    const canapolisCorreto = { lat:-18.7228793, lon:-49.2016329, state:'Minas Gerais' }
-    const assisSp           = { lat:-22.6620892, lon:-50.4206230, state:'São Paulo' }
+  it('com as duas UFs preenchidas: nem chama o IBGE — geocodifica direto (sem regressão, sem chamada de rede extra desnecessária)', async () => {
+    const ibgeMock = vi.fn()
     vi.stubGlobal('fetch', vi.fn(url => {
+      if (url.includes('servicodados.ibge.gov.br')) { ibgeMock(); return Promise.resolve({ json: async () => [] }) }
       if (url.includes('nominatim.openstreetmap.org')) {
-        const c = url.includes('city=Can') ? canapolisCorreto : assisSp
+        const c = url.includes('city=Can') ? CANAPOLIS_MG : ASSIS_SP
         return Promise.resolve({ json: async () => [{ lat:String(c.lat), lon:String(c.lon), address:{ state:c.state } }] })
       }
       return Promise.resolve({ json: async () => ({ routes:[{ distance: 542000 }] }) })
     }))
     const { km } = await calcularDistancia('Assis', 'SP', 'Canápolis', 'MG')
     expect(km).toBe(542)
+    expect(ibgeMock).not.toHaveBeenCalled()
   })
 })
