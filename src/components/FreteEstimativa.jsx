@@ -247,7 +247,14 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
   // ── Recalcula estimativa ──────────────────────────────────────
   useEffect(() => {
     const kmVal = parseFloat(km)
-    const vid   = veiculoId || (readOnly ? 'prancha3' : '')
+    // O fallback pra prancha3 em modo leitura é só pra "ainda não calculou
+    // nada" (veiculoId realmente nunca setado). Quando modoManual é true, o
+    // veiculoId vazio é um sinal DELIBERADO ("máquina não reconhecida" ou
+    // "categoria sempre rebocada" — ver Seleção de veículo por peso acima) —
+    // usar prancha3 aqui inventava um preço por cima do próprio aviso de
+    // "informe o frete manualmente" que a tela mostra ao lado, o pior tipo de
+    // erro: um total que parece legítimo pro aprovador, mas não é.
+    const vid   = veiculoId || (readOnly && !modoManual ? 'prancha3' : '')
     if (!kmVal || !vid) { setResultado(null); return }
     const usaMills = motoristaMills && motoristaMills.veiculoId === vid
     const res = calcularFrete({
@@ -265,7 +272,7 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
   // já sinaliza isso; aqui é só repassar pra fora).
   useEffect(() => {
     if (!onChange) return
-    const vid = veiculoId || (readOnly ? 'prancha3' : '')
+    const vid = veiculoId || (readOnly && !modoManual ? 'prancha3' : '')
     const usarSeparado = cobrarSeparado ?? rotaInfo?.ehDesvio
     // Bug corrigido: `parseFloat(valorManual) || null` tratava 0 como "vazio"
     // (0 é falsy em JS) — um frete de R$0,00 (ex: transportadora do cliente,
@@ -553,7 +560,20 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
       {!rotaInfo && (
       <>
       <div style={{ marginBottom:12 }}>
-        <button onClick={()=>{userTouched.current=true;setModoManual(m=>!m)}}
+        <button onClick={()=>{
+            const indoPraManual = !modoManual
+            // Indo pro manual: trava o recálculo automático (não pode sobrescrever
+            // o que o analista vai digitar). Voltando pro automático: PRECISA
+            // liberar o recálculo (userTouched=false), senão "Voltar para cálculo
+            // automático" só troca qual bloco aparece na tela, sem realmente
+            // recalcular nada — ficava mostrando veiculoId/grupoLabel travados
+            // desde a última vez que o efeito rodou (podem já estar desatualizados
+            // ou, pior, vazios por "máquina não reconhecida", caso em que o
+            // fallback de leitura (readOnly) inventava uma Prancha 3 eixos por
+            // cima do aviso de "informe manualmente" ainda visível).
+            userTouched.current = indoPraManual
+            setModoManual(indoPraManual)
+          }}
           style={{ background:'none', border:'none', color:T.laranja, fontFamily:FONT, fontWeight:700, fontSize:11, cursor:'pointer', padding:0 }}>
           {modoManual ? '← Voltar para cálculo automático' : '✏️ Prefere informar o frete manualmente?'}
         </button>
