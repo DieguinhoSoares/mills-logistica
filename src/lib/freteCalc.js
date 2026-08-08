@@ -1078,14 +1078,30 @@ function normTxtUF(s) { return String(s||'').toUpperCase().normalize('NFD').repl
 // município com o mesmo nome em estados diferentes (existem várias cidades
 // "Bom Jesus" Brasil afora, por exemplo) fica sem resolver, pra não
 // arriscar escolher o estado errado.
-async function descobrirUFPorCidade(cidade) {
+// Devolve { nome, uf } com o nome CANÔNICO do IBGE (não o texto bruto que
+// veio do card) — importante porque cards antigos guardam a cidade como
+// texto solto, às vezes com sujeira colada (ex: "Canápolis - MG"), e esse
+// texto sujo, se fosse repassado direto pra Nominatim depois, prejudicaria
+// a busca de coordenada mesmo já tendo descoberto a UF certa aqui.
+async function descobrirCidadeIBGE(cidade) {
   try {
     const res  = await fetch('https://servicodados.ibge.gov.br/api/v1/localidades/municipios?orderBy=nome')
     const data = await res.json()
     const alvo = normTxtUF(cidade)
-    const matches = data.filter(m => normTxtUF(m.nome) === alvo)
+    if (!alvo) return null
+    let matches = data.filter(m => normTxtUF(m.nome) === alvo)
+    // Se não bateu exato, tenta por prefixo — só aceita se sobrar
+    // exatamente 1 candidato inequívoco, mesmo padrão de segurança do
+    // match exato (ver comentário acima sobre nome com sujeira colada).
+    if (matches.length === 0) {
+      matches = data.filter(m => {
+        const nomeNorm = normTxtUF(m.nome)
+        return nomeNorm && (alvo.startsWith(nomeNorm) || nomeNorm.startsWith(alvo))
+      })
+    }
     if (matches.length !== 1) return null
-    return matches[0].microrregiao?.mesorregiao?.UF?.sigla || null
+    const uf = matches[0].microrregiao?.mesorregiao?.UF?.sigla
+    return uf ? { nome: matches[0].nome, uf } : null
   } catch { return null }
 }
 
@@ -1103,13 +1119,21 @@ async function buscarCoordenadas(cidade, uf) {
   // pras próximas vezes. Em vez disso, tenta descobrir a UF sozinho pela
   // base oficial do IBGE (autoconsertável, sem intervenção manual); só cai
   // pro fluxo de "informe manualmente" se nem isso resolver (nome de cidade
-  // ambíguo entre estados).
-  const ufResolvida = uf || await descobrirUFPorCidade(cidade)
-  if (!ufResolvida) return null
+  // ambíguo entre estados). Também troca o nome da cidade pelo canônico do
+  // IBGE nesse caso — texto sujo de card antigo (ex: "Canápolis - MG") não
+  // vai direto pra Nominatim, só a UF descoberta seria pouco.
+  let cidadeResolvida = cidade
+  let ufResolvida = uf
+  if (!ufResolvida) {
+    const achado = await descobrirCidadeIBGE(cidade)
+    if (!achado) return null
+    cidadeResolvida = achado.nome
+    ufResolvida = achado.uf
+  }
   try {
     const estado = ESTADOS_BR[ufResolvida] || ufResolvida
     const url = `https://nominatim.openstreetmap.org/search?` +
-      `city=${encodeURIComponent(cidade)}&state=${encodeURIComponent(estado)}` +
+      `city=${encodeURIComponent(cidadeResolvida)}&state=${encodeURIComponent(estado)}` +
       `&country=Brazil&format=json&limit=1&addressdetails=1`
     const res  = await fetch(url, { headers:{ 'Accept-Language':'pt-BR', 'User-Agent':'mills-logistica/1.0' } })
     const data = await res.json()

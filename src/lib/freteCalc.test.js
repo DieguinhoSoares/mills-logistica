@@ -652,6 +652,13 @@ describe('calcularDistancia — UF de destino vazia (card sem origin/destination
     expect(km).toBe(542)
   })
 
+  it('sem UF de destino, cidade cadastrada com sujeira no card antigo ("Canápolis - MG" em vez de só "Canápolis"): ainda descobre a UF por prefixo, sem ambiguidade', async () => {
+    const municipios = [{ nome:'Canápolis', microrregiao:{ mesorregiao:{ UF:{ sigla:'MG' } } } }]
+    vi.stubGlobal('fetch', vi.fn(mockComIBGE({ municipios, destino:CANAPOLIS_MG, kmRota:542 })))
+    const { km } = await calcularDistancia('Assis', 'SP', 'Canápolis - MG', undefined)
+    expect(km).toBe(542)
+  })
+
   it('sem UF de destino, nome de cidade AMBÍGUO no IBGE (2+ municípios homônimos em estados diferentes): não arrisca escolher — cai pro fluxo de km manual', async () => {
     const municipios = [
       { nome:'Bom Jesus', microrregiao:{ mesorregiao:{ UF:{ sigla:'PI' } } } },
