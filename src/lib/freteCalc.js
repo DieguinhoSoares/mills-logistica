@@ -1071,10 +1071,25 @@ async function buscarCoordenadas(cidade, uf) {
     const estado = estadosBR[uf] || uf
     const url = `https://nominatim.openstreetmap.org/search?` +
       `city=${encodeURIComponent(cidade)}&state=${encodeURIComponent(estado)}` +
-      `&country=Brazil&format=json&limit=1`
+      `&country=Brazil&format=json&limit=1&addressdetails=1`
     const res  = await fetch(url, { headers:{ 'Accept-Language':'pt-BR', 'User-Agent':'mills-logistica/1.0' } })
     const data = await res.json()
     if (!data?.length) return null
+    // Bug real (2026-08): a Nominatim devolveu, com status 200 "normal", um
+    // ponto no interior da BAHIA pra uma busca de "Canápolis" + "Minas
+    // Gerais" — a cidade certa (confirmada manualmente) fica a ~1250km
+    // dali. Nenhum erro de rede, nenhum timeout — só o resultado errado. O
+    // restante do cálculo (rota, checagem de rota implausível, preço) não
+    // tinha como pegar isso sozinho, porque a rota ATÉ o ponto errado é
+    // plausível — o problema é o ponto em si. addressdetails=1 devolve o
+    // estado do resultado; se vier de um estado diferente do pedido,
+    // descarta em vez de seguir usando uma coordenada da cidade errada.
+    const normTxt = s => String(s||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim()
+    const estadoRetornado = data[0].address?.state
+    if (estado && estadoRetornado && normTxt(estadoRetornado) !== normTxt(estado)) {
+      console.warn(`[freteCalc] geocodificação de "${cidade}" (${uf}) devolveu estado diferente do pedido: "${estadoRetornado}" — descartando resultado`)
+      return null
+    }
     return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) }
   } catch { return null }
 }

@@ -4,7 +4,7 @@
 // Rodar: npm test
 // ============================================================
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { calcularFrete, selecionarVeiculoPorPeso, resolverVeiculoTransporte, analisarRotaComParadas, getValorIda, otimizarOrdemParadas, DIARIAS, VEICULOS, formatBRL, PESO_GRUPO, buscarGrupoModelo, buscarFabricanteModelo, kmRotaEhPlausivel } from './freteCalc'
+import { calcularFrete, selecionarVeiculoPorPeso, resolverVeiculoTransporte, analisarRotaComParadas, getValorIda, otimizarOrdemParadas, DIARIAS, VEICULOS, formatBRL, PESO_GRUPO, buscarGrupoModelo, buscarFabricanteModelo, kmRotaEhPlausivel, calcularDistancia } from './freteCalc'
 
 describe('calcularFrete — entradas inválidas', () => {
   it('retorna null sem km', () => {
@@ -549,5 +549,52 @@ describe('kmRotaEhPlausivel — rejeita rota OSRM implausível (caso real Assis/
 
   it('coordenadas idênticas (reta=0): não divide por zero, sempre plausível', () => {
     expect(kmRotaEhPlausivel(50, assis, assis)).toBe(true)
+  })
+})
+
+// Caso real (2026-08), descoberto depois do fix acima: kmRotaEhPlausivel não
+// bastou. A Nominatim devolveu, com HTTP 200 "normal", coordenadas de uma
+// cidade no interior da BAHIA pra uma busca de "Canápolis" + "Minas
+// Gerais" — confirmado via Network tab do usuário (URL da OSRM usando
+// -44.200949,-13.072454 como destino, quando Canápolis/MG real é
+// -49.2016329,-18.7228793). Como a rota ATÉ o ponto errado é uma rota real e
+// plausível, a checagem de km sozinha não detecta isso — o problema é a
+// coordenada em si, não a distância entre os 2 pontos.
+describe('calcularDistancia — rejeita geocodificação que devolve estado diferente do pedido', () => {
+  const CANAPOLIS_MG_CORRETO = { lat:-18.7228793, lon:-49.2016329, state:'Minas Gerais' }
+  const PONTO_ERRADO_BAHIA   = { lat:-13.072454,  lon:-44.200949,  state:'Bahia' }
+  const ASSIS_SP = { lat:-22.6620892, lon:-50.4206230, state:'São Paulo' }
+
+  function mockFetchComEstado(destino, kmRota) {
+    return url => {
+      if (url.includes('nominatim.openstreetmap.org')) {
+        const isDestino = url.includes('city=Can') // "Canápolis" url-encoded
+        const c = isDestino ? destino : ASSIS_SP
+        return Promise.resolve({ json: async () => [{ lat:String(c.lat), lon:String(c.lon), address:{ state:c.state } }] })
+      }
+      if (url.includes('router.project-osrm.org')) {
+        return Promise.resolve({ json: async () => ({ routes:[{ distance: kmRota * 1000 }] }) })
+      }
+      return Promise.resolve({ json: async () => ({}) })
+    }
+  }
+
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  it('Nominatim devolve estado errado (Bahia) pra uma busca em Minas Gerais → descarta, não usa a coordenada errada', async () => {
+    // OSRM mockado devolvendo o valor real do bug (1589km) — mas nem chega a
+    // ser avaliado, porque a coordenada já é descartada antes da chamada à OSRM.
+    vi.stubGlobal('fetch', vi.fn(mockFetchComEstado(PONTO_ERRADO_BAHIA, 1589)))
+    const { km } = await calcularDistancia('Assis', 'SP', 'Canápolis', 'MG')
+    // Sem coordenada válida pro destino, calcularDistancia não tem como
+    // calcular NADA (nem rota real, nem Haversine) — melhor pedir km manual
+    // do que seguir usando um destino que não é o real.
+    expect(km).toBeNull()
+  })
+
+  it('Nominatim devolve o estado certo (Minas Gerais) → aceita normalmente', async () => {
+    vi.stubGlobal('fetch', vi.fn(mockFetchComEstado(CANAPOLIS_MG_CORRETO, 542)))
+    const { km } = await calcularDistancia('Assis', 'SP', 'Canápolis', 'MG')
+    expect(km).toBe(542) // rota real (Google Maps) entre os pontos CERTOS — plausível, aceita
   })
 })
