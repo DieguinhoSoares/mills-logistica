@@ -672,6 +672,15 @@ export function FreteEstimativa({ request, simClients = [], readOnly = false, is
               : !veiculoId
               ? '🚛 Selecione o veículo para calcular.'
               : ''}
+            {/* Diagnóstico visível na própria tela — sem precisar de DevTools —
+                pra dar pra ver de cara o que exatamente falhou na busca de
+                distância (cidade/UF ausente, nome que a base não reconhece,
+                etc.), em vez de só "não encontrada" sem explicação. */}
+            {!km && (
+              <div style={{ marginTop:8, fontSize:9, color:T.textMuted, opacity:.75 }}>
+                origem: {request?.originCityName||'—'} ({request?.origin||'sem UF'}) → destino: {request?.destCityName||'—'} ({request?.destination||'sem UF'})
+              </div>
+            )}
           </div>
         )
       )}
