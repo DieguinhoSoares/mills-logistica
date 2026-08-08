@@ -611,3 +611,51 @@ describe('calcularDistancia — rejeita geocodificação que devolve estado dife
     expect(km).toBeNull()
   })
 })
+
+// Causa raiz REAL do bug persistir mesmo depois dos 2 fixes acima (2026-08):
+// a solicitação real em produção estava com a UF de destino VAZIA (mesmo
+// problema de dado que a ferramenta de migração do Master existe pra
+// corrigir — request.destination não preenchido). Sem uma UF esperada pra
+// comparar, NENHUMA checagem (nem texto, nem geografia) consegue distinguir
+// "cidade errada" de "cidade certa" — uma coordenada em outro estado
+// qualquer é sempre autoconsistente com o que a própria Nominatim diz que
+// é. A versão anterior desse código nem percebia isso: montava a URL com
+// "&state=undefined" (encodeURIComponent(undefined) vira a STRING
+// "undefined") e confiava cegamente em qualquer coisa que a Nominatim
+// devolvesse. Fix: sem UF, nem tenta geocodificar — mesma filosofia já
+// usada pra máquina não reconhecida (não adivinha, força revisão manual).
+describe('calcularDistancia — UF de destino vazia (card sem origin/destination preenchido)', () => {
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  it('sem UF de destino: nem tenta geocodificar o lado sem UF — recusa em vez de arriscar a cidade errada', async () => {
+    const fetchMock = vi.fn(() => Promise.resolve({ json: async () => [] }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { km } = await calcularDistancia('Assis', 'SP', 'Canápolis', undefined)
+    expect(km).toBeNull()
+    // Só chama a Nominatim pro lado que TEM UF (Assis/SP) — o lado sem UF
+    // (Canápolis, sem destino) nunca gera uma chamada de rede.
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0][0]).toContain('city=Assis')
+  })
+
+  it('sem UF de origem: mesmo comportamento (nem chama a Nominatim pro lado sem UF)', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const { km } = await calcularDistancia('Assis', undefined, 'Canápolis', 'MG')
+    expect(km).toBeNull()
+  })
+
+  it('com as duas UFs preenchidas: geocodifica normalmente (sem regressão)', async () => {
+    const canapolisCorreto = { lat:-18.7228793, lon:-49.2016329, state:'Minas Gerais' }
+    const assisSp           = { lat:-22.6620892, lon:-50.4206230, state:'São Paulo' }
+    vi.stubGlobal('fetch', vi.fn(url => {
+      if (url.includes('nominatim.openstreetmap.org')) {
+        const c = url.includes('city=Can') ? canapolisCorreto : assisSp
+        return Promise.resolve({ json: async () => [{ lat:String(c.lat), lon:String(c.lon), address:{ state:c.state } }] })
+      }
+      return Promise.resolve({ json: async () => ({ routes:[{ distance: 542000 }] }) })
+    }))
+    const { km } = await calcularDistancia('Assis', 'SP', 'Canápolis', 'MG')
+    expect(km).toBe(542)
+  })
+})

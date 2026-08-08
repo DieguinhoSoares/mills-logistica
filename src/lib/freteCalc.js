@@ -1057,18 +1057,37 @@ export function resolverVeiculoTransporte(
 }
 
 // ── DISTÂNCIA: Nominatim + OSRM ──────────────────────────────
+const ESTADOS_BR = {
+  AC:'Acre', AL:'Alagoas', AM:'Amazonas', AP:'Amapá', BA:'Bahia',
+  CE:'Ceará', DF:'Distrito Federal', ES:'Espírito Santo', GO:'Goiás',
+  MA:'Maranhão', MG:'Minas Gerais', MS:'Mato Grosso do Sul',
+  MT:'Mato Grosso', PA:'Pará', PB:'Paraíba', PE:'Pernambuco',
+  PI:'Piauí', PR:'Paraná', RJ:'Rio de Janeiro', RN:'Rio Grande do Norte',
+  RO:'Rondônia', RR:'Roraima', RS:'Rio Grande do Sul',
+  SC:'Santa Catarina', SE:'Sergipe', SP:'São Paulo', TO:'Tocantins',
+}
+function normTxtUF(s) { return String(s||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim() }
+
 async function buscarCoordenadas(cidade, uf) {
+  // Causa raiz REAL do bug persistir mesmo depois das checagens de estado
+  // (texto) e geografia abaixo: a solicitação real em produção estava com a
+  // UF de destino VAZIA (mesmo problema de dado que a ferramenta de
+  // migração do Master existe pra corrigir — request.destination não
+  // preenchido). Sem UF esperada não tem como VALIDAR o resultado — nem
+  // comparando texto, nem geografia: uma coordenada em outro estado
+  // qualquer bate "consigo mesma" (é autoconsistente com o que a própria
+  // Nominatim diz), então não existe checagem que distinga "cidade errada
+  // mas coerente" de "cidade certa". Antes disso, a versão anterior desse
+  // código nem percebia o problema — montava a URL com "&state=undefined"
+  // (encodeURIComponent(undefined) vira a STRING "undefined") e confiava
+  // cegamente em qualquer coisa que a Nominatim devolvesse pra essa busca
+  // sem filtro de estado nenhum. Mesma filosofia já usada no resto do
+  // sistema pra máquina não reconhecida (ver temItemNaoIdentificado): sem
+  // como confirmar que está certo, não adivinha — recusa geocodificar e
+  // força a tela a pedir km manual.
+  if (!uf) return null
   try {
-    const estadosBR = {
-      AC:'Acre', AL:'Alagoas', AM:'Amazonas', AP:'Amapá', BA:'Bahia',
-      CE:'Ceará', DF:'Distrito Federal', ES:'Espírito Santo', GO:'Goiás',
-      MA:'Maranhão', MG:'Minas Gerais', MS:'Mato Grosso do Sul',
-      MT:'Mato Grosso', PA:'Pará', PB:'Paraíba', PE:'Pernambuco',
-      PI:'Piauí', PR:'Paraná', RJ:'Rio de Janeiro', RN:'Rio Grande do Norte',
-      RO:'Rondônia', RR:'Roraima', RS:'Rio Grande do Sul',
-      SC:'Santa Catarina', SE:'Sergipe', SP:'São Paulo', TO:'Tocantins',
-    }
-    const estado = estadosBR[uf] || uf
+    const estado = ESTADOS_BR[uf] || uf
     const url = `https://nominatim.openstreetmap.org/search?` +
       `city=${encodeURIComponent(cidade)}&state=${encodeURIComponent(estado)}` +
       `&country=Brazil&format=json&limit=1&addressdetails=1`
@@ -1082,12 +1101,12 @@ async function buscarCoordenadas(cidade, uf) {
     // Nominatim está com o campo "state" rotulado como "Minas Gerais" mesmo
     // com a coordenada fisicamente na Bahia (erro de qualidade do dado no
     // próprio OpenStreetMap, não dá pra detectar só lendo texto). Por isso
-    // a validação principal agora é GEOGRÁFICA: confere se a coordenada
-    // devolvida realmente cai dentro (ou perto) da caixa delimitadora real
-    // da UF pedida, sem depender do que a Nominatim diz que é.
-    const normTxt = s => String(s||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim()
+    // a validação principal é GEOGRÁFICA: confere se a coordenada devolvida
+    // realmente cai dentro (ou perto) da caixa delimitadora real da UF
+    // PEDIDA (sempre existe nesse ponto — a função já retornou null acima
+    // se não tivesse), sem depender do que a Nominatim diz que é.
     const estadoRetornado = data[0].address?.state
-    if (estado && estadoRetornado && normTxt(estadoRetornado) !== normTxt(estado)) {
+    if (estadoRetornado && normTxtUF(estadoRetornado) !== normTxtUF(estado)) {
       console.warn(`[freteCalc] geocodificação de "${cidade}" (${uf}) devolveu estado diferente do pedido: "${estadoRetornado}" — descartando resultado`)
       return null
     }
