@@ -597,4 +597,17 @@ describe('calcularDistancia — rejeita geocodificação que devolve estado dife
     const { km } = await calcularDistancia('Assis', 'SP', 'Canápolis', 'MG')
     expect(km).toBe(542) // rota real (Google Maps) entre os pontos CERTOS — plausível, aceita
   })
+
+  // Caso real (2026-08), descoberto DEPOIS do fix acima: a checagem de texto
+  // (comparar address.state) não bastou. Confirmado ao vivo com o usuário
+  // que o registro da Nominatim para esse bug específico vem rotulado como
+  // "Minas Gerais" (bate com o texto pedido) mesmo com a coordenada
+  // fisicamente na Bahia — erro de qualidade de dado no OpenStreetMap, só
+  // detectável validando a coordenada contra a geografia real da UF.
+  it('Nominatim devolve rótulo "Minas Gerais" (bate com o texto) mas coordenada fisicamente na Bahia → checagem geográfica descarta mesmo assim', async () => {
+    const pontoComRotuloErrado = { ...PONTO_ERRADO_BAHIA, state: 'Minas Gerais' }
+    vi.stubGlobal('fetch', vi.fn(mockFetchComEstado(pontoComRotuloErrado, 1589)))
+    const { km } = await calcularDistancia('Assis', 'SP', 'Canápolis', 'MG')
+    expect(km).toBeNull()
+  })
 })

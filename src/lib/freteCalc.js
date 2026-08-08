@@ -1077,21 +1077,60 @@ async function buscarCoordenadas(cidade, uf) {
     if (!data?.length) return null
     // Bug real (2026-08): a Nominatim devolveu, com status 200 "normal", um
     // ponto no interior da BAHIA pra uma busca de "Canápolis" + "Minas
-    // Gerais" — a cidade certa (confirmada manualmente) fica a ~1250km
-    // dali. Nenhum erro de rede, nenhum timeout — só o resultado errado. O
-    // restante do cálculo (rota, checagem de rota implausível, preço) não
-    // tinha como pegar isso sozinho, porque a rota ATÉ o ponto errado é
-    // plausível — o problema é o ponto em si. addressdetails=1 devolve o
-    // estado do resultado; se vier de um estado diferente do pedido,
-    // descarta em vez de seguir usando uma coordenada da cidade errada.
+    // Gerais". A checagem de texto abaixo (comparar data[0].address.state
+    // com o estado pedido) NÃO pegou esse caso — o registro devolvido pela
+    // Nominatim está com o campo "state" rotulado como "Minas Gerais" mesmo
+    // com a coordenada fisicamente na Bahia (erro de qualidade do dado no
+    // próprio OpenStreetMap, não dá pra detectar só lendo texto). Por isso
+    // a validação principal agora é GEOGRÁFICA: confere se a coordenada
+    // devolvida realmente cai dentro (ou perto) da caixa delimitadora real
+    // da UF pedida, sem depender do que a Nominatim diz que é.
     const normTxt = s => String(s||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim()
     const estadoRetornado = data[0].address?.state
     if (estado && estadoRetornado && normTxt(estadoRetornado) !== normTxt(estado)) {
       console.warn(`[freteCalc] geocodificação de "${cidade}" (${uf}) devolveu estado diferente do pedido: "${estadoRetornado}" — descartando resultado`)
       return null
     }
-    return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) }
+    const lat = parseFloat(data[0].lat)
+    const lon = parseFloat(data[0].lon)
+    if (coordenadaForaDaUF(lat, lon, uf)) {
+      console.warn(`[freteCalc] geocodificação de "${cidade}" (${uf}) devolveu coordenada fora da UF (lat ${lat}, lon ${lon}) — descartando resultado`)
+      return null
+    }
+    return { lat, lon }
   } catch { return null }
+}
+
+// Caixas delimitadoras aproximadas (latMin, latMax, lonMin, lonMax) de cada
+// UF — validação GEOGRÁFICA real da coordenada devolvida pela geocodificação
+// (ver bug documentado acima em buscarCoordenadas: o texto "state" que a
+// Nominatim devolve pode dizer a UF certa mesmo com a coordenada errada).
+// Valores aproximados com margem generosa — não é o contorno exato da
+// fronteira, só o suficiente pra pegar erro grosseiro (centenas/milhares de
+// km), sem risco de rejeitar cidade real perto de divisa de estado.
+const LIMITES_UF = {
+  AC:[-11.2,-7.0,-74.0,-66.5],   AL:[-10.5,-8.8,-38.3,-35.1],
+  AM:[-9.8,2.3,-73.9,-56.0],     AP:[-1.2,4.5,-54.9,-49.8],
+  BA:[-18.4,-8.5,-46.7,-37.3],   CE:[-7.9,-2.8,-41.4,-37.2],
+  DF:[-16.1,-15.5,-48.3,-47.3],  ES:[-21.3,-17.9,-41.9,-39.6],
+  GO:[-19.5,-12.4,-53.3,-45.9],  MA:[-10.3,-1.0,-48.8,-41.8],
+  MG:[-22.9,-14.2,-51.0,-39.9],  MS:[-24.1,-17.2,-58.2,-50.9],
+  MT:[-18.0,-7.3,-61.6,-50.2],   PA:[-9.8,2.6,-58.9,-46.1],
+  PB:[-8.3,-6.0,-38.8,-34.8],    PE:[-9.5,-7.3,-41.4,-32.4],
+  PI:[-10.9,-2.7,-45.9,-40.4],   PR:[-26.7,-22.5,-54.6,-48.0],
+  RJ:[-23.4,-20.8,-44.9,-40.9],  RN:[-6.9,-4.8,-38.6,-34.9],
+  RO:[-13.7,-7.9,-66.8,-59.8],   RR:[1.4,5.3,-64.9,-58.9],
+  RS:[-33.8,-27.0,-57.7,-49.7],  SC:[-29.4,-25.9,-53.9,-48.3],
+  SE:[-11.6,-9.5,-38.3,-36.4],   SP:[-25.4,-19.8,-53.2,-44.2],
+  TO:[-13.5,-5.1,-50.8,-45.7],
+}
+const MARGEM_UF_GRAUS = 0.6 // ~65km de folga pra cidade real perto de divisa
+function coordenadaForaDaUF(lat, lon, uf) {
+  const box = LIMITES_UF[uf]
+  if (!box) return false // UF não catalogada (sigla inválida/atípica) — não bloqueia
+  const [latMin, latMax, lonMin, lonMax] = box
+  return lat < latMin - MARGEM_UF_GRAUS || lat > latMax + MARGEM_UF_GRAUS ||
+         lon < lonMin - MARGEM_UF_GRAUS || lon > lonMax + MARGEM_UF_GRAUS
 }
 
 // Distância em linha reta (grande círculo), sem nenhum fator de correção —
