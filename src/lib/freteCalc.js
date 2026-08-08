@@ -761,6 +761,97 @@ function resolverDimensaoUnica(n, simClients) {
   }
 }
 
+// ── DIAGNÓSTICO DE N° INTERNO ────────────────────────────────────────────
+// Ferramenta de autoatendimento pra Frotas/Master investigarem, sem precisar
+// pedir pra mim toda vez, por que uma máquina específica caiu como "não
+// reconhecida" (ou pegou dimensão errada). Caso real que motivou: usuário
+// reportou que a PCP01168 (Caterpillar 938K SC, confirmadamente cadastrada
+// no SIM) apareceu como "máquina não reconhecida" — precisa mostrar o
+// caminho exato que o N° interno percorre na cascata de resolução
+// (resolverDimensaoUnica) pra achar o ponto real da falha (dado ausente no
+// CSV, chave Fabricante+Modelo não catalogada em DIMENSOES_MODELO, Grupo de
+// Modelo não catalogado em PESO_GRUPO, etc.) em vez de ficar adivinhando.
+export function diagnosticarNInterno(nInterno, simClients) {
+  const nStr = String(nInterno || '').trim()
+  const nNum = nStr.replace(/\D/g, '').replace(/^0+/, '')
+  const diag = {
+    nInterno: nStr,
+    encontrado: false,
+    semDadosDeModelo: false,
+    cliente: null,
+    tipoMatch: null, // 'exato' | 'numerico' | null
+    fabricanteRaw: '',
+    modeloRaw: '',
+    grupoModeloRaw: '',
+    chaveFabricanteModelo: '',
+    dimensaoModeloExata: null,
+    dimensaoPorModeloApenas: null,
+    grupoModeloExisteEmPesoGrupo: false,
+    resultado: null,
+  }
+  if (!nStr) return diag
+
+  // Mesma ordem de prioridade das funções reais (buscarFabricanteModelo/
+  // buscarDimensaoModelo/buscarGrupoModelo): por cliente, tenta match exato
+  // primeiro, só cai pro numérico se não achar — evita reportar um caminho
+  // diferente do que o cálculo de frete realmente percorre.
+  for (const c of simClients || []) {
+    let modeloEntry = c.machineModelos?.[nStr]
+    let modeloMatch = modeloEntry ? 'exato' : null
+    if (!modeloEntry && c.machineModelos) {
+      modeloEntry = matchNumericoUnico(Object.entries(c.machineModelos), nNum, v => `${v.fabricante}|${v.modelo}`)
+      if (modeloEntry) modeloMatch = 'numerico'
+    }
+    let grupoEntry = c.machineGroups?.[nStr]
+    let grupoMatch = grupoEntry ? 'exato' : null
+    if (!grupoEntry && c.machineGroups) {
+      grupoEntry = matchNumericoUnico(Object.entries(c.machineGroups), nNum)
+      if (grupoEntry) grupoMatch = 'numerico'
+    }
+    if (modeloEntry || grupoEntry) {
+      diag.encontrado = true
+      diag.cliente = c.name
+      diag.tipoMatch = modeloMatch || grupoMatch
+      if (modeloEntry) { diag.fabricanteRaw = modeloEntry.fabricante || ''; diag.modeloRaw = modeloEntry.modelo || '' }
+      if (grupoEntry) diag.grupoModeloRaw = grupoEntry
+      break
+    }
+    if (!diag.encontrado) {
+      const internos = Array.isArray(c.nInternos) ? c.nInternos : []
+      const match = internos.find(k => {
+        const kStr = String(k).trim()
+        const kNum = kStr.replace(/\D/g, '').replace(/^0+/, '')
+        return kStr === nStr || kNum === nNum
+      })
+      if (match) {
+        diag.encontrado = true
+        diag.semDadosDeModelo = true
+        diag.cliente = c.name
+        diag.tipoMatch = String(match).trim() === nStr ? 'exato' : 'numerico'
+        break
+      }
+    }
+  }
+
+  if (diag.fabricanteRaw || diag.modeloRaw) {
+    const fab = normalizaModelo(diag.fabricanteRaw)
+    const mod = normalizaModelo(diag.modeloRaw)
+    diag.chaveFabricanteModelo = `${fab}|${mod}`
+    diag.dimensaoModeloExata = DIMENSOES_MODELO[diag.chaveFabricanteModelo] || null
+    if (!diag.dimensaoModeloExata && mod) {
+      const porModelo = Object.entries(DIMENSOES_MODELO).find(([k]) => k.endsWith(`|${mod}`))
+      if (porModelo) diag.dimensaoPorModeloApenas = { chave: porModelo[0], ...porModelo[1] }
+    }
+  }
+
+  if (diag.grupoModeloRaw) {
+    diag.grupoModeloExisteEmPesoGrupo = PESO_GRUPO[diag.grupoModeloRaw] !== undefined
+  }
+
+  diag.resultado = resolverDimensaoUnica(nStr, simClients)
+  return diag
+}
+
 export function resolverVeiculoTransporte(
   nInternosIda   = [],
   nInternosVolta = [],

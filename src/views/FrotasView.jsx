@@ -15,6 +15,7 @@ import { DriversModal }      from '../components/DriversModal'
 import { AssignDriverModal } from '../components/AssignDriverModal'
 import { RequestsKanban }    from '../components/RequestsKanban'
 import { CsvUploadModal }    from '../components/CsvUploadModal'
+import { DiagnosticoModal }  from '../components/DiagnosticoModal'
 import { WeekView, MonthView, YearView } from '../components/CalendarViews'
 
 /* ══ MAIN FROTAS VIEW ════════════════════════════════════════════════════════ */
@@ -191,6 +192,7 @@ export function FrotasView() {
   const [painelTab,    setPainelTab]    = useState('resumo')
   const [settingsModal, setSettingsModal] = useState(false)
   const [driversModal,  setDriversModal]  = useState(false)
+  const [diagnosticoModal, setDiagnosticoModal] = useState(false)
   const [assignModal,   setAssignModal]   = useState(null)
   const [rotogramaModal,setRotogramaModal]= useState(null)
   const [pendingCardForm, setPendingCardForm] = useState(null)
@@ -627,6 +629,10 @@ export function FrotasView() {
                   style={{ width:'100%', textAlign:'left', padding:'8px 12px', borderRadius:T.rSm, border:'none', background:'transparent', cursor:'pointer', fontFamily:FONT, fontSize:12, color:T.text }}>
                   👤 Motoristas
                 </button>
+                <button onClick={()=>{setDiagnosticoModal(true);setMaisOpen(false)}}
+                  style={{ width:'100%', textAlign:'left', padding:'8px 12px', borderRadius:T.rSm, border:'none', background:'transparent', cursor:'pointer', fontFamily:FONT, fontSize:12, color:T.text }}>
+                  🔍 Diagnosticar Equipamento
+                </button>
                 <button onClick={()=>{setSettingsModal(true);setMaisOpen(false)}}
                   style={{ width:'100%', textAlign:'left', padding:'8px 12px', borderRadius:T.rSm, border:'none', background:'transparent', cursor:'pointer', fontFamily:FONT, fontSize:12, color:T.text }}>
                   ⚙️ Configurações
@@ -1040,6 +1046,7 @@ export function FrotasView() {
         />}
         {exportModal&&<ExportModal cards={cards} onClose={()=>setExportModal(false)}/>}
         {driversModal&&<DriversModal drivers={drivers} onSave={saveDriver} onDelete={deleteDriver} onClose={()=>setDriversModal(false)} onRotograma={d=>{setDriversModal(false);setRotogramaModal(d)}} addToast={addToast}/>}
+        {diagnosticoModal&&<DiagnosticoModal simClients={simClients} onClose={()=>setDiagnosticoModal(false)}/>}
         {assignModal&&<AssignDriverModal req={assignModal.req} drivers={drivers} simClients={simClients} cards={cards} onConfirm={handleAssignConfirm} onCancel={()=>setAssignModal(null)}/>}
         {pendingCardForm&&<AssignDriverModal
           req={{
