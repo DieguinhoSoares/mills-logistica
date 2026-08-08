@@ -4,7 +4,7 @@
 // Rodar: npm test
 // ============================================================
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { calcularFrete, selecionarVeiculoPorPeso, resolverVeiculoTransporte, analisarRotaComParadas, getValorIda, otimizarOrdemParadas, DIARIAS, VEICULOS, formatBRL, PESO_GRUPO, buscarGrupoModelo, buscarFabricanteModelo } from './freteCalc'
+import { calcularFrete, selecionarVeiculoPorPeso, resolverVeiculoTransporte, analisarRotaComParadas, getValorIda, otimizarOrdemParadas, DIARIAS, VEICULOS, formatBRL, PESO_GRUPO, buscarGrupoModelo, buscarFabricanteModelo, kmRotaEhPlausivel } from './freteCalc'
 
 describe('calcularFrete — entradas inválidas', () => {
   it('retorna null sem km', () => {
@@ -523,5 +523,31 @@ describe('otimizarOrdemParadas — heurística do vizinho mais próximo', () => 
     // sem nenhum aviso.
     expect(ordem.length).toBeLessThan(matriz.length)
     expect(ordem).not.toContain(2) // parada B (índice 2) ficou de fora
+  })
+})
+
+// Caso real (2026-08): rota Assis/SP → Canápolis/MG — o roteador público
+// (OSRM) devolveu 1589km, quando o Google Maps confirma 542km reais
+// (7h28min, via Rodovia Transbrasiliana e BR-153) pra essa mesma rota. As
+// coordenadas usadas abaixo são as reais dessas duas cidades.
+describe('kmRotaEhPlausivel — rejeita rota OSRM implausível (caso real Assis/SP → Canápolis/MG)', () => {
+  const assis     = { lat: -22.6559, lon: -50.4142 }
+  const canapolis = { lat: -18.7261, lon: -49.2181 }
+
+  it('1589km (valor real que a OSRM devolveu) é implausível — reta entre as 2 cidades é ~450km', () => {
+    expect(kmRotaEhPlausivel(1589, assis, canapolis)).toBe(false)
+  })
+
+  it('542km (valor real confirmado no Google Maps) é plausível', () => {
+    expect(kmRotaEhPlausivel(542, assis, canapolis)).toBe(true)
+  })
+
+  it('rota com desvio real grande (litoral/serra) ainda passa dentro do multiplicador generoso', () => {
+    // ~2x a distância em linha reta — desvio real, não deve ser rejeitado
+    expect(kmRotaEhPlausivel(900, assis, canapolis)).toBe(true)
+  })
+
+  it('coordenadas idênticas (reta=0): não divide por zero, sempre plausível', () => {
+    expect(kmRotaEhPlausivel(50, assis, assis)).toBe(true)
   })
 })

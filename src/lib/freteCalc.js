@@ -1079,6 +1079,38 @@ async function buscarCoordenadas(cidade, uf) {
   } catch { return null }
 }
 
+// Distância em linha reta (grande círculo), sem nenhum fator de correção —
+// usada tanto pelo fallback Haversine×1.3 quanto pela checagem de
+// plausibilidade abaixo.
+function haversineStraightKm(a, b) {
+  const R    = 6371
+  const dLat = (b.lat - a.lat) * Math.PI / 180
+  const dLon = (b.lon - a.lon) * Math.PI / 180
+  const x    = Math.sin(dLat/2)**2 + Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLon/2)**2
+  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x))
+}
+
+function haversineKm(a, b) {
+  return Math.round(haversineStraightKm(a, b) * 1.3)
+}
+
+// Caso real (2026-08): rota Assis/SP → Canápolis/MG voltou 1589km da OSRM
+// (roteador público), quando a distância em linha reta entre as duas
+// cidades é ~454km — nenhuma rodovia no Brasil precisa de quase 3,5x a
+// distância em linha reta pra ligar 2 cidades vizinhas de estados
+// fronteiriços. O roteador público (router.project-osrm.org) ocasionalmente
+// monta rota errada (map-matching ruim, desvio por trecho sem dado), e sem
+// checagem nenhuma esse tipo de falha externa virava frete de milhares de
+// reais calculado sobre km errado, sem nenhum aviso. Multiplicador generoso
+// (2,5x) pra não rejeitar rotas com desvio real grande (litoral, serra,
+// travessia de rio) — só barra o que é claramente implausível.
+const LIMITE_MULTIPLICADOR_ROTA = 2.5
+export function kmRotaEhPlausivel(kmRota, coordO, coordD) {
+  const reta = haversineStraightKm(coordO, coordD)
+  if (reta <= 0) return true
+  return kmRota <= reta * LIMITE_MULTIPLICADOR_ROTA
+}
+
 export async function calcularDistancia(cidadeOrigem, ufOrigem, cidadeDestino, ufDestino) {
   const [coordO, coordD] = await Promise.all([
     buscarCoordenadas(cidadeOrigem, ufOrigem),
@@ -1090,25 +1122,14 @@ export async function calcularDistancia(cidadeOrigem, ufOrigem, cidadeDestino, u
     const res  = await fetch(url)
     const data = await res.json()
     if (data?.routes?.[0]?.distance) {
-      return { km: Math.round(data.routes[0].distance / 1000), coordO, coordD }
+      const kmRota = Math.round(data.routes[0].distance / 1000)
+      if (kmRotaEhPlausivel(kmRota, coordO, coordD)) {
+        return { km: kmRota, coordO, coordD }
+      }
+      console.warn(`[freteCalc] rota OSRM implausível: ${kmRota}km (reta ~${Math.round(haversineStraightKm(coordO, coordD))}km) — usando fallback Haversine×1.3`)
     }
   } catch { /* fallback */ }
-  // Fallback Haversine × 1.3
-  const R    = 6371
-  const dLat = (coordD.lat - coordO.lat) * Math.PI / 180
-  const dLon = (coordD.lon - coordO.lon) * Math.PI / 180
-  const a    = Math.sin(dLat/2)**2 +
-    Math.cos(coordO.lat*Math.PI/180)*Math.cos(coordD.lat*Math.PI/180)*Math.sin(dLon/2)**2
-  const km   = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) * 1.3)
-  return { km, coordO, coordD }
-}
-
-function haversineKm(a, b) {
-  const R    = 6371
-  const dLat = (b.lat - a.lat) * Math.PI / 180
-  const dLon = (b.lon - a.lon) * Math.PI / 180
-  const x    = Math.sin(dLat/2)**2 + Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLon/2)**2
-  return Math.round(R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x)) * 1.3)
+  return { km: haversineKm(coordO, coordD), coordO, coordD }
 }
 
 // Distância de uma rota com N pontos (origem + paradas, na ordem em que o
