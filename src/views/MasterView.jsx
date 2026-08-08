@@ -10,6 +10,7 @@ import { db } from '../lib/firebase'
 import { salvarWhatsAppConfig } from '../lib/vercelApi'
 import { useCards, useRequests, useNotifications, useConfig, usePendingUsers, useManagerialRequests, runDailyBackup, useMessages, useAllUsers, useBackupStatus, notifyUser, backfillSeqIds, backfillKmHistorico, approveAsSupervisor, refuseAsSupervisor, approveAsGerente, refuseAsGerente, useFalhasSilenciosas } from '../hooks/useFirestore'
 import { FreteEstimativa } from '../components/FreteEstimativa'
+import { coordenadaForaDaUF } from '../lib/freteCalc'
 import { MessageThread }    from '../components/MessageThread'
 import { ExportModal }      from '../components/ExportModal'
 import { EmissoesExportModal } from '../components/EmissoesExportModal'
@@ -168,7 +169,20 @@ export function MasterView({ simClients = [] }) {
       const data = await res.json()
       if (!data.length) return ''
       const stateName = data[0].address?.state || ''
-      return STATE_ABBR[stateName] || stateName.slice(0,2).toUpperCase()
+      const uf = STATE_ABBR[stateName] || stateName.slice(0,2).toUpperCase()
+      // Mesma classe de bug real encontrada no cálculo de frete (2026-08): a
+      // Nominatim pode devolver um "state" que não bate com a coordenada de
+      // verdade (erro de qualidade de dado no OpenStreetMap). Como esta
+      // função descobre a UF a partir da cidade (não tem uma UF esperada de
+      // antemão pra comparar), valida a coordenada contra a geografia real
+      // da PRÓPRIA UF que a API disse que é — se não bater, a resposta não é
+      // confiável, melhor não gravar nada (mesmo tratamento de "não
+      // encontrado" que já existe pra resposta vazia) do que gravar uma UF
+      // errada num card.
+      const lat = parseFloat(data[0].lat)
+      const lon = parseFloat(data[0].lon)
+      if (coordenadaForaDaUF(lat, lon, uf)) return ''
+      return uf
     } catch { return '' }
   }
 

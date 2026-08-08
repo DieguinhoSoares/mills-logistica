@@ -1125,7 +1125,13 @@ const LIMITES_UF = {
   TO:[-13.5,-5.1,-50.8,-45.7],
 }
 const MARGEM_UF_GRAUS = 0.6 // ~65km de folga pra cidade real perto de divisa
-function coordenadaForaDaUF(lat, lon, uf) {
+// Exportada pra reaproveitar em outros lugares que também confiam em
+// geocodificação externa sem ter como validar contra um estado JÁ informado
+// (ex: MasterView.jsx migra origin/destination de cards antigos descobrindo
+// o estado a partir do nome da cidade — mesmo risco de fundo, checagem
+// aplicada ao contrário: valida a coordenada contra o PRÓPRIO estado que a
+// API disse que é, em vez de contra um estado esperado de antemão).
+export function coordenadaForaDaUF(lat, lon, uf) {
   const box = LIMITES_UF[uf]
   if (!box) return false // UF não catalogada (sigla inválida/atípica) — não bloqueia
   const [latMin, latMax, lonMin, lonMax] = box
