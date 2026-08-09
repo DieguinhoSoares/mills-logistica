@@ -1,0 +1,24 @@
+name: Daily Firestore Backup
+
+on:
+  schedule:
+    # 08:00 UTC = 05:00 America/Sao_Paulo — bem depois da meia-noite local,
+    # evita ambiguidade sobre "qual dia é hoje" perto da virada do dia.
+    - cron: '0 8 * * *'
+  workflow_dispatch: {} # permite rodar manualmente (Actions → Daily Firestore Backup → Run workflow), útil pra testar sem esperar o horário
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm install
+      - name: Run daily backup
+        run: node scripts/dailyBackup.mjs
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
