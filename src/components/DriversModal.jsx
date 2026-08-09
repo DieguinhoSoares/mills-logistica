@@ -83,10 +83,25 @@ export function DriversModal({ drivers, onSave, onDelete, onClose, onRotograma, 
           <div style={{ marginTop:16 }}><button onClick={onClose} style={{ ...BS, width:'100%', background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>Fechar</button></div>
         </div>
       </motion.div>
+      {/* Achado de auditoria: onDelete(deleting.id) nem era esperado nem tinha
+          catch — o toast "removido" aparecia mesmo quando a exclusão falhava
+          de verdade (offline, permissão negada), deixando o motorista intacto
+          no Firestore enquanto a tela dizia o contrário. Mesmo padrão de
+          try/catch já usado em handleSave acima. */}
       <ConfirmModal open={!!deleting} danger title="Remover motorista"
         message={`Remover "${deleting?.name}"? Rotogramas já montados pra esse motorista ficam órfãos.`}
         confirmLabel="🗑 Remover"
-        onConfirm={()=>{onDelete(deleting.id);addToast('Motorista removido.','success');setDeleting(null)}}
+        onConfirm={async()=>{
+          try {
+            await onDelete(deleting.id)
+            addToast('Motorista removido.','success')
+          } catch (err) {
+            console.error('Erro ao remover motorista:', err)
+            addToast('Erro ao remover motorista. Tente novamente.', 'error')
+          } finally {
+            setDeleting(null)
+          }
+        }}
         onCancel={()=>setDeleting(null)}/>
     </div>
   )

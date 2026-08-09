@@ -28,11 +28,20 @@ export function LoginScreen() {
       await resetPassword(email)
       setResetSent(true)
     } catch (e) {
+      // resetPassword hoje chama um endpoint próprio na Vercel (ver
+      // AuthContext.jsx), não mais o Firebase Auth direto — o erro que
+      // chega aqui é um Error comum com .message (o texto que o próprio
+      // endpoint devolveu), sem .code nenhum. O mapeamento por .code abaixo
+      // fica como fallback pra se um dia isso voltar a chamar o Firebase
+      // Auth direto, mas o que realmente aparece pro usuário hoje é
+      // e.message — antes disso não existir aqui, TODO erro caía na
+      // mensagem genérica, mesmo quando o servidor já mandava um motivo
+      // específico.
       const msgs = {
         'auth/invalid-email':  'E-mail inválido.',
         'auth/user-not-found': 'Não existe conta com esse e-mail.',
       }
-      setError(msgs[e.code] || 'Não foi possível enviar o e-mail. Tente novamente.')
+      setError(msgs[e.code] || e.message || 'Não foi possível enviar o e-mail. Tente novamente.')
     }
     setLoading(false)
   }

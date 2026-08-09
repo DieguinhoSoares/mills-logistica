@@ -308,10 +308,17 @@ export function KPIView({ cards, requests, simClients, onNavigateToAprovacoes })
     // momento" — por isso sempre cardsFiltrados (só unidade), nunca
     // cardsPeriodo: não existe "em execução na semana passada", execução é
     // um status atual, não um evento com data pra filtrar por período.
+    // Achado de auto-revisão: atrasadosAgora usava cardsAtivos (que agora
+    // SEGUE o toggle de período, corretamente, pros cards de KPI como "No
+    // Prazo"/SLA) — reaproveitar a mesma variável aqui fazia um serviço
+    // atrasado de verdade sumir dessa lista sempre que o toggle não estava
+    // em "Acumulado", contradizendo a intenção deste painel (sempre atual).
+    // Usa seu próprio conjunto, independente do período.
+    const cardsAtivosAgora  = cardsFiltrados.filter(c => c.status!=='cancelado' && c.status!=='concluido')
     const emExecucao        = cardsFiltrados.filter(c=>c.status==='em_execucao').length
     const aguardandoValid   = cardsFiltrados.filter(c=>c.status==='aguardando_validacao').length
     const interrompidos     = cardsFiltrados.filter(c=>c.status==='interrompido').length
-    const atrasadosAgora    = cardsAtivos.filter(c => c.endDate && c.endDate < hoje)
+    const atrasadosAgora    = cardsAtivosAgora.filter(c => c.endDate && c.endDate < hoje)
       .sort((a,b)=>a.endDate.localeCompare(b.endDate)).slice(0,6)
       .map(c=>({ cliente:c.client||'—', driver:c.driver||'—', dias:Math.max(0,Math.round((new Date(hoje)-new Date(c.endDate))/86400000)) }))
 

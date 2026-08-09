@@ -611,7 +611,15 @@ export function useConfig() {
     const unsub = onSnapshot(doc(db,'config','settings'), snap=>{ if(snap.exists()) setConfig(snap.data()) }, ()=>{})
     return unsub
   }, [])
-  const saveConfig = data => setDoc(doc(db,'config','settings'), { ...config, ...data, updatedAt:serverTimestamp() }, { merge:true })
+  // Achado de auditoria: espalhar o `config` local (snapshot do onSnapshot no
+  // momento do clique) de volta na escrita causava perda de atualização
+  // concorrente — se dois admins salvassem campos DIFERENTES quase ao mesmo
+  // tempo (ex: um o webhook do Teams, outro a chave do TollGuru), quem
+  // gravasse com o snapshot local mais desatualizado sobrescrevia o campo
+  // que o outro acabou de salvar, voltando pro valor antigo. `{merge:true}`
+  // do Firestore já faz merge por campo no servidor — não precisa (e não
+  // deve) reenviar o resto do config local junto.
+  const saveConfig = data => setDoc(doc(db,'config','settings'), { ...data, updatedAt:serverTimestamp() }, { merge:true })
   return { config, saveConfig }
 }
 

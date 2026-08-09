@@ -63,6 +63,7 @@ function ConclusaoModal({ card, onConfirm, onClose }) {
   const [preview,  setPreview]  = useState(null)
   const [obs,      setObs]      = useState('')
   const [saving,   setSaving]   = useState(false)
+  const [erro,     setErro]     = useState('')
   const [compressing, setCompressing] = useState(false)
   const inputRef = useRef()
 
@@ -79,11 +80,21 @@ function ConclusaoModal({ card, onConfirm, onClose }) {
     setCompressing(false)
   }
 
+  // Achado de auditoria: sem try/catch, uma falha de rede (comum em campo,
+  // sinal fraco) deixava o botão travado em "⏳ Registrando..." pra sempre —
+  // sem erro, sem conseguir tentar de novo sem recarregar a página inteira.
   const handleConfirm = async () => {
     if (!canConfirm) return
     setSaving(true)
-    await onConfirm({ foto, obs })
-    setSaving(false)
+    setErro('')
+    try {
+      await onConfirm({ foto, obs })
+    } catch (err) {
+      console.error('Erro ao concluir serviço:', err)
+      setErro('Não foi possível registrar — verifique sua conexão e tente de novo.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -141,6 +152,8 @@ function ConclusaoModal({ card, onConfirm, onClose }) {
             style={{ width:'100%', background:T.surfaceAlt, border:`1px solid ${obsObrig&&!obs.trim()?T.perigo:T.border}`, borderRadius:T.r, padding:'10px 12px', color:T.text, fontSize:13, fontFamily:FONT, boxSizing:'border-box', outline:'none', height:80, resize:'none' }}/>
         </div>
 
+        {erro && <div style={{ background:T.perigoLight, color:T.perigo, borderRadius:T.r, padding:'9px 12px', fontFamily:FONT, fontSize:12, fontWeight:600, marginBottom:12 }}>⚠️ {erro}</div>}
+
         <button onClick={handleConfirm} disabled={!canConfirm||saving}
           style={{ width:'100%', background:canConfirm?T.verde:T.borderMid, color:'white', border:'none', borderRadius:T.rLg, padding:'14px', fontFamily:FONT, fontWeight:700, fontSize:15, cursor:canConfirm?'pointer':'default', opacity:canConfirm?1:0.6 }}>
           {saving ? '⏳ Registrando...' : '✅ Confirmar Conclusão'}
@@ -158,14 +171,24 @@ function InterrupcaoModal({ card, onConfirm, onClose }) {
   const [motivo,    setMotivo]    = useState('')
   const [descricao, setDescricao] = useState('')
   const [saving,    setSaving]    = useState(false)
+  const [erro,      setErro]      = useState('')
 
   const canConfirm = motivo && (motivo !== 'outro' || descricao.trim())
 
+  // Mesmo achado de auditoria do ConclusaoModal acima — sem try/catch, uma
+  // falha de rede travava o botão em "⏳ Registrando..." pra sempre.
   const handleConfirm = async () => {
     if (!canConfirm) return
     setSaving(true)
-    await onConfirm({ motivo, descricao })
-    setSaving(false)
+    setErro('')
+    try {
+      await onConfirm({ motivo, descricao })
+    } catch (err) {
+      console.error('Erro ao interromper serviço:', err)
+      setErro('Não foi possível registrar — verifique sua conexão e tente de novo.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -199,6 +222,8 @@ function InterrupcaoModal({ card, onConfirm, onClose }) {
               style={{ width:'100%', background:T.surfaceAlt, border:`1px solid ${T.border}`, borderRadius:T.r, padding:'10px 12px', color:T.text, fontSize:13, fontFamily:FONT, boxSizing:'border-box', outline:'none', height:80, resize:'none' }}/>
           </div>
         )}
+
+        {erro && <div style={{ background:T.perigoLight, color:T.perigo, borderRadius:T.r, padding:'9px 12px', fontFamily:FONT, fontSize:12, fontWeight:600, marginBottom:12 }}>⚠️ {erro}</div>}
 
         <button onClick={handleConfirm} disabled={!canConfirm||saving}
           style={{ width:'100%', background:canConfirm?'#B8860B':T.borderMid, color:'white', border:'none', borderRadius:T.rLg, padding:'14px', fontFamily:FONT, fontWeight:700, fontSize:15, cursor:canConfirm?'pointer':'default', opacity:canConfirm?1:0.6 }}>
@@ -251,11 +276,13 @@ function ServicoCard({ card, index, onUpdateStatus }) {
   }
 
   const handleRetomar = async () => {
-    // interrompidoEm também precisa ser limpo aqui — antes só interrupcaoMotivo/
-    // interrupcaoDescricao eram apagados, deixando esse timestamp obsoleto no
-    // card pra sempre (não aparece em nenhuma tela hoje, mas ficaria enganoso
-    // se um relatório futuro vier a usar esse campo).
-    await onUpdateStatus(card.id, 'em_execucao', { interrupcaoMotivo:null, interrupcaoDescricao:null, interrompidoEm:null })
+    // interrompidoEm E interrupcaoEm (nomes quase iguais, campos diferentes —
+    // o 2º setado em handleInterrupcao acima) precisam os dois ser limpos
+    // aqui. Antes só interrupcaoMotivo/interrupcaoDescricao/interrompidoEm
+    // eram apagados, deixando interrupcaoEm obsoleto no card pra sempre (não
+    // aparece em nenhuma tela hoje, mas ficaria enganoso se um relatório
+    // futuro vier a usar esse campo).
+    await onUpdateStatus(card.id, 'em_execucao', { interrupcaoMotivo:null, interrupcaoDescricao:null, interrompidoEm:null, interrupcaoEm:null })
   }
 
   return (

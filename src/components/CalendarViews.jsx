@@ -16,8 +16,13 @@ export function WeekView({ cards, baseDate, conflicts, onEdit, onAddCard, onMove
   const t = todayStr()
   return (
     <div style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+      {/* pending.card.endDate pode faltar de propósito — serviço de 1 dia só
+          (ver cardsForDay em utils.js, que já trata isso como normal). Sem o
+          fallback pro startDate, new Date(undefined) vira Invalid Date, e
+          ne.toISOString() mais abaixo lança RangeError — travava a tela ao
+          arrastar qualquer serviço de 1 dia pra outra data. */}
       {pending && <MoveModal card={pending.card} targetDate={pending.tgt}
-        onConfirm={reason => { const diff=(new Date(pending.tgt)-new Date(pending.card.startDate))/86400000; const ne=new Date(pending.card.endDate); ne.setDate(ne.getDate()+diff); onMoveCard(pending.card.id, pending.tgt, ne.toISOString().split('T')[0], reason); setPending(null) }}
+        onConfirm={reason => { const diff=(new Date(pending.tgt)-new Date(pending.card.startDate))/86400000; const ne=new Date(pending.card.endDate||pending.card.startDate); ne.setDate(ne.getDate()+diff); onMoveCard(pending.card.id, pending.tgt, ne.toISOString().split('T')[0], reason); setPending(null) }}
         onCancel={() => setPending(null)}/>}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:7, flex:1, minHeight:0 }}>
         {days.map((day, idx) => {
@@ -53,8 +58,10 @@ export function MonthView({ cards, year, month, conflicts, onEdit, onAddCard, on
   const t = todayStr()
   return (
     <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+      {/* Mesmo fallback do WeekView acima — endDate ausente é normal (serviço
+          de 1 dia só), e sem o fallback pro startDate isso travava a tela. */}
       {pending && <MoveModal card={pending.card} targetDate={pending.tgt}
-        onConfirm={reason=>{const diff=(new Date(pending.tgt)-new Date(pending.card.startDate))/86400000;const ne=new Date(pending.card.endDate);ne.setDate(ne.getDate()+diff);onMoveCard(pending.card.id,pending.tgt,ne.toISOString().split('T')[0],reason);setPending(null);}}
+        onConfirm={reason=>{const diff=(new Date(pending.tgt)-new Date(pending.card.startDate))/86400000;const ne=new Date(pending.card.endDate||pending.card.startDate);ne.setDate(ne.getDate()+diff);onMoveCard(pending.card.id,pending.tgt,ne.toISOString().split('T')[0],reason);setPending(null);}}
         onCancel={()=>setPending(null)}/>}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:2, marginBottom:3, flexShrink:0 }}>
         {WD_SHORT.map(d => <div key={d} style={{ textAlign:'center', color:T.textMuted, fontSize:9, fontWeight:700, fontFamily:'IBM Plex Sans,sans-serif', padding:'3px 0', textTransform:'uppercase', letterSpacing:'0.06em' }}>{d}</div>)}

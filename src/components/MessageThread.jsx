@@ -10,11 +10,24 @@ export function MessageThread({ requestId, profile, onClose }) {
   const { messages, sendMessage } = useMessages(requestId)
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
+  const [erro, setErro] = useState('')
+  // Achado de auditoria: sem try/catch, uma falha no envio (offline,
+  // permissão negada) deixava o botão travado em "⏳" pra sempre — sem erro,
+  // sem conseguir enviar mais nenhuma mensagem nessa conversa sem recarregar
+  // a página inteira.
   const handleSend = async () => {
     if (!text.trim()) return
     setSending(true)
-    await sendMessage({ requestId, text:text.trim(), authorId:profile?.uid||'', authorName:profile?.name||'Frotas', authorRole:profile?.role||'frotas', type:'message' })
-    setText(''); setSending(false)
+    setErro('')
+    try {
+      await sendMessage({ requestId, text:text.trim(), authorId:profile?.uid||'', authorName:profile?.name||'Frotas', authorRole:profile?.role||'frotas', type:'message' })
+      setText('')
+    } catch (err) {
+      console.error('Erro ao enviar mensagem:', err)
+      setErro('Não foi possível enviar. Tente de novo.')
+    } finally {
+      setSending(false)
+    }
   }
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.55)', zIndex:2000, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)' }}
@@ -45,6 +58,7 @@ export function MessageThread({ requestId, profile, onClose }) {
             )
           })}
         </div>
+        {erro && <div style={{ padding:'0 16px 10px', color:T.perigo, fontFamily:FONT, fontSize:11, fontWeight:600 }}>⚠️ {erro}</div>}
         <div style={{ padding:'12px 16px', borderTop:`1px solid ${T.border}`, display:'flex', gap:8 }}>
           <input value={text} onChange={e=>setText(e.target.value)}
             onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();handleSend()}}}
