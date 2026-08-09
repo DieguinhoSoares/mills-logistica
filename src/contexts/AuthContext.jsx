@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import { auth, db } from '../lib/firebase'
 import {
   onAuthStateChanged, signInWithEmailAndPassword,
-  createUserWithEmailAndPassword, signOut
+  createUserWithEmailAndPassword, signOut, deleteUser
 } from 'firebase/auth'
 import { doc, onSnapshot, setDoc } from 'firebase/firestore'
 import { resetarSenhaApi } from '../lib/vercelApi'
@@ -31,7 +31,23 @@ export function AuthProvider({ children }) {
       if (u) {
         unsubProfile = onSnapshot(doc(db, 'users', u.uid),
           snap => { setProfile(snap.exists() ? snap.data() : null); setLoading(false) },
-          () => { setLoading(false) }
+          err => {
+            // Achado de auditoria: antes só parava o loading, sem nunca
+            // limpar o profile — se o listener morresse com erro, o app
+            // continuava confiando num profile antigo pra sempre (o
+            // listener morto nunca mais manda atualização nenhuma).
+            // "permission-denied" é o sinal mais forte de que o acesso foi
+            // revogado de verdade (ex: Master bloqueou/removeu o usuário e
+            // as regras do Firestore agora negam a leitura do próprio
+            // perfil) — nesse caso, limpa o perfil pra a tela cair
+            // corretamente pro login/bloqueio (App.tsx já trata
+            // !profile). Outros erros (rede instável, timeout) NÃO mexem
+            // no perfil — não é razoável deslogar alguém por uma
+            // instabilidade passageira de conexão.
+            console.error('Erro no listener de perfil:', err)
+            if (err.code === 'permission-denied') setProfile(null)
+            setLoading(false)
+          }
         )
       } else {
         setProfile(null)
@@ -61,7 +77,24 @@ export function AuthProvider({ children }) {
       status:    'pendente',
       createdAt: new Date().toISOString(),
     }
-    await setDoc(doc(db, 'users', u.uid), profileData)
+    try {
+      await setDoc(doc(db, 'users', u.uid), profileData)
+    } catch (err) {
+      // Achado de auditoria: sem isso, uma falha aqui (rede caiu bem nesse
+      // instante, erro transiente do Firestore) deixava a conta de Auth
+      // criada mas SEM perfil — login() volta a funcionar (credencial
+      // válida), só que profile nunca existe, prendendo a pessoa na tela
+      // de login pra sempre (App.tsx exige user E profile pra liberar
+      // qualquer tela); e um novo cadastro com o mesmo e-mail falha com
+      // "e-mail já em uso", sem essa pessoa nunca ter conseguido entrar
+      // nem uma vez. Desfaz a conta de Auth recém-criada nesse caso —
+      // sem perfil, ela não serve pra nada mesmo — pra quem tentou se
+      // cadastrar poder simplesmente tentar de novo do zero.
+      await deleteUser(u).catch(delErr => {
+        console.error('Falha ao desfazer conta de autenticação após erro no cadastro:', delErr)
+      })
+      throw err
+    }
     setProfile(profileData)
     return u
   }
