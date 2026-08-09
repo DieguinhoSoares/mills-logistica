@@ -157,7 +157,12 @@ export function KPIView({ cards, requests, simClients, onNavigateToAprovacoes })
   // Filtro por unidade — chips no topo, recalcula tudo abaixo. 'todas' não
   // filtra nada (comportamento igual ao de antes de existir esse filtro).
   const [unidadeFiltro, setUnidadeFiltro] = useState('todas')
-  const [periodoComparacao, setPeriodoComparacao] = useState('semana')
+  // 3 opções — antes era só semana/mês, e mesmo assim só um card ("Total de
+  // Serviços") realmente respeitava a escolha; todo o resto da tela sempre
+  // mostrava o acumulado, sem ligação nenhuma com o toggle (pedido explícito
+  // do usuário pra corrigir: "todos os indicadores" precisam seguir o
+  // período, com Acumulado como padrão ao abrir a tela).
+  const [periodo, setPeriodo] = useState('acumulado') // 'acumulado' | 'mes' | 'semana'
   const unidadesDisponiveis = useMemo(() =>
     ['todas', ...Array.from(new Set(cards.map(c=>c.unit).filter(Boolean))).sort()]
   , [cards])
@@ -165,27 +170,22 @@ export function KPIView({ cards, requests, simClients, onNavigateToAprovacoes })
     unidadeFiltro==='todas' ? cards : cards.filter(c=>c.unit===unidadeFiltro)
   , [cards, unidadeFiltro])
 
-  // Emissão de CO2 (Escopo 1/3) — dado enviado ao time de Meio Ambiente da
-  // Mills pra divulgação externa. Ver src/lib/emissoes.js: consumo médio por
-  // veículo ainda marcado "a confirmar" com o time de Meio Ambiente.
-  const emissoes = useMemo(() => resumirEmissoes(cardsFiltrados, simClients), [cardsFiltrados, simClients])
-
-  const stats = useMemo(() => {
+  // Dataset efetivo do período selecionado — base de TODOS os indicadores
+  // agregados/históricos da tela (cards numéricos, gráficos de distribuição
+  // e emissão de carbono). Duas seções ficam de fora de propósito, não por
+  // esquecimento: "Cenário Operacional Agora" é sempre o estado ATUAL da
+  // operação (em execução/aguardando validação agora mesmo — não existe
+  // "em execução na semana passada", é um status, não um evento com data),
+  // e "Serviços por dia" é sempre a tendência dos últimos 7 dias corridos
+  // (um gráfico diário não cabe olhando o acumulado inteiro).
+  const { cardsPeriodo, periodoInfo } = useMemo(() => {
     const hoje      = todayStr()
     const thisMonth = hoje.slice(0,7)
     const lastMonth = new Date(new Date().getFullYear(), new Date().getMonth()-1, 1).toISOString().slice(0,7)
-
-    // Base pra todas as métricas agregadas — cancelado nunca deve inflar volume,
-    // distribuição por motorista/filial/rota, nem comparativo mensal.
-    // cardsValidos: base histórica — inclui concluídos, exclui cancelados.
-    // Usado para métricas de volume, por tipo, por motorista, rotas (dados históricos completos).
     const cardsValidos = cardsFiltrados.filter(c => c.status !== 'cancelado')
-    // cardsAtivos: só o que está em execução — para métricas operacionais (atrasados, prazo).
-    const cardsAtivos  = cardsValidos.filter(c => c.status !== 'concluido')
 
     const monthCards = cardsValidos.filter(c=>c.startDate?.startsWith(thisMonth))
     const lastCards  = cardsValidos.filter(c=>c.startDate?.startsWith(lastMonth))
-    const total      = cardsValidos.length
 
     // Comparativo semana atual vs. anterior — mesma lógica do comparativo
     // mensal (membership no período, não "até hoje"), só que na janela
@@ -195,11 +195,42 @@ export function KPIView({ cards, requests, simClients, onNavigateToAprovacoes })
     const lastWeekDays = getWeekDays(lastWeekStartDate.toISOString().split('T')[0])
     const weekCards     = cardsValidos.filter(c=>c.startDate>=thisWeekDays[0] && c.startDate<=thisWeekDays[6])
     const lastWeekCards = cardsValidos.filter(c=>c.startDate>=lastWeekDays[0] && c.startDate<=lastWeekDays[6])
-    const growthPctSemana = lastWeekCards.length ? Math.round(((weekCards.length-lastWeekCards.length)/lastWeekCards.length)*100) : null
 
-    // Últimos 7 dias — alimenta o gráfico "Serviços por dia" e o sparkline
-    // do card "Serviços". Meta = média do período, arredondada (não é um
-    // valor fixo cravado no código, se ajusta ao volume real da operação).
+    const porPeriodo = periodo==='semana' ? weekCards : periodo==='mes' ? monthCards : cardsValidos
+    const growthPct       = lastCards.length     ? Math.round(((monthCards.length-lastCards.length)/lastCards.length)*100) : null
+    const growthPctSemana = lastWeekCards.length ? Math.round(((weekCards.length-lastWeekCards.length)/lastWeekCards.length)*100) : null
+    return {
+      cardsPeriodo: porPeriodo,
+      periodoInfo: {
+        trend: periodo==='semana' ? growthPctSemana : periodo==='mes' ? growthPct : null,
+        sub: periodo==='semana' ? `vs. ${lastWeekCards.length} na semana anterior`
+           : periodo==='mes'    ? `vs. ${lastCards.length} no mês anterior`
+           : 'Acumulado (últimos 180 dias)',
+        // Mês corrente sempre (independente do toggle) — mantém o card "Mês
+        // Atual" com o MESMO significado fixo de sempre, pra não remover/
+        // mudar um card que já existia sem isso ter sido pedido.
+        mesAtualCount: monthCards.length,
+      },
+    }
+  }, [cardsFiltrados, periodo])
+
+  // Emissão de CO2 (Escopo 1/3) — dado enviado ao time de Meio Ambiente da
+  // Mills pra divulgação externa. Ver src/lib/emissoes.js: consumo médio por
+  // veículo ainda marcado "a confirmar" com o time de Meio Ambiente.
+  const emissoes = useMemo(() => resumirEmissoes(cardsPeriodo, simClients), [cardsPeriodo, simClients])
+
+  const stats = useMemo(() => {
+    const hoje = todayStr()
+    // cardsAtivos: só o que está em execução (dentro do período escolhido) —
+    // para métricas operacionais (atrasados, prazo, aderência).
+    const cardsAtivos = cardsPeriodo.filter(c => c.status !== 'concluido')
+    const total = cardsPeriodo.length
+
+    // Últimos 7 dias — sempre a tendência diária corrida, independente do
+    // período escolhido no toggle (ver comentário em cardsPeriodo acima:
+    // um gráfico dia-a-dia não cabe olhando o acumulado inteiro). Por isso
+    // usa cardsFiltrados (só unidade) direto, não cardsPeriodo.
+    const cardsValidos = cardsFiltrados.filter(c => c.status !== 'cancelado')
     const diasSemana = []
     for (let i = 6; i >= 0; i--) {
       const d = new Date(); d.setDate(d.getDate() - i)
@@ -222,27 +253,27 @@ export function KPIView({ cards, requests, simClients, onNavigateToAprovacoes })
     const pctAder     = totalAtivos ? Math.round(((totalAtivos-remanejados)/totalAtivos)*100) : 0
 
     const byType = Object.entries(CARD_TYPES).map(([k,v])=>({
-      label:v.short, value:cardsValidos.filter(c=>c.type===k).length, color:v.color
+      label:v.short, value:cardsPeriodo.filter(c=>c.type===k).length, color:v.color
     }))
 
     const driverMap={}
-    cardsValidos.forEach(c=>{ const d=c.driver||'Sem motorista'; driverMap[d]=(driverMap[d]||0)+1 })
+    cardsPeriodo.forEach(c=>{ const d=c.driver||'Sem motorista'; driverMap[d]=(driverMap[d]||0)+1 })
     const byDriver = Object.entries(driverMap).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([k,v])=>({label:k,value:v}))
 
     // Cidade destino — prioriza cidade, cai em estado só se não tiver cidade
     const cityMap={}
-    cardsValidos.forEach(c=>{
+    cardsPeriodo.forEach(c=>{
       const cidade = c.destCity || c.destCityName || c.destState || c.destination
       if (cidade) cityMap[cidade]=(cityMap[cidade]||0)+1
     })
     const byState = Object.entries(cityMap).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([k,v])=>({label:k,value:v}))
 
     const filialMap={}
-    cardsValidos.forEach(c=>{ const f=c.unit; if(f) filialMap[f]=(filialMap[f]||0)+1 })
+    cardsPeriodo.forEach(c=>{ const f=c.unit; if(f) filialMap[f]=(filialMap[f]||0)+1 })
     const byFilial = Object.entries(filialMap).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([k,v])=>({label:k.replace(/ \(.*\)/,''),value:v}))
 
     // Tempo médio — só conta cards com datas DIFERENTES e não cancelados
-    const cardsComDuracao = cardsValidos.filter(c=>
+    const cardsComDuracao = cardsPeriodo.filter(c=>
       c.startDate && c.endDate &&
       c.startDate !== c.endDate
     )
@@ -257,7 +288,7 @@ export function KPIView({ cards, requests, simClients, onNavigateToAprovacoes })
 
     // Rotas — cidade × cidade, exclui mesmo ponto
     const routeMap={}
-    cardsValidos.filter(c=>c.origin&&c.destination).forEach(c=>{
+    cardsPeriodo.filter(c=>c.origin&&c.destination).forEach(c=>{
       const origem  = c.originCity || c.originCityName || c.origin
       const destino = c.destCity   || c.destCityName   || c.destination
       if (origem && destino && origem !== destino) {
@@ -267,14 +298,16 @@ export function KPIView({ cards, requests, simClients, onNavigateToAprovacoes })
     })
     const topRoutes = Object.entries(routeMap).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([k,v])=>({label:k,value:v}))
 
-    const growthPct = lastCards.length ? Math.round(((monthCards.length-lastCards.length)/lastCards.length)*100) : null
     const pendReq   = (requests||[]).filter(r=>r.status==='pendente').length
     const aceitoReq = (requests||[]).filter(r=>r.status==='aceito').length
     const reqValidas = (requests||[]).filter(r=>r.status!=='cancelado').length
     const taxaAceit = reqValidas ? Math.round((aceitoReq/reqValidas)*100) : 0
 
     // ── Cenário operacional AGORA — o que Rafael mais precisa ver de cara:
-    // não é histórico, é "o que está rolando com a equipe neste exato momento".
+    // não é histórico, é "o que está rolando com a equipe neste exato
+    // momento" — por isso sempre cardsFiltrados (só unidade), nunca
+    // cardsPeriodo: não existe "em execução na semana passada", execução é
+    // um status atual, não um evento com data pra filtrar por período.
     const emExecucao        = cardsFiltrados.filter(c=>c.status==='em_execucao').length
     const aguardandoValid   = cardsFiltrados.filter(c=>c.status==='aguardando_validacao').length
     const interrompidos     = cardsFiltrados.filter(c=>c.status==='interrompido').length
@@ -296,10 +329,9 @@ export function KPIView({ cards, requests, simClients, onNavigateToAprovacoes })
       }
     })
 
-    return { total,totalAtivos,late,onTime,pctOnTime,pctAder,remanejados,byType,byDriver,byState,byFilial,tempoMedio,topRoutes,monthCards,growthPct,pendReq,taxaAceit,
-      emExecucao,aguardandoValid,interrompidos,atrasadosAgora,slaPorUrgencia,diasSemana,metaDia,sparklineServicos,
-      weekCards,lastWeekCards,growthPctSemana }
-  }, [cardsFiltrados, requests])
+    return { total,totalAtivos,late,onTime,pctOnTime,pctAder,remanejados,byType,byDriver,byState,byFilial,tempoMedio,topRoutes,pendReq,taxaAceit,
+      emExecucao,aguardandoValid,interrompidos,atrasadosAgora,slaPorUrgencia,diasSemana,metaDia,sparklineServicos }
+  }, [cardsFiltrados, cardsPeriodo, requests])
 
   const painelRef = useRef(null)
   const [exportandoImg, setExportandoImg] = useState(false)
@@ -343,14 +375,16 @@ export function KPIView({ cards, requests, simClients, onNavigateToAprovacoes })
         </div>
       )}
 
-      {/* Semana/Mês — decide a janela de comparação do card "Total de Serviços"
-          logo abaixo: semana atual vs. semana anterior (segunda–domingo) ou
-          mês atual vs. mês passado. */}
+      {/* Acumulado/Mês/Semana — decide o período de TODOS os indicadores
+          abaixo (exceto Cenário Operacional Agora, que é sempre o estado
+          atual, e o gráfico "Serviços por dia", sempre os últimos 7 dias
+          corridos — ver comentário em cardsPeriodo). Acumulado é o padrão
+          ao abrir a tela. */}
       <div style={{ background:'#fff', border:'1px solid rgba(26,22,18,.08)', borderRadius:8, display:'flex', padding:2, gap:2, width:'fit-content', marginBottom:14 }}>
-        {['semana','mes'].map(p => (
-          <button key={p} onClick={()=>setPeriodoComparacao(p)}
-            style={{ padding:'4px 10px', borderRadius:6, background:periodoComparacao===p?T.laranja:'transparent', color:periodoComparacao===p?'white':T.textMuted, fontSize:9.5, fontWeight:700, border:'none', cursor:'pointer', fontFamily:FONT }}>
-            {p==='semana'?'Semana':'Mês'}
+        {['acumulado','mes','semana'].map(p => (
+          <button key={p} onClick={()=>setPeriodo(p)}
+            style={{ padding:'4px 10px', borderRadius:6, background:periodo===p?T.laranja:'transparent', color:periodo===p?'white':T.textMuted, fontSize:9.5, fontWeight:700, border:'none', cursor:'pointer', fontFamily:FONT }}>
+            {p==='acumulado'?'Acumulado':p==='mes'?'Mês':'Semana'}
           </button>
         ))}
       </div>
@@ -413,10 +447,10 @@ export function KPIView({ cards, requests, simClients, onNavigateToAprovacoes })
 
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:14 }}>
         <KPICard title="Total de Serviços"
-          value={periodoComparacao==='semana' ? stats.weekCards.length : stats.total}
+          value={stats.total}
           icon="📋" color={T.laranja} bg={T.laranjaXLight}
-          trend={periodoComparacao==='semana' ? stats.growthPctSemana : stats.growthPct}
-          sub={periodoComparacao==='semana' ? `vs. ${stats.lastWeekCards.length} na semana anterior` : 'Últimos 180 dias'}
+          trend={periodoInfo.trend}
+          sub={periodoInfo.sub}
           sparkline={stats.sparklineServicos}/>
         <KPICard title="No Prazo"           value={`${stats.pctOnTime}%`}  icon="✅" color={T.sucesso} bg={T.sucessoLight}  sub={`${stats.onTime}/${stats.totalAtivos} em aberto`}/>
         <KPICard title="Aderência"          value={`${stats.pctAder}%`}    icon="📅" color={T.verde}   bg={T.verdeLight}    sub={`${stats.remanejados} remanejamentos`}/>
@@ -426,7 +460,7 @@ export function KPIView({ cards, requests, simClients, onNavigateToAprovacoes })
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:14 }}>
         <KPICard title="Atrasados"          value={stats.late}              icon="🔴" color={T.perigo}  bg={T.perigoLight}  sub={stats.late?(onNavigateToAprovacoes?'Clique pra ver na fila de aprovações':'endDate < hoje, não concluídos'):'Tudo em dia 🎉'}
           onClick={stats.late && onNavigateToAprovacoes ? onNavigateToAprovacoes : undefined}/>
-        <KPICard title="Mês Atual"          value={stats.monthCards.length} icon="📆" color={T.amarelo} bg={T.amareloLight} sub="Serviços no mês"/>
+        <KPICard title="Mês Atual"          value={periodoInfo.mesAtualCount} icon="📆" color={T.amarelo} bg={T.amareloLight} sub="Serviços no mês (fixo, não segue o toggle acima)"/>
         <KPICard title="Solicitações Pend." value={stats.pendReq}           icon="📥" color={T.laranjaDeep} bg="#FDEEE9"        sub="Aguardando resposta"/>
         <KPICard title="Taxa de Aceite"     value={`${stats.taxaAceit}%`}   icon="🤝" color={T.sucesso} bg={T.sucessoLight} sub="Solicitações aceitas"/>
       </div>
