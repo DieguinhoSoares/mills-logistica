@@ -316,15 +316,26 @@ export function MunicipioInput({ value, onChange, placeholder='Cidade...' }) {
   const [search, setSearch]   = useState(value ? `${value.m} (${value.s})` : '')
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
+  // Cada tecla dispara um fetch novo, sem cancelar o anterior \u2014 se a resposta
+  // de uma busca mais ANTIGA (ex: "S\u00e3o Paulo") chegar DEPOIS da resposta de
+  // uma busca mais NOVA (ex: "Rio de Janeiro", digitado r\u00e1pido em seguida),
+  // o setResults da antiga rodava por \u00faltimo e sobrescrevia a lista, mesmo
+  // com o campo j\u00e1 mostrando outro texto \u2014 clicar numa sugest\u00e3o "colava" a
+  // cidade errada (bug real de condi\u00e7\u00e3o de corrida, achado em auditoria).
+  // Um contador de sequ\u00eancia resolve sem precisar de AbortController: s\u00f3
+  // aplica o resultado se ainda for o pedido mais recente disparado.
+  const buscaSeq = useRef(0)
   const buscar = async (texto) => {
     if(texto.length<2){ setResults([]); return }
+    const minhaSeq = ++buscaSeq.current
     setLoading(true)
     try {
       const res  = await fetch('https://servicodados.ibge.gov.br/api/v1/localidades/municipios?orderBy=nome')
       const data = await res.json()
+      if (minhaSeq !== buscaSeq.current) return // uma busca mais nova j\u00e1 rodou \u2014 descarta essa resposta atrasada
       const normT=texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); setResults(data.filter(m=>m.nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes(normT)).slice(0,10).map(m=>({ m:m.nome, s:m.microrregiao.mesorregiao.UF.sigla })))
-    } catch { setResults([]) }
-    setLoading(false)
+    } catch { if (minhaSeq === buscaSeq.current) setResults([]) }
+    if (minhaSeq === buscaSeq.current) setLoading(false)
   }
   return (
     <div style={{ position:'relative' }}>

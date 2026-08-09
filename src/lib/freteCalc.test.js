@@ -4,7 +4,7 @@
 // Rodar: npm test
 // ============================================================
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { calcularFrete, selecionarVeiculoPorPeso, resolverVeiculoTransporte, analisarRotaComParadas, getValorIda, otimizarOrdemParadas, DIARIAS, VEICULOS, formatBRL, PESO_GRUPO, buscarGrupoModelo, buscarFabricanteModelo, kmRotaEhPlausivel, calcularDistancia } from './freteCalc'
+import { calcularFrete, selecionarVeiculoPorPeso, resolverVeiculoTransporte, analisarRotaComParadas, getValorIda, otimizarOrdemParadas, DIARIAS, VEICULOS, formatBRL, PESO_GRUPO, buscarGrupoModelo, buscarFabricanteModelo, kmRotaEhPlausivel, calcularDistancia, calcularDistanciaMultiPonto, calcularMatrizDistancias } from './freteCalc'
 
 describe('calcularFrete — entradas inválidas', () => {
   it('retorna null sem km', () => {
@@ -475,6 +475,31 @@ describe('Frete Rodando — opção manual, nunca calculada automaticamente', ()
   })
 })
 
+// Achado real de auditoria (2026-08): as faixas da TABELA tinham um "buraco"
+// de 1km entre elas (ex: 0-50 e depois 51-100) — km decimal caindo bem nesse
+// buraco (50,5 · 100,5 · 250,5 · 500,5 · 1000,5 · 2000,5 · 3000,5) não batia
+// em NENHUMA faixa, e getValorIda devolvia 0 em silêncio. Alcançável de
+// verdade: o campo de "km real" (Frotas, distância de fato rodada) e o
+// campo de km manual aceitam decimal livre, não só o inteiro que
+// calcularDistancia devolve.
+describe('getValorIda — faixas contíguas, sem buraco de 1km entre elas', () => {
+  it('km decimal exatamente no meio de cada buraco antigo NÃO devolve mais 0', () => {
+    for (const km of [50.5, 100.5, 250.5, 500.5, 1000.5, 2000.5, 3000.5]) {
+      expect(getValorIda(km, 'truck')).toBeGreaterThan(0)
+    }
+  })
+  it('km inteiro exatamente na fronteira continua com o MESMO valor de antes (sem regressão de preço)', () => {
+    // Faixa fixa (≤100km): valor fixo, não multiplica por km.
+    expect(getValorIda(50, 'truck')).toBeCloseTo(1143.22)
+    expect(getValorIda(100, 'truck')).toBeCloseTo(1681.21)
+    // Faixa por km (>100km): fronteira agora pertence à faixa de baixo (a
+    // primeira que bate no .find), mesmo comportamento de sempre pra
+    // valores inteiros — só o buraco de 1km é que não existe mais.
+    expect(getValorIda(250, 'truck')).toBeCloseTo(13.04*250, 1)
+    expect(getValorIda(500, 'truck')).toBeCloseTo(11.42*500, 1)
+  })
+})
+
 describe('otimizarOrdemParadas — heurística do vizinho mais próximo', () => {
   it('reordena pra visitar o mais próximo a cada passo, partindo da origem (índice 0)', () => {
     // Origem=0, A=1 (longe, 100km), B=2 (perto da origem, 10km), C=3 (perto de B, 15km depois de B)
@@ -549,6 +574,85 @@ describe('kmRotaEhPlausivel — rejeita rota OSRM implausível (caso real Assis/
 
   it('coordenadas idênticas (reta=0): não divide por zero, sempre plausível', () => {
     expect(kmRotaEhPlausivel(50, assis, assis)).toBe(true)
+  })
+})
+
+// Achado real de auditoria (2026-08): kmRotaEhPlausivel só estava ligada em
+// calcularDistancia (rota de 1 trecho só) — calcularDistanciaMultiPonto e
+// calcularMatrizDistancias (rota combinada com paradas, e a matriz que
+// alimenta a otimização de ordem do Rotograma) chamam a MESMA OSRM pública
+// mas usavam a distância bruta sem checagem nenhuma, reabrindo exatamente o
+// mesmo bug já documentado (1589km ao vés de 542km), só que em dinheiro de
+// frete combinado (valorSeparado) ou na ordem "otimizada" de paradas.
+describe('calcularDistanciaMultiPonto — mesma checagem de plausibilidade OSRM que calcularDistancia', () => {
+  const ASSIS       = { lat:-22.6620892, lon:-50.4206230, state:'São Paulo' }
+  const CANAPOLIS    = { lat:-18.7228793, lon:-49.2016329, state:'Minas Gerais' }
+  const UBERLANDIA   = { lat:-18.9186, lon:-48.2772, state:'Minas Gerais' }
+
+  function mockFetch({ pernasKm }) {
+    return url => {
+      if (url.includes('nominatim.openstreetmap.org')) {
+        const c = url.includes('city=Can') ? CANAPOLIS : url.includes('city=Uber') ? UBERLANDIA : ASSIS
+        return Promise.resolve({ json: async () => [{ lat:String(c.lat), lon:String(c.lon), address:{ state:c.state } }] })
+      }
+      if (url.includes('router.project-osrm.org/route')) {
+        return Promise.resolve({ json: async () => ({ routes:[{ legs: pernasKm.map(km => ({ distance: km*1000 })) }] }) })
+      }
+      return Promise.resolve({ json: async () => ({}) })
+    }
+  }
+
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  it('todas as pernas plausíveis: usa a distância da OSRM normalmente', async () => {
+    // Assis→Canápolis ~454km reta, Canápolis→Uberlândia bem perto — pernas
+    // realistas, dentro do multiplicador.
+    vi.stubGlobal('fetch', vi.fn(mockFetch({ pernasKm:[542, 90] })))
+    const { pernas } = await calcularDistanciaMultiPonto([
+      { cidade:'Assis', uf:'SP' }, { cidade:'Canápolis', uf:'MG' }, { cidade:'Uberlândia', uf:'MG' },
+    ])
+    expect(pernas).toEqual([542, 90])
+  })
+
+  it('uma perna implausível (mesmo bug real: 1589km numa reta de ~450km): descarta TODAS as pernas da OSRM, cai pro fallback Haversine×1.3 na rota inteira', async () => {
+    vi.stubGlobal('fetch', vi.fn(mockFetch({ pernasKm:[1589, 90] })))
+    const { pernas } = await calcularDistanciaMultiPonto([
+      { cidade:'Assis', uf:'SP' }, { cidade:'Canápolis', uf:'MG' }, { cidade:'Uberlândia', uf:'MG' },
+    ])
+    // Nenhuma perna deve ser o valor implausível vindo direto da OSRM.
+    expect(pernas[0]).not.toBe(1589)
+  })
+})
+
+describe('calcularMatrizDistancias — mesma checagem de plausibilidade OSRM que calcularDistancia', () => {
+  const ASSIS     = { lat:-22.6620892, lon:-50.4206230, state:'São Paulo' }
+  const CANAPOLIS = { lat:-18.7228793, lon:-49.2016329, state:'Minas Gerais' }
+
+  function mockFetch({ matrizKm }) {
+    return url => {
+      if (url.includes('nominatim.openstreetmap.org')) {
+        const c = url.includes('city=Can') ? CANAPOLIS : ASSIS
+        return Promise.resolve({ json: async () => [{ lat:String(c.lat), lon:String(c.lon), address:{ state:c.state } }] })
+      }
+      if (url.includes('router.project-osrm.org/table')) {
+        return Promise.resolve({ json: async () => ({ distances: matrizKm.map(row => row.map(km => km*1000)) }) })
+      }
+      return Promise.resolve({ json: async () => ({}) })
+    }
+  }
+
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  it('par implausível na matriz (mesmo bug real): descarta a matriz inteira da OSRM, cai pro fallback Haversine×1.3', async () => {
+    vi.stubGlobal('fetch', vi.fn(mockFetch({ matrizKm: [[0, 1589], [1589, 0]] })))
+    const matriz = await calcularMatrizDistancias([{ cidade:'Assis', uf:'SP' }, { cidade:'Canápolis', uf:'MG' }])
+    expect(matriz[0][1]).not.toBe(1589)
+  })
+
+  it('matriz plausível: usa a distância da OSRM normalmente', async () => {
+    vi.stubGlobal('fetch', vi.fn(mockFetch({ matrizKm: [[0, 542], [542, 0]] })))
+    const matriz = await calcularMatrizDistancias([{ cidade:'Assis', uf:'SP' }, { cidade:'Canápolis', uf:'MG' }])
+    expect(matriz[0][1]).toBe(542)
   })
 })
 

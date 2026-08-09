@@ -379,7 +379,7 @@ export function FrotasView() {
         addToast('❌ Solicitação recusada.','info')
       } catch (err) {
         console.error('Erro ao recusar solicitação:', err)
-        addToast('Erro ao recusar. Tente novamente.', 'error')
+        addToast(err.message || 'Erro ao recusar. Tente novamente.', 'error')
       }
     }
   }
@@ -546,7 +546,12 @@ export function FrotasView() {
       addToast(`✅ Serviço aceito e atribuído a ${motorista||'motorista'}!`,'accepted')
     } catch (err) {
       console.error('Erro ao atribuir motorista:', err)
-      addToast('Erro ao atribuir motorista. Tente novamente.', 'error')
+      // Se a solicitação já foi decidida por outra pessoa (ver guard novo em
+      // respondRequest), fecha o modal também — senão o analista via o erro
+      // mas o modal continuava aberto, convidando a tentar de novo em cima
+      // de um pedido que já não existe mais nesse estado.
+      addToast(err.message || 'Erro ao atribuir motorista. Tente novamente.', 'error')
+      setAssignModal(null)
     }
   }
 

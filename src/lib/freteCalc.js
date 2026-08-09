@@ -14,15 +14,26 @@
 // negociada até o momento (não consta na planilha de diárias) — DIARIAS
 // não tem entrada pra ele, então valorDiaria fica 0 se alguém pedir diária
 // pra esse veículo (guard em `DIARIAS[veiculoId]`, ver linha ~1216).
+// Faixas contíguas de propósito (min da faixa N = max da faixa N-1, sem
+// gap de 1km entre elas) — bug real (2026-08): min começava em max+1 (ex:
+// 0-50 e depois 51-100), então qualquer km NÃO-inteiro caindo exatamente
+// nesse intervalo de 1km (50,5 · 100,5 · 250,5 · 500,5 · 1000,5 · 2000,5 ·
+// 3000,5) não batia em NENHUMA faixa — getValorIda devolvia 0 em silêncio,
+// virando um frete de R$0,00 "válido". Isso é alcançável de verdade: o
+// campo de km real (Frotas, distância de fato rodada) e o de km manual
+// aceitam decimal livre, não só o inteiro que calcularDistancia devolve.
+// TABELA.find() pega o PRIMEIRO match, então um km bem em cima do limite
+// (ex: exatamente 50) continua caindo na mesma faixa de antes — só fecha
+// o buraco entre elas, não muda nenhum valor pra km inteiro já existente.
 const TABELA = [
   { min:0,    max:50,       fixo:true,  '3/4':739.73,  truck:1143.22, bitruck:1291.17, prancha3:1315.19, prancha4:1587.88, bitrem9:2512.62 },
-  { min:51,   max:100,      fixo:true,  '3/4':1143.22, truck:1681.21, bitruck:2017.45, prancha3:2072.70, prancha4:2479.71, bitrem9:3828.05 },
-  { min:101,  max:250,      fixo:false, '3/4':9.75,    truck:13.04,   bitruck:15.38,   prancha3:17.24,   prancha4:21.32,   bitrem9:31.60   },
-  { min:251,  max:500,      fixo:false, '3/4':8.91,    truck:11.42,   bitruck:14.06,   prancha3:15.95,   prancha4:19.32,   bitrem9:28.29   },
-  { min:501,  max:1000,     fixo:false, '3/4':8.16,    truck:11.01,   bitruck:13.17,   prancha3:15.15,   prancha4:18.42,   bitrem9:27.08   },
-  { min:1001, max:2000,     fixo:false, '3/4':7.97,    truck:10.71,   bitruck:12.89,   prancha3:14.59,   prancha4:17.72,   bitrem9:26.16   },
-  { min:2001, max:3000,     fixo:false, '3/4':7.89,    truck:10.68,   bitruck:12.72,   prancha3:14.48,   prancha4:17.56,   bitrem9:25.98   },
-  { min:3001, max:Infinity, fixo:false, '3/4':7.95,    truck:10.64,   bitruck:12.67,   prancha3:14.41,   prancha4:17.51,   bitrem9:25.89   },
+  { min:50,   max:100,      fixo:true,  '3/4':1143.22, truck:1681.21, bitruck:2017.45, prancha3:2072.70, prancha4:2479.71, bitrem9:3828.05 },
+  { min:100,  max:250,      fixo:false, '3/4':9.75,    truck:13.04,   bitruck:15.38,   prancha3:17.24,   prancha4:21.32,   bitrem9:31.60   },
+  { min:250,  max:500,      fixo:false, '3/4':8.91,    truck:11.42,   bitruck:14.06,   prancha3:15.95,   prancha4:19.32,   bitrem9:28.29   },
+  { min:500,  max:1000,     fixo:false, '3/4':8.16,    truck:11.01,   bitruck:13.17,   prancha3:15.15,   prancha4:18.42,   bitrem9:27.08   },
+  { min:1000, max:2000,     fixo:false, '3/4':7.97,    truck:10.71,   bitruck:12.89,   prancha3:14.59,   prancha4:17.72,   bitrem9:26.16   },
+  { min:2000, max:3000,     fixo:false, '3/4':7.89,    truck:10.68,   bitruck:12.72,   prancha3:14.48,   prancha4:17.56,   bitrem9:25.98   },
+  { min:3000, max:Infinity, fixo:false, '3/4':7.95,    truck:10.64,   bitruck:12.67,   prancha3:14.41,   prancha4:17.51,   bitrem9:25.89   },
 ]
 
 // ── DIÁRIAS — valores 2026 ────────────────────────────────────
@@ -1269,7 +1280,17 @@ export async function calcularDistanciaMultiPonto(pontos) {
     const data = await res.json()
     if (data?.routes?.[0]?.legs) {
       const pernas = data.routes[0].legs.map(l => Math.round(l.distance / 1000))
-      return { pernas, total: pernas.reduce((a,b)=>a+b,0), coords }
+      // Mesma checagem de plausibilidade do calcularDistancia (ver
+      // kmRotaEhPlausivel e o caso real documentado ali) — sem isso, uma
+      // perna mal roteada pela OSRM entrava direto no valor de frete de
+      // rota combinada (valorSeparado, dinheiro de verdade) sem aviso
+      // nenhum, só porque essa função nunca teve a mesma checagem que
+      // calcularDistancia já tinha pro caso de 1 trecho só.
+      const todasPlausiveis = pernas.every((km, i) => kmRotaEhPlausivel(km, coords[i], coords[i+1]))
+      if (todasPlausiveis) {
+        return { pernas, total: pernas.reduce((a,b)=>a+b,0), coords }
+      }
+      console.warn('[freteCalc] rota OSRM multi-ponto com pelo menos uma perna implausível — usando fallback Haversine×1.3 em todas as pernas')
     }
   } catch { /* fallback */ }
   // Fallback Haversine × 1.3 perna a perna (mesmo fator do calcularDistancia)
@@ -1293,7 +1314,17 @@ export async function calcularMatrizDistancias(pontos) {
     const data = await res.json()
     if (data?.distances) {
       // data.distances vem em metros — converte pra km
-      return data.distances.map(row => row.map(m => m == null ? Infinity : Math.round(m/1000)))
+      const matriz = data.distances.map(row => row.map(m => m == null ? Infinity : Math.round(m/1000)))
+      // Mesma checagem de plausibilidade do calcularDistancia — essa matriz
+      // alimenta a otimização de ORDEM das paradas (Rotograma); um par
+      // implausível bagunça a ordem "otimizada" inteira em cima de uma
+      // distância que a própria OSRM roteou errado (ver caso real
+      // documentado em kmRotaEhPlausivel).
+      const todasPlausiveis = matriz.every((row, i) => row.every((km, j) =>
+        i === j || km === Infinity || kmRotaEhPlausivel(km, coords[i], coords[j])
+      ))
+      if (todasPlausiveis) return matriz
+      console.warn('[freteCalc] matriz de distâncias OSRM com pelo menos um par implausível — usando fallback Haversine×1.3 na matriz inteira')
     }
   } catch { /* fallback */ }
   // Fallback: monta a matriz via Haversine par a par (mesmo fator ×1.3)

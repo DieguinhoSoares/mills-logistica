@@ -251,34 +251,43 @@ export function useRequests(roleFilter) {
   }
 
   const respondRequest = async (id, status, note, teamsWebhookUrl) => {
-    await updateDoc(doc(db,'requests',id), {
-      status, responseNote:note, respondedAt:serverTimestamp(), updatedAt:serverTimestamp(),
-    })
-    // Antes usava requests.find(r=>r.id===id) — dependia da lista local já
-    // ter carregado aquele item no momento exato do clique. Se por qualquer
-    // motivo (race condition, lista ainda carregando, filtro aplicado antes)
-    // o item não estivesse nessa lista, a notificação pro solicitante era
-    // pulada em silêncio, sem erro nenhum — a recusa/aceite acontecia normal,
-    // só o aviso nunca existia. Agora busca o documento direto no Firestore,
-    // igual as funções de aprovação (refuseAsSupervisor, approveAsGerente
-    // etc.) já fazem, que são mais confiáveis por não dependerem de estado
-    // local nenhum.
-    const snap = await getDoc(doc(db,'requests',id))
-    const req  = snap.exists() ? { id, ...snap.data() } : null
-    if (!req) {
-      console.warn(`[respondRequest] Documento requests/${id} não encontrado — notificação ao solicitante não foi enviada.`)
-    }
-    if (req) {
-      await notifyUser(req.requesterId,
-        status==='aceito'?'request_accepted':'request_rejected',
-        status==='aceito'?'✅ Solicitação aceita!':'❌ Solicitação recusada',
-        note||(status==='aceito'?'Sua solicitação foi aceita.':'Sua solicitação foi recusada.'), id)
-      if (teamsWebhookUrl) {
-        await sendTeamsNotification(teamsWebhookUrl,
-          `${status==='aceito'?'✅':'❌'} Solicitação ${status==='aceito'?'Aceita':'Recusada'}`,
-          `Solicitante: ${req.requesterName||req.unit}\nServiço: ${req.type}\nData: ${req.desiredDate}\n\n${note||''}`
-        )
+    // Igual às funções de aprovação em cadeia abaixo (approveAsSupervisor
+    // etc.) — antes, um getDoc + checagem de status ANTES de um updateDoc
+    // separado ainda deixava uma janela de corrida real: dois analistas de
+    // Frotas decidindo o mesmo pedido quase ao mesmo tempo (ex: um aceita e
+    // atribui motorista enquanto o outro recusa) podiam os dois passar pela
+    // checagem (leram o mesmo status "pendente" antes de qualquer um
+    // escrever) e um sobrescrever a decisão do outro em silêncio — e como
+    // handleAssignConfirm só cria/reaproveita o card DEPOIS disso suceder,
+    // a mesma corrida arriscava duas atribuições de motorista pro mesmo
+    // pedido. Uma transação de verdade fecha essa janela: se dois rodarem
+    // ao mesmo tempo, o Firestore detecta o conflito e faz a segunda tentar
+    // de novo com uma leitura fresca — aí ela vê o status já mudado e
+    // desiste, em vez de escrever por cima.
+    const ref = doc(db,'requests',id)
+    const req = await runTransaction(db, async tx => {
+      const snap = await tx.get(ref)
+      if (!snap.exists()) throw new Error('Esta solicitação não existe mais.')
+      const data = { id, ...snap.data() }
+      if (data.status !== 'pendente') {
+        throw new Error('Esta solicitação não está mais aguardando decisão da Frotas (alguém já decidiu, ou ela mudou de etapa).')
       }
+      tx.update(ref, { status, responseNote:note, respondedAt:serverTimestamp(), updatedAt:serverTimestamp() })
+      return data
+    })
+    // Efeito colateral (notificação) só depois da transação confirmar — não
+    // pode rodar dentro do corpo dela, porque o Firestore pode reexecutar
+    // esse corpo em caso de conflito, e uma notificação não pode disparar
+    // 2x por causa disso.
+    await notifyUser(req.requesterId,
+      status==='aceito'?'request_accepted':'request_rejected',
+      status==='aceito'?'✅ Solicitação aceita!':'❌ Solicitação recusada',
+      note||(status==='aceito'?'Sua solicitação foi aceita.':'Sua solicitação foi recusada.'), id)
+    if (teamsWebhookUrl) {
+      await sendTeamsNotification(teamsWebhookUrl,
+        `${status==='aceito'?'✅':'❌'} Solicitação ${status==='aceito'?'Aceita':'Recusada'}`,
+        `Solicitante: ${req.requesterName||req.unit}\nServiço: ${req.type}\nData: ${req.desiredDate}\n\n${note||''}`
+      )
     }
   }
 
@@ -293,28 +302,41 @@ export function useRequests(roleFilter) {
 // só para pegar essas 5 funções, sem nunca usar os dados que ele retornava
 // (item da revisão: "listener fantasma"). Extraídas aqui, GerenteView não
 // precisa mais chamar useRequests() e o listener duplicado desaparece.
-// As 4 funções de aprovação/recusa abaixo checam req.status logo após o
-// getDoc — sem isso, qualquer chamador (o modal já trava pelo cliente, ver
-// GerenteView.jsx `podeDecidir`, mas nada impede uma chamada direta ou uma
-// aba desatualizada) podia reverter uma decisão de uma etapa que não é mais
-// a atual: aprovar de novo algo já recusado, ou um Supervisor "aprovar" uma
-// solicitação que a Gerência já decidiu. Não é uma transação de verdade
-// (ainda dá uma pequena janela de corrida entre 2 aprovações quase
-// simultâneas), mas fecha o caso comum de decisão fora de ordem/repetida.
+// As 5 funções de aprovação/recusa abaixo rodam dentro de uma transação
+// Firestore de verdade (tx.get + checagem de status + tx.update, tudo
+// atômico) — antes era um getDoc + updateDoc separados, o que fechava o
+// caso comum (decisão fora de ordem/repetida a partir de estado já obsoleto
+// na tela) mas deixava uma janela de corrida real entre 2 decisões quase
+// simultâneas: as duas liam o mesmo status "pendente_X" antes de qualquer
+// updateDoc rodar, as duas passavam pela checagem, e a segunda escrita
+// sobrescrevia a primeira em silêncio — inclusive derrubando a entrada do
+// approvalLog da primeira decisão do histórico (log reconstruído a partir
+// da leitura obsoleta da segunda chamada). Com runTransaction, se duas
+// rodarem em cima do mesmo documento ao mesmo tempo, o Firestore detecta o
+// conflito e reexecuta a segunda com uma leitura fresca — ela então vê o
+// status já mudado pela primeira e desiste corretamente, sem sobrescrever
+// nada. Efeitos colaterais (notificação, WhatsApp) sempre DEPOIS da
+// transação confirmar, nunca dentro do corpo dela — o Firestore pode
+// reexecutar esse corpo em caso de conflito, e uma notificação não pode
+// disparar mais de uma vez por causa disso.
 export async function approveAsSupervisor(id, note, approverName, approverRole) {
-  const snap = await getDoc(doc(db,'requests',id))
-  const req  = { id, ...snap.data() }
-  if (req.status !== 'pendente_supervisor') {
-    throw new Error('Esta solicitação não está mais aguardando aprovação do Supervisor (alguém já decidiu, ou ela avançou de etapa).')
-  }
-  const logEntry = { step:'supervisor', approver:approverName, role:approverRole, note, at:new Date().toISOString(), action:'approved' }
-  const nextStatus = req.needsGerenteApproval ? 'pendente_gerente' : 'pendente'
-  await updateDoc(doc(db,'requests',id), {
-    status:               nextStatus,
-    approvalLog:          [...(req.approvalLog||[]), logEntry],
-    supervisorApprovedAt: serverTimestamp(),
-    supervisorApprovedBy: approverName,
-    updatedAt:            serverTimestamp(),
+  const ref = doc(db,'requests',id)
+  const req = await runTransaction(db, async tx => {
+    const snap = await tx.get(ref)
+    const data = { id, ...snap.data() }
+    if (data.status !== 'pendente_supervisor') {
+      throw new Error('Esta solicitação não está mais aguardando aprovação do Supervisor (alguém já decidiu, ou ela avançou de etapa).')
+    }
+    const logEntry = { step:'supervisor', approver:approverName, role:approverRole, note, at:new Date().toISOString(), action:'approved' }
+    const nextStatus = data.needsGerenteApproval ? 'pendente_gerente' : 'pendente'
+    tx.update(ref, {
+      status:               nextStatus,
+      approvalLog:          [...(data.approvalLog||[]), logEntry],
+      supervisorApprovedAt: serverTimestamp(),
+      supervisorApprovedBy: approverName,
+      updatedAt:            serverTimestamp(),
+    })
+    return data
   })
   await notifyUser(req.requesterId, 'supervisor_approved', '✅ Aprovado pelo Supervisor',
     note || 'Sua solicitação foi aprovada pelo supervisor.', id)
@@ -335,34 +357,42 @@ export async function approveAsSupervisor(id, note, approverName, approverRole) 
 }
 
 export async function refuseAsSupervisor(id, note, approverName) {
-  const snap = await getDoc(doc(db,'requests',id))
-  const req  = { id, ...snap.data() }
-  if (req.status !== 'pendente_supervisor') {
-    throw new Error('Esta solicitação não está mais aguardando aprovação do Supervisor (alguém já decidiu, ou ela avançou de etapa).')
-  }
-  const logEntry = { step:'supervisor', approver:approverName, note, at:new Date().toISOString(), action:'refused' }
-  await updateDoc(doc(db,'requests',id), {
-    status:'recusado', responseNote:note,
-    approvalLog:[...(req.approvalLog||[]), logEntry],
-    updatedAt:serverTimestamp(),
+  const ref = doc(db,'requests',id)
+  const req = await runTransaction(db, async tx => {
+    const snap = await tx.get(ref)
+    const data = { id, ...snap.data() }
+    if (data.status !== 'pendente_supervisor') {
+      throw new Error('Esta solicitação não está mais aguardando aprovação do Supervisor (alguém já decidiu, ou ela avançou de etapa).')
+    }
+    const logEntry = { step:'supervisor', approver:approverName, note, at:new Date().toISOString(), action:'refused' }
+    tx.update(ref, {
+      status:'recusado', responseNote:note,
+      approvalLog:[...(data.approvalLog||[]), logEntry],
+      updatedAt:serverTimestamp(),
+    })
+    return data
   })
   await notifyUser(req.requesterId, 'request_rejected', '❌ Solicitação recusada pelo Supervisor',
     note||'Sua solicitação foi recusada.', id)
 }
 
 export async function approveAsGerente(id, note, approverName, approverRole) {
-  const snap = await getDoc(doc(db,'requests',id))
-  const req  = { id, ...snap.data() }
-  if (req.status !== 'pendente_gerente') {
-    throw new Error('Esta solicitação não está mais aguardando aprovação da Gerência (alguém já decidiu, ou ela avançou de etapa).')
-  }
-  const logEntry = { step:'gerente', approver:approverName, role:approverRole, note, at:new Date().toISOString(), action:'approved' }
-  await updateDoc(doc(db,'requests',id), {
-    status:'pendente',
-    approvalLog:[...(req.approvalLog||[]), logEntry],
-    gerenteApprovedAt:serverTimestamp(),
-    gerenteApprovedBy:approverName,
-    updatedAt:serverTimestamp(),
+  const ref = doc(db,'requests',id)
+  const req = await runTransaction(db, async tx => {
+    const snap = await tx.get(ref)
+    const data = { id, ...snap.data() }
+    if (data.status !== 'pendente_gerente') {
+      throw new Error('Esta solicitação não está mais aguardando aprovação da Gerência (alguém já decidiu, ou ela avançou de etapa).')
+    }
+    const logEntry = { step:'gerente', approver:approverName, role:approverRole, note, at:new Date().toISOString(), action:'approved' }
+    tx.update(ref, {
+      status:'pendente',
+      approvalLog:[...(data.approvalLog||[]), logEntry],
+      gerenteApprovedAt:serverTimestamp(),
+      gerenteApprovedBy:approverName,
+      updatedAt:serverTimestamp(),
+    })
+    return data
   })
   await notifyUser(req.requesterId, 'gerente_approved', '✅ Aprovado pela Gerência',
     note||'Sua solicitação foi aprovada pela gerência e encaminhada para o time de Frotas.', id)
@@ -371,31 +401,48 @@ export async function approveAsGerente(id, note, approverName, approverRole) {
 }
 
 export async function refuseAsGerente(id, note, approverName) {
-  const snap = await getDoc(doc(db,'requests',id))
-  const req  = { id, ...snap.data() }
-  if (req.status !== 'pendente_gerente') {
-    throw new Error('Esta solicitação não está mais aguardando aprovação da Gerência (alguém já decidiu, ou ela avançou de etapa).')
-  }
-  const logEntry = { step:'gerente', approver:approverName, note, at:new Date().toISOString(), action:'refused' }
-  await updateDoc(doc(db,'requests',id), {
-    status:'recusado', responseNote:note,
-    approvalLog:[...(req.approvalLog||[]), logEntry],
-    updatedAt:serverTimestamp(),
+  const ref = doc(db,'requests',id)
+  const req = await runTransaction(db, async tx => {
+    const snap = await tx.get(ref)
+    const data = { id, ...snap.data() }
+    if (data.status !== 'pendente_gerente') {
+      throw new Error('Esta solicitação não está mais aguardando aprovação da Gerência (alguém já decidiu, ou ela avançou de etapa).')
+    }
+    const logEntry = { step:'gerente', approver:approverName, note, at:new Date().toISOString(), action:'refused' }
+    tx.update(ref, {
+      status:'recusado', responseNote:note,
+      approvalLog:[...(data.approvalLog||[]), logEntry],
+      updatedAt:serverTimestamp(),
+    })
+    return data
   })
   await notifyUser(req.requesterId, 'request_rejected', '❌ Solicitação recusada pela Gerência',
     note||'Sua solicitação foi recusada pela gerência.', id)
 }
 
 export async function approveAsMaster(id, note, approverName) {
-  const snap = await getDoc(doc(db,'requests',id))
-  const req  = { id, ...snap.data() }
-  const logEntry = { step:'master', approver:approverName, role:'master', note, at:new Date().toISOString(), action:'approved' }
-  await updateDoc(doc(db,'requests',id), {
-    status:'pendente',
-    approvalLog:[...(req.approvalLog||[]), logEntry],
-    masterApprovedAt:serverTimestamp(),
-    masterApprovedBy:approverName,
-    updatedAt:serverTimestamp(),
+  // Não usada hoje em nenhuma tela (MasterView reaproveita approveAsSupervisor/
+  // approveAsGerente) — mas fica lado a lado com as 4 funções irmãs acima, que
+  // TÊM essa checagem por um motivo real (ver comentário acima delas). Sem
+  // isso aqui, se algum botão "Aprovar como Master" for ligado nela no futuro,
+  // reabriria exatamente a mesma falha (reverte uma decisão já tomada, sem
+  // erro nenhum) que as outras 4 já foram corrigidas pra evitar.
+  const ref = doc(db,'requests',id)
+  const req = await runTransaction(db, async tx => {
+    const snap = await tx.get(ref)
+    const data = { id, ...snap.data() }
+    if (data.status !== 'pendente_supervisor' && data.status !== 'pendente_gerente') {
+      throw new Error('Esta solicitação não está mais aguardando aprovação (alguém já decidiu, ou ela avançou de etapa).')
+    }
+    const logEntry = { step:'master', approver:approverName, role:'master', note, at:new Date().toISOString(), action:'approved' }
+    tx.update(ref, {
+      status:'pendente',
+      approvalLog:[...(data.approvalLog||[]), logEntry],
+      masterApprovedAt:serverTimestamp(),
+      masterApprovedBy:approverName,
+      updatedAt:serverTimestamp(),
+    })
+    return data
   })
   await notifyUser(req.requesterId, 'master_approved', '✅ Aprovado pelo Master',
     note||'Sua solicitação foi aprovada e encaminhada para o time de Frotas.', id)
@@ -792,16 +839,25 @@ export async function backfillSeqIds() {
   const snap = await getDocs(collection(db,'cards'))
   const semSeq = snap.docs.filter(d => !d.data().seqId).map(d => ({ id:d.id, ...d.data() }))
   semSeq.sort((a,b) => (a.createdAt?.seconds||0) - (b.createdAt?.seconds||0))
+  if (semSeq.length === 0) return 0
 
   const counterRef = doc(db, 'system', 'cardSeqCounter')
-  const counterSnap = await getDoc(counterRef)
-  let seq = counterSnap.exists() ? (counterSnap.data().value || 0) : 0
-
-  for (const c of semSeq) {
-    seq += 1
-    await updateDoc(doc(db,'cards',c.id), { seqId: seq })
-  }
-  await setDoc(counterRef, { value: seq }, { merge: true }) // sincroniza pro próximo card criado continuar daqui
+  // Reserva o bloco INTEIRO de números numa única transação, antes de tocar
+  // em qualquer card — achado de auditoria: a versão antiga lia o contador
+  // uma vez, ia gravando card por card com um `seq` só local, e só
+  // sincronizava o contador de volta no FINAL do laço. Nada impedia dois
+  // Masters clicando "Executar migração" quase ao mesmo tempo: os dois liam
+  // o mesmo valor inicial e atribuíam a MESMA sequência de números a cards
+  // diferentes — dois serviços terminando com o mesmo #seqId visível
+  // (mesmo padrão do proximoSeqId() transacional já usado em saveCard, só
+  // que reservando N números de uma vez em vez de 1).
+  const inicioSeq = await runTransaction(db, async tx => {
+    const counterSnap = await tx.get(counterRef)
+    const atual = counterSnap.exists() ? (counterSnap.data().value || 0) : 0
+    tx.set(counterRef, { value: atual + semSeq.length }, { merge: true })
+    return atual
+  })
+  await Promise.all(semSeq.map((c, i) => updateDoc(doc(db,'cards',c.id), { seqId: inicioSeq + i + 1 })))
   return semSeq.length
 }
 

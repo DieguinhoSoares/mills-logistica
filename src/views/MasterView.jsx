@@ -290,18 +290,44 @@ export function MasterView({ simClients = [] }) {
     addToast(`Serviço de ${card.client} cancelado.`, 'info')
   }
 
+  // Achado real de auditoria (2026-08): esse handler decidia com base no
+  // `req` CONGELADO no momento em que o modal foi aberto (setApprovalModal(r)
+  // guarda aquele snapshot), nunca revalidado contra `mgrReqs` — se alguém
+  // mais decidisse a mesma solicitação enquanto o modal estava aberto,
+  // approveAsSupervisor/approveAsGerente corretamente REJEITAM a escrita (ver
+  // guard de status em cada uma), mas essa exceção nunca era pega aqui: sem
+  // try/catch, o botão travava em "⏳..." pra sempre, sem toast de erro, sem
+  // fechar o modal — e sem revalidar contra o status ATUAL, a decisão de qual
+  // função chamar (approveAsSupervisor vs approveAsGerente) também podia
+  // estar errada. Mesmo padrão de handleApproveFromModal/handleRefuseFromModal
+  // em GerenteView.jsx: busca o status ao vivo, tenta, e deixa o catch subir
+  // pro botão saber que falhou (ver ApprovalModal abaixo).
   const handleMasterApprove = async (req, note) => {
-    if (req.status==='pendente_supervisor') await approveAsSupervisor(req.id, note, profile?.name, 'master')
-    else await approveAsGerente(req.id, note, profile?.name, 'master')
-    setApprovalModal(null)
-    addToast('Solicitação aprovada!', 'success')
+    const live = mgrReqs.find(x => x.id === req.id) || req
+    try {
+      if (live.status==='pendente_supervisor') await approveAsSupervisor(req.id, note, profile?.name, 'master')
+      else await approveAsGerente(req.id, note, profile?.name, 'master')
+      setApprovalModal(null)
+      addToast('Solicitação aprovada!', 'success')
+    } catch (err) {
+      console.error('Erro ao aprovar solicitação (Master):', err)
+      addToast(err.message || 'Erro ao aprovar. Tente novamente.', 'error')
+      throw err // deixa o botão no ApprovalModal saber que falhou (ver finally lá)
+    }
   }
 
   const handleMasterRefuse = async (req, note) => {
-    if (req.status==='pendente_supervisor') await refuseAsSupervisor(req.id, note, profile?.name)
-    else await refuseAsGerente(req.id, note, profile?.name)
-    setApprovalModal(null)
-    addToast('Solicitação recusada.', 'info')
+    const live = mgrReqs.find(x => x.id === req.id) || req
+    try {
+      if (live.status==='pendente_supervisor') await refuseAsSupervisor(req.id, note, profile?.name)
+      else await refuseAsGerente(req.id, note, profile?.name)
+      setApprovalModal(null)
+      addToast('Solicitação recusada.', 'info')
+    } catch (err) {
+      console.error('Erro ao recusar solicitação (Master):', err)
+      addToast(err.message || 'Erro ao recusar. Tente novamente.', 'error')
+      throw err
+    }
   }
 
   const handleApproveUser = async (userId) => {
@@ -946,11 +972,21 @@ function ApprovalModal({ req, profile, simClients, onApprove, onRefuse, onClose 
         </div>
         <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
           <button onClick={onClose} style={{ ...BS, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>Cancelar</button>
-          <button onClick={async()=>{ setSaving(true); await onRefuse(req, note); setSaving(false) }} disabled={saving||!note.trim()}
+          {/* try/catch/finally aqui — antes, se onRefuse/onApprove lançasse
+              (ex: alguém mais já decidiu essa solicitação enquanto o modal
+              estava aberto — ver guard de status em refuseAsSupervisor/
+              approveAsGerente), o setSaving(false) seguinte nunca rodava:
+              botão travado em "⏳..." pra sempre, sem fechar o modal, sem
+              nenhum aviso. O toast de erro já é mostrado por
+              handleMasterApprove/handleMasterRefuse antes de relançar — aqui
+              só evita o travamento e mantém o modal aberto pra tentar de
+              novo ou fechar manualmente, em vez de fechar como se tivesse
+              dado certo. */}
+          <button onClick={async()=>{ setSaving(true); try { await onRefuse(req, note) } catch { /* toast já mostrado */ } finally { setSaving(false) } }} disabled={saving||!note.trim()}
             style={{ ...BS, background:note.trim()?T.perigoLight:T.borderMid, color:note.trim()?T.perigo:T.textMuted, border:`1px solid ${note.trim()?T.perigo+'40':T.border}`, fontWeight:700, opacity:note.trim()?1:0.5 }}>
             ❌ Recusar
           </button>
-          <button onClick={async()=>{ setSaving(true); await onApprove(req, note); setSaving(false) }} disabled={saving}
+          <button onClick={async()=>{ setSaving(true); try { await onApprove(req, note) } catch { /* toast já mostrado */ } finally { setSaving(false) } }} disabled={saving}
             style={{ ...BS, background:T.verde, color:'white', fontWeight:700 }}>
             {saving?'⏳...':'✅ Aprovar'}
           </button>
