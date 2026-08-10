@@ -26,7 +26,7 @@ const SUBTYPES_EMBARQUE = ['troca_tecnica','sinistro','garantia']
 const SUBTYPES_OFICINA  = ['garantia']
 const SUBTYPES_MAQUINA_RESERVA = ['troca_tecnica','sinistro','garantia']
 
-export function SolicitanteView({ simClients }) {
+export function SolicitanteView({ simClients, simClientsError }) {
   const { profile, logout }         = useAuth()
   const { requests, submitRequest } = useRequests('solicitante')
   const { notifications, unreadCount, markAllRead, markRead, deleteNotification, enablePush, disablePush } = useNotifications()
@@ -271,7 +271,7 @@ export function SolicitanteView({ simClients }) {
 
       {messaging && <MessageThread requestId={messaging.id} profile={profile} onClose={()=>setMessaging(null)}/>}
       {(showForm||reopenData) && (
-        <RequestForm simClients={simClients||[]} profile={profile} initialData={reopenData||null}
+        <RequestForm simClients={simClients||[]} simClientsError={simClientsError} profile={profile} initialData={reopenData||null}
           onSubmit={handleSubmit} onClose={()=>{setShowForm(false);setReopenData(null)}}/>
       )}
     </div>

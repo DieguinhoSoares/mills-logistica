@@ -560,23 +560,41 @@ export function usePushInvite() {
 
 export function useSimClients() {
   const [simClients, setSimClients] = useState([])
+  // Achado de suporte real: uma solicitante nova viu a busca de Planta/Obra
+  // não encontrar nada (base carregada vazia) sem nenhum aviso — o erro do
+  // listener era descartado em silêncio (()=>{} abaixo), e um erro dentro do
+  // loop de lotes (getDoc de simClients_N) também não tinha proteção
+  // nenhuma. Resolveu com logout/login (token de auth renovado), mas sem
+  // esse estado exposto, não tinha como quem usa o hook saber que a busca
+  // "vazia" era uma falha de carregamento, não a base realmente sem aquele
+  // resultado.
+  const [simClientsError, setSimClientsError] = useState(false)
   useEffect(() => {
     const unsub = onSnapshot(doc(db,'config','simClients'), async snap => {
-      if (!snap.exists()) return
+      if (!snap.exists()) { setSimClientsError(false); return }
       const { batches, clients } = snap.data()
-      // Prioridade 1: batches (formato atual — sempre gerado pelo upload recente)
-      // Prioridade 2: clients inline (formato legado — só usado se não há batches)
-      if (batches) {
-        const all = []
-        for (let i = 0; i < batches; i++) {
-          const bSnap = await getDoc(doc(db,'config',`simClients_${i}`))
-          if (bSnap.exists()) all.push(...(bSnap.data().clients||[]))
+      try {
+        // Prioridade 1: batches (formato atual — sempre gerado pelo upload recente)
+        // Prioridade 2: clients inline (formato legado — só usado se não há batches)
+        if (batches) {
+          const all = []
+          for (let i = 0; i < batches; i++) {
+            const bSnap = await getDoc(doc(db,'config',`simClients_${i}`))
+            if (bSnap.exists()) all.push(...(bSnap.data().clients||[]))
+          }
+          if (all.length > 0) { setSimClients(all); setSimClientsError(false); return }
         }
-        if (all.length > 0) { setSimClients(all); return }
+        // Fallback legado — base inline antiga (antes da migração pra batches)
+        if (clients && clients.length > 0) setSimClients(clients)
+        setSimClientsError(false)
+      } catch (err) {
+        console.error('Erro ao carregar lotes da base de plantas/obras (simClients):', err)
+        setSimClientsError(true)
       }
-      // Fallback legado — base inline antiga (antes da migração pra batches)
-      if (clients && clients.length > 0) setSimClients(clients)
-    }, ()=>{})
+    }, err => {
+      console.error('Erro no listener da base de plantas/obras (simClients):', err)
+      setSimClientsError(true)
+    })
     return unsub
   }, [])
   const uploadClients = async clients => {
@@ -602,7 +620,7 @@ export function useSimClients() {
     await Promise.all(batches.map((b,i) => setDoc(doc(db,'config',`simClients_${i}`), { clients:b, updatedAt:serverTimestamp() })))
     await setDoc(doc(db,'config','simClients'), { total:clients.length, batches:batches.length, updatedAt:serverTimestamp() })
   }
-  return { simClients, uploadClients }
+  return { simClients, simClientsError, uploadClients }
 }
 
 export function useConfig() {

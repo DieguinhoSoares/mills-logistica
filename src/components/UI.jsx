@@ -184,7 +184,7 @@ export function NotificationBell({ notifications, unreadCount, onMarkAllRead, on
   )
 }
 
-export function ClientInput({ value, onChange, simClients }) {
+export function ClientInput({ value, onChange, simClients, simClientsError }) {
   const [open, setOpen]     = useState(false)
   const [search, setSearch] = useState(value?.name||'')
 
@@ -228,7 +228,18 @@ export function ClientInput({ value, onChange, simClients }) {
         onFocus={()=>setOpen(true)}
         onBlur={handleBlur}
         placeholder="Digite a planta ou obra..." style={{ width:'100%', background:T.surfaceAlt, border:`1px solid ${T.border}`, borderRadius:8, padding:'9px 12px', color:T.text, fontSize:13, fontFamily:FONT, boxSizing:'border-box', outline:'none' }} autoComplete="off"/>
-      {open && filtered.length>0 && (
+      {/* Achado de bug real: o fallback "texto livre" abaixo (linhas
+          originalmente aninhadas aqui dentro) exigia filtered.length===0,
+          mas só renderizava se o container pai já exigisse
+          filtered.length>0 — as duas condições nunca podiam ser
+          verdadeiras ao mesmo tempo, então esse fallback nunca aparecia
+          NUNCA, pra ninguém. Resultado: digitar algo sem nenhum resultado
+          (base vazia por falha de carregamento, OU cliente genuinamente
+          novo/fora do SIM) não mostrava nada — nem a lista, nem a opção de
+          seguir com texto livre — só um campo mudo, sem explicação (foi
+          exatamente o que uma solicitante nova reportou). Corrigido
+          soltando as duas condições, cada bloco decide por si só. */}
+      {open && (filtered.length>0 || search.trim().length>=3) && (
         <div style={{ position:'absolute', top:'100%', left:0, right:0, background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.r, boxShadow:T.shadowLg, zIndex:500, maxHeight:220, overflowY:'auto' }}>
           {filtered.map(c => (
             <div key={c.name} onMouseDown={()=>{ onChange(c); setSearch(c.name); setOpen(false) }}
@@ -246,15 +257,18 @@ export function ClientInput({ value, onChange, simClients }) {
           {/* Opção de texto livre — só aparece quando não há nenhum match no SIM
               É um último recurso: fornecedores externos, clientes novos antes
               da base ser atualizada. Perde vínculo com SIM (sem estado/cidade/frotas). */}
-          {search.trim().length>=3 && filtered.length===0 && (
+          {filtered.length===0 && (
             <div onMouseDown={()=>{ const obj={name:search.trim(),state:'',city:'',machines:0,nInternos:[],_livreLookup:true}; onChange(obj); setOpen(false) }}
               style={{ padding:'9px 13px', cursor:'pointer', background:T.amareloLight, borderTop:`2px solid ${T.amarelo}40` }}
               onMouseEnter={e=>e.currentTarget.style.opacity='0.8'}
               onMouseLeave={e=>e.currentTarget.style.opacity='1'}>
               <div style={{ fontFamily:FONT, fontWeight:700, fontSize:11, color:'#8A6D00' }}>
-                ⚠️ Não encontrado no SIM
+                {simClientsError ? '⚠️ Base do SIM não carregou' : '⚠️ Não encontrado no SIM'}
               </div>
               <div style={{ fontFamily:FONT, fontSize:10, color:'#8A6D00', marginTop:2 }}>
+                {simClientsError
+                  ? <>A busca pode estar incompleta agora. Tente sair e entrar de novo antes de usar texto livre.<br/></>
+                  : null}
                 Clique aqui para usar <strong>"{search.trim()}"</strong> como texto livre — sem vínculo com SIM.<br/>
                 <em>Só use se o cliente realmente não está na base.</em>
               </div>

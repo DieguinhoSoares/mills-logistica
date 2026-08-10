@@ -141,7 +141,7 @@ function SubtypeSelect({ type, value, onChange, error }) {
   )
 }
 
-export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, profile, initialData, title, submitLabel, relatedRequest, onUseOriginalRequest }) {
+export function RequestForm({ simClients, simClientsError, drivers, onSubmit, onClose, onDelete, profile, initialData, title, submitLabel, relatedRequest, onUseOriginalRequest }) {
   const blank = {
     type:'freteCliente', subtype:'', machine:'',
     nInternos:[], nInternosReserva:[], originCity:null, destCity:null,
@@ -496,9 +496,19 @@ export function RequestForm({ simClients, drivers, onSubmit, onClose, onDelete, 
               <label style={{ ...LS, color:errors.clientName?T.perigo:T.textMuted }}>
                 🔍 Planta / Obra (base SIM) <span style={{ color:T.perigo }}>*</span>
               </label>
+              {/* Achado de suporte: uma solicitante nova viu essa busca "não achar
+                  nada" sem explicação — o carregamento da base tinha falhado em
+                  silêncio (resolveu com logout/login). Antes disso não tinha como
+                  saber a diferença entre "base carregada mas sem esse resultado" e
+                  "base nem carregou". */}
+              {simClientsError && (
+                <div style={{ background:T.perigoLight, color:T.perigo, borderRadius:T.r, padding:'7px 10px', fontFamily:FONT, fontSize:11, fontWeight:600, marginBottom:8 }}>
+                  ⚠️ Não foi possível carregar a base de plantas/obras. Tente sair e entrar de novo — se persistir, avise a equipe de Frotas.
+                </div>
+              )}
               <ClientInput value={form.clientName?{name:form.clientName}:null}
                 onChange={c=>{set('clientName',c?.name||'');set('selectedClient',c||null);set('nInternos',[]);if(c?.state)set('destCity',{m:c.city||'',s:c.state})}}
-                simClients={simClients||[]}/>
+                simClients={simClients||[]} simClientsError={simClientsError}/>
               {form.clientName && <div style={{ marginTop:4, color:T.verde, fontSize:11, fontFamily:FONT, fontWeight:700 }}>✓ {form.clientName}</div>}
               {fieldErr('clientName')}
             </div>

@@ -11,7 +11,7 @@ import { PushInviteBanner } from './components/UI'
 
 function AppInner() {
   const { user, profile, logout } = useAuth()
-  const { simClients }    = useSimClients()
+  const { simClients, simClientsError } = useSimClients()
   const pushInvite = usePushInvite()
 
   if (!user || !profile) return <LoginScreen />
@@ -54,7 +54,7 @@ function AppInner() {
     profile.role === 'supervisor'  ? <GerenteView     simClients={simClients} /> :
     profile.role === 'gerente'     ? <GerenteView     simClients={simClients} /> :
     profile.role === 'indicadores' ? <IndicadoresView /> :
-    profile.role === 'solicitante' ? <SolicitanteView simClients={simClients} /> :
+    profile.role === 'solicitante' ? <SolicitanteView simClients={simClients} simClientsError={simClientsError} /> :
     <LoginScreen />
 
   // Overlay fixo no topo (não empurra o layout): as views já usam height:100vh
