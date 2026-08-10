@@ -76,8 +76,15 @@ function CancelCardModal({ card, onConfirm, onClose }) {
       <motion.div initial={{ scale:.95, opacity:0 }} animate={{ scale:1, opacity:1 }}
         style={{ background:T.surface, borderRadius:T.rLg, padding:28, width:440, boxShadow:T.shadowLg, border:`2px solid ${T.perigo}` }}>
         <h3 style={{ color:T.perigo, fontFamily:FONT, fontWeight:700, fontSize:18, margin:'0 0 6px' }}>🚫 Cancelar Serviço</h3>
+        {/* Pedido real do Master: com vários serviços parecidos na agenda (mesmo
+            cliente, às vezes até duplicados por engano), só o nome do cliente
+            não dava segurança pra confirmar sem abrir o card antes — precisa
+            do número da frota/equipamento e do número do serviço (#seqId) pra
+            confirmar de olho, sem tentativa e erro. */}
         <p style={{ color:T.textSec, fontFamily:FONT, fontSize:12, margin:'0 0 16px' }}>
-          Cancelar <strong style={{ color:T.laranja }}>{card?.client}</strong> — {fmt(card?.startDate)}.
+          Cancelar <strong style={{ color:T.laranja }}>{card?.client}</strong>
+          {card?.nInterno && <> — frota <strong>{card.nInterno}</strong></>}
+          {card?.seqId && <> (serviço #{card.seqId})</>} — {fmt(card?.startDate)}.
         </p>
         <div style={{ marginBottom:16 }}>
           <label style={LS}>Motivo <span style={{ color:T.perigo }}>*</span></label>
@@ -420,8 +427,11 @@ export function MasterView({ simClients = [] }) {
       {emissoesModal && <EmissoesExportModal cards={cards} simClients={simClients} onClose={()=>setEmissoesModal(false)}
         onRunMigration={handleKmMigration} migrating={kmMigrating} migrateLog={kmMigrateLog} migrateProgress={kmProgress} addToast={addToast}/>}
       {cancelModal && <CancelCardModal card={cancelModal} onConfirm={r=>handleCancelCard(cancelModal,r)} onClose={()=>setCancelModal(null)}/>}
+      {/* Mesmo pedido do CancelCardModal acima — precisa do número da
+          frota/equipamento e do #seqId do serviço pra confirmar com
+          segurança, sem ter que abrir o card antes por tentativa e erro. */}
       <ConfirmModal open={!!deleteTarget} danger title="Excluir serviço"
-        message={`Excluir o serviço de ${deleteTarget?.client||'este card'}? Esta ação não pode ser desfeita.`}
+        message={`Excluir o serviço${deleteTarget?.seqId?` #${deleteTarget.seqId}`:''} de ${deleteTarget?.client||'este card'}${deleteTarget?.nInterno?` — frota ${deleteTarget.nInterno}`:''} (${fmt(deleteTarget?.startDate)})? Esta ação não pode ser desfeita.`}
         confirmLabel="🗑 Excluir" onConfirm={()=>{deleteCard(deleteTarget.id);setDeleteTarget(null)}} onCancel={()=>setDeleteTarget(null)}/>
       {approvalModal && <ApprovalModal req={approvalModal} profile={profile} simClients={simClients} onApprove={handleMasterApprove} onRefuse={handleMasterRefuse} onClose={()=>setApprovalModal(null)}/>}
       {roleModalUser && <UserRoleModal user={roleModalUser} role={approvingRole[roleModalUser.id]}
