@@ -6,7 +6,7 @@
 // ============================================================
 import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { T, FONT, BS, IS, LS, NF_STATUS, SUBTYPES_NF } from '../lib/constants'
+import { T, FONT, BS, IS, LS, NF_STATUS, SUBTYPES_NF, MOTIVO_NF_OPTIONS } from '../lib/constants'
 import { fmt, todayStr, getSubtypeLabel, nfStatusForCard, buildFrotaIndex } from '../lib/utils'
 import { SapClientsUploadModal } from './SapClientsUploadModal'
 import { FrotaInput, MunicipioInput } from './UI'
@@ -56,6 +56,12 @@ export function NfRequestsPanel({ cards, nfRequests, sapClients, sapClientsError
   const [busca, setBusca] = useState('')
   const [clienteQuery, setClienteQuery] = useState('')
   const [saving, setSaving] = useState(false)
+  // Modo "Outro" do select de Motivo — precisa de estado próprio (não dá pra
+  // derivar só de form.motivo==='') porque o próprio ato de escolher "Outro"
+  // zera form.motivo até o analista digitar algo, e nesse instante ainda
+  // precisa continuar mostrando o campo de texto livre, não voltar pro
+  // "— selecione —". Reiniciado sempre que o formulário abre (abrir* abaixo).
+  const [motivoOutro, setMotivoOutro] = useState(false)
 
   // nInterno → {client, city, state, horimetro, valor, serie}, a partir da
   // base SIM já carregada — Frota/Horímetro/Valor de aquisição vêm dali em
@@ -78,28 +84,21 @@ export function NfRequestsPanel({ cards, nfRequests, sapClients, sapClientsError
       .some(v => String(v||'').toLowerCase().includes(q)))
   }, [nfRequests, busca])
 
-  // Cliente/CNPJ destino — busca no cadastro SAP (tem CNPJ/Código SAP) e,
-  // como fallback/complemento, na base SIM já carregada (tem o nome mas não
-  // CNPJ/SAP — usada mesmo quando o cadastro SAP novo ainda não foi subido).
+  // Cliente/CNPJ destino — busca SÓ no cadastro SAP. É a única base que tem
+  // CNPJ/Código SAP (exigidos na NF de verdade) — a base SIM não tem esses
+  // códigos, então não entra na busca aqui (misturar deixaria fácil escolher
+  // um cliente sem CNPJ/SAP por engano).
   const clientesSapFiltrados = useMemo(() => {
     const q = clienteQuery.trim().toLowerCase()
     if (q.length < 2) return []
-    return sapClients.filter(c => c.nome.toLowerCase().includes(q) || c.cnpj.includes(q)).slice(0,5)
+    return sapClients.filter(c => c.nome.toLowerCase().includes(q) || c.cnpj.includes(q)).slice(0,6)
   }, [sapClients, clienteQuery])
-
-  const clientesSimFiltrados = useMemo(() => {
-    const q = clienteQuery.trim().toLowerCase()
-    if (q.length < 2) return []
-    const norm = s => String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-    const nq = norm(q)
-    return (simClients||[]).filter(c => norm(c.name).includes(nq) || (c.cliente && norm(c.cliente).includes(nq))).slice(0,5)
-  }, [simClients, clienteQuery])
 
   const set = (k,v) => setForm(p => ({ ...p, [k]:v }))
 
-  const abrirParaCard = card => { setForm(blankForm(card)); setClienteQuery('') }
-  const abrirNova     = () => { setForm(blankForm(null)); setClienteQuery('') }
-  const abrirEdicao   = reg => { setForm({ ...blankForm(null), ...reg }); setClienteQuery(reg.clienteDestino||'') }
+  const abrirParaCard = card => { const f=blankForm(card); setForm(f); setClienteQuery(''); setMotivoOutro(!!f.motivo && !MOTIVO_NF_OPTIONS.includes(f.motivo)) }
+  const abrirNova     = () => { setForm(blankForm(null)); setClienteQuery(''); setMotivoOutro(false) }
+  const abrirEdicao   = reg => { const f={ ...blankForm(null), ...reg }; setForm(f); setClienteQuery(reg.clienteDestino||''); setMotivoOutro(!!f.motivo && !MOTIVO_NF_OPTIONS.includes(f.motivo)) }
 
   const escolherCard = cardId => {
     const card = cards.find(c=>c.id===cardId)
@@ -135,11 +134,6 @@ export function NfRequestsPanel({ cards, nfRequests, sapClients, sapClientsError
     set('cnpjDestino', c.cnpj)
     set('codSapDestino', c.codigoSap)
     setClienteQuery(c.nome)
-  }
-
-  const escolherClienteSim = c => {
-    set('clienteDestino', c.name)
-    setClienteQuery(c.name)
   }
 
   const handleSalvar = async () => {
@@ -263,27 +257,33 @@ export function NfRequestsPanel({ cards, nfRequests, sapClients, sapClientsError
                 <label style={LS}>Origem</label>
                 <MunicipioInput value={parseOrigem(form.origem)} onChange={v=>set('origem', formatOrigem(v))} placeholder="Cidade de origem..."/>
               </div>
-              <div><label style={LS}>Motivo</label><input value={form.motivo} onChange={e=>set('motivo',e.target.value)} style={IS}/></div>
+              <div>
+                <label style={LS}>Motivo</label>
+                <select value={motivoOutro ? 'outro' : (form.motivo||'')} onChange={e=>{
+                    if (e.target.value === 'outro') { setMotivoOutro(true); set('motivo','') }
+                    else { setMotivoOutro(false); set('motivo', e.target.value) }
+                  }} style={IS}>
+                  <option value="">— selecione —</option>
+                  {MOTIVO_NF_OPTIONS.map(m => <option key={m} value={m}>{m}</option>)}
+                  <option value="outro">✏️ Outro (digitar)</option>
+                </select>
+                {motivoOutro && (
+                  <input value={form.motivo} onChange={e=>set('motivo',e.target.value)} placeholder="Descreva o motivo..." style={{ ...IS, marginTop:6 }}/>
+                )}
+              </div>
             </div>
 
             <div style={{ marginBottom:12, position:'relative' }}>
               <label style={LS}>Cliente / CNPJ destino</label>
               <input value={clienteQuery} onChange={e=>{ setClienteQuery(e.target.value); set('clienteDestino', e.target.value) }}
-                placeholder="Buscar por nome ou CNPJ (base SIM ou cadastro SAP)..." style={IS}/>
-              {(clientesSapFiltrados.length > 0 || clientesSimFiltrados.length > 0) && (
+                placeholder="Buscar no cadastro SAP por nome ou CNPJ..." style={IS}/>
+              {clientesSapFiltrados.length > 0 && (
                 <div style={{ position:'absolute', top:'100%', left:0, right:0, background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.rSm, boxShadow:T.shadowMd, zIndex:10, marginTop:2, maxHeight:220, overflowY:'auto' }}>
                   {clientesSapFiltrados.map((c,i) => (
-                    <div key={`sap-${i}`} onClick={()=>escolherCliente(c)}
-                      style={{ padding:'7px 11px', cursor:'pointer', fontFamily:FONT, fontSize:11, borderBottom:`1px solid ${T.border}` }}>
-                      <div style={{ color:T.text, fontWeight:700 }}>{c.nome} <span style={{ color:T.info, fontWeight:700, fontSize:9 }}>SAP</span></div>
+                    <div key={i} onClick={()=>escolherCliente(c)}
+                      style={{ padding:'7px 11px', cursor:'pointer', fontFamily:FONT, fontSize:11, borderBottom:i<clientesSapFiltrados.length-1?`1px solid ${T.border}`:'none' }}>
+                      <div style={{ color:T.text, fontWeight:700 }}>{c.nome}</div>
                       <div style={{ color:T.textMuted, fontSize:10 }}>CNPJ {c.cnpj||'—'} {c.codigoSap && `· SAP ${c.codigoSap}`}</div>
-                    </div>
-                  ))}
-                  {clientesSimFiltrados.map((c,i) => (
-                    <div key={`sim-${i}`} onClick={()=>escolherClienteSim(c)}
-                      style={{ padding:'7px 11px', cursor:'pointer', fontFamily:FONT, fontSize:11, borderBottom:i<clientesSimFiltrados.length-1?`1px solid ${T.border}`:'none' }}>
-                      <div style={{ color:T.text, fontWeight:700 }}>{c.name}</div>
-                      <div style={{ color:T.textMuted, fontSize:10 }}>{c.city||'—'}/{c.state||'—'} · sem CNPJ cadastrado</div>
                     </div>
                   ))}
                 </div>

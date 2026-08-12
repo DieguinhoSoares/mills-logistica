@@ -97,6 +97,17 @@ export const CARD_SUBTYPES = {
   ],
 }
 
+// Lista padronizada de "Motivo" pro formulário de Solicitação de NF — união
+// dos rótulos de subtipo (sem duplicar entre Frete Mills/Cliente) que exigem
+// NF (SUBTYPES_NF acima). O formulário oferece só essas opções + "Outro"
+// pra digitar livre quando nenhuma bate — evita motivo digitado à mão de
+// forma inconsistente entre solicitações (ex.: "Desmobilização" vs "desmob").
+export const MOTIVO_NF_OPTIONS = Array.from(new Set(
+  Object.values(CARD_SUBTYPES).flat()
+    .filter(s => SUBTYPES_NF.includes(s.value))
+    .map(s => s.label)
+))
+
 // Estados da solicitação de NF (ver src/lib/utils.js#nfStatusForCard) — fonte
 // única de cor/label usada no badge do card (UI.jsx) e no painel de
 // Solicitação de NF (NfRequestsPanel.jsx).
