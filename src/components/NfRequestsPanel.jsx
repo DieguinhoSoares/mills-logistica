@@ -4,7 +4,7 @@
 // (SUBTYPES_NF), com lembrete pros que ainda não têm nenhuma solicitação
 // registrada. Ver nfStatusForCard (utils.js) pra regra dos 3 estados.
 // ============================================================
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { T, FONT, BS, IS, LS, NF_STATUS, SUBTYPES_NF, MOTIVO_NF_OPTIONS } from '../lib/constants'
 import { fmt, todayStr, getSubtypeLabel, nfStatusForCard, buildFrotaIndex } from '../lib/utils'
@@ -76,6 +76,15 @@ export function NfRequestsPanel({ cards, nfRequests, sapClients, sapClientsError
   // vez de digitados de cabeça (ver buildFrotaIndex em utils.js).
   const frotaIndex = useMemo(() => buildFrotaIndex(simClients), [simClients])
 
+  // Guarda os últimos valores que vieram do AUTO-preenchimento por frota (não
+  // do que o analista digitou à mão) — sem isso, escolher a frota errada e
+  // depois corrigir não atualizava Horímetro/Valor/Origem (o guard "só
+  // preenche se estiver vazio" barrava a correção do mesmo jeito que barraria
+  // uma edição manual real). Comparando o valor atual do campo com o que foi
+  // auto-preenchido da última vez, dá pra diferenciar "campo intocado desde a
+  // frota anterior" (pode atualizar) de "analista editou à mão" (não mexe).
+  const lastAutoFill = useRef({ origem:'', horimetro:'', valor:'' })
+
   const cardsQueExigemNF = useMemo(() =>
     cards.filter(c => SUBTYPES_NF.includes(c.subtype) && c.status !== 'cancelado')
       .sort((a,b) => (b.startDate||'').localeCompare(a.startDate||'')),
@@ -104,9 +113,9 @@ export function NfRequestsPanel({ cards, nfRequests, sapClients, sapClientsError
 
   const set = (k,v) => setForm(p => ({ ...p, [k]:v }))
 
-  const abrirParaCard = card => { const f=blankForm(card); setForm(f); setClienteQuery(''); setMotivoOutro(!!f.motivo && !MOTIVO_NF_OPTIONS.includes(f.motivo)) }
-  const abrirNova     = () => { setForm(blankForm(null)); setClienteQuery(''); setMotivoOutro(false) }
-  const abrirEdicao   = reg => { const f={ ...blankForm(null), ...reg }; setForm(f); setClienteQuery(reg.clienteDestino||''); setMotivoOutro(!!f.motivo && !MOTIVO_NF_OPTIONS.includes(f.motivo)) }
+  const abrirParaCard = card => { const f=blankForm(card); setForm(f); setClienteQuery(''); setMotivoOutro(!!f.motivo && !MOTIVO_NF_OPTIONS.includes(f.motivo)); lastAutoFill.current = { origem:'', horimetro:'', valor:'' } }
+  const abrirNova     = () => { setForm(blankForm(null)); setClienteQuery(''); setMotivoOutro(false); lastAutoFill.current = { origem:'', horimetro:'', valor:'' } }
+  const abrirEdicao   = reg => { const f={ ...blankForm(null), ...reg }; setForm(f); setClienteQuery(reg.clienteDestino||''); setMotivoOutro(!!f.motivo && !MOTIVO_NF_OPTIONS.includes(f.motivo)); lastAutoFill.current = { origem:f.origem||'', horimetro:f.horimetro||'', valor:f.valor||'' } }
 
   const escolherCard = cardId => {
     const card = cards.find(c=>c.id===cardId)
@@ -122,19 +131,28 @@ export function NfRequestsPanel({ cards, nfRequests, sapClients, sapClientsError
   }
 
   // Frota escolhida (ou digitada igual a um nInterno conhecido) — autopreenche
-  // Origem/Horímetro/Valor a partir da base SIM, só quando o campo ainda
-  // está vazio (nunca sobrescreve algo que o analista já editou à mão).
+  // Origem/Horímetro/Valor a partir da base SIM. Atualiza um campo sempre que
+  // ele ainda tiver o valor auto-preenchido da frota ANTERIOR (ou estiver
+  // vazio) — cobre tanto o primeiro preenchimento quanto o caso de escolher a
+  // frota errada e depois corrigir. Só NÃO mexe quando o valor atual diverge
+  // do que foi auto-preenchido da última vez, sinal de que o analista editou
+  // à mão (aí sim preserva a edição).
   const escolherFrota = nInterno => {
+    const info = frotaIndex.get(nInterno)
+    const novoOrigem    = info ? formatOrigem({ m:info.city, s:info.state }) : ''
+    const novoHorimetro = info?.horimetro || ''
+    const novoValor     = info?.valor || ''
     setForm(p => {
-      const info = frotaIndex.get(nInterno)
-      if (!info) return { ...p, nInterno }
+      const auto = lastAutoFill.current
+      const intocado = (atual, autoAnterior) => atual === autoAnterior
       return {
         ...p, nInterno,
-        origem:    p.origem    || formatOrigem({ m:info.city, s:info.state }),
-        horimetro: p.horimetro || info.horimetro,
-        valor:     p.valor     || info.valor,
+        origem:    intocado(p.origem, auto.origem)       ? novoOrigem    : p.origem,
+        horimetro: intocado(p.horimetro, auto.horimetro) ? novoHorimetro : p.horimetro,
+        valor:     intocado(p.valor, auto.valor)         ? novoValor     : p.valor,
       }
     })
+    lastAutoFill.current = { origem:novoOrigem, horimetro:novoHorimetro, valor:novoValor }
   }
 
   const escolherCliente = c => {
