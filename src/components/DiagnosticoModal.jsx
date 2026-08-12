@@ -9,6 +9,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { T, FONT, BS, IS, LS } from '../lib/constants'
 import { diagnosticarNInterno } from '../lib/freteCalc'
+import { buildFrotaIndex } from '../lib/utils'
 
 function Linha({ label, children }) {
   return (
@@ -35,6 +36,11 @@ export function DiagnosticoModal({ simClients, onClose }) {
   }
 
   const r = diag?.resultado
+  // Horímetro/Valor/Série — mesmo índice (buildFrotaIndex) que o painel de
+  // Solicitação de NF usa pra autopreencher o formulário. Mostrar aqui
+  // ajuda a responder "por que não autopreencheu": ou o CSV não tem essas
+  // colunas pra essa frota, ou o N° interno não bate exato com o índice.
+  const frotaInfo = diag?.encontrado ? buildFrotaIndex(simClients).get(diag.nInterno) : null
 
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.55)', zIndex:3500, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)' }}>
@@ -72,6 +78,26 @@ export function DiagnosticoModal({ simClients, onClose }) {
                   <Linha label="Fabricante (raw)">{diag.fabricanteRaw || '—'}</Linha>
                   <Linha label="Modelo (raw)">{diag.modeloRaw || '—'}</Linha>
                   <Linha label="Grupo de Modelo (raw)">{diag.grupoModeloRaw || '—'}</Linha>
+                </>
+              )}
+            </div>
+
+            <div>
+              <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:T.text, marginBottom:6 }}>📄 Dados pro autopreenchimento da Solicitação de NF</div>
+              {diag.tipoMatch!=='exato' ? (
+                <div style={{ color:T.perigo, fontFamily:FONT, fontSize:11, padding:'6px 0' }}>
+                  ⚠️ Match só numérico (fallback) — o autopreenchimento da NF exige N° interno idêntico ao do CSV, então não funciona nesse caso.
+                </div>
+              ) : (
+                <>
+                  <Linha label="Horímetro"><Selo ok={!!frotaInfo?.horimetro} textoOk={frotaInfo?.horimetro} textoFalha="não veio no CSV pra essa frota"/></Linha>
+                  <Linha label="Valor de aquisição"><Selo ok={!!frotaInfo?.valor} textoOk={frotaInfo?.valor} textoFalha="não veio no CSV pra essa frota"/></Linha>
+                  <Linha label="Nº de série"><Selo ok={!!frotaInfo?.serie} textoOk={frotaInfo?.serie} textoFalha="não veio no CSV pra essa frota"/></Linha>
+                  {!frotaInfo?.horimetro && !frotaInfo?.valor && (
+                    <div style={{ marginTop:8, color:T.textMuted, fontFamily:FONT, fontSize:10, lineHeight:1.5 }}>
+                      Se nenhuma frota tem esses dados, o export atual do SIM provavelmente não inclui as colunas "Horímetro"/"Valor de aquisição" — precisa confirmar com quem gera o CSV se dá pra incluí-las.
+                    </div>
+                  )}
                 </>
               )}
             </div>
