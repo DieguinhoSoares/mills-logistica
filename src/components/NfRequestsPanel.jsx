@@ -249,6 +249,23 @@ export function NfRequestsPanel({ cards, nfRequests, sapClients, sapClientsError
               <div>
                 <label style={LS}>Frota (nº interno)</label>
                 <FrotaInput value={form.nInterno} onChange={escolherFrota} simClients={simClients||[]}/>
+                {/* Explica na hora por que Horímetro/Valor/Origem não vieram sozinhos
+                    — sem isso, "não achou" e "achou mas o CSV não tem esse dado"
+                    pareciam a mesma coisa pra quem preenche o formulário. */}
+                {form.nInterno && (() => {
+                  const info = frotaIndex.get(form.nInterno)
+                  if (!info) return (
+                    <div style={{ color:T.perigo, fontFamily:FONT, fontSize:10, marginTop:4 }}>
+                      ⚠️ "{form.nInterno}" não encontrado na base SIM carregada — confira o número ou atualize a base SIM (menu "⋯ Mais").
+                    </div>
+                  )
+                  if (!info.horimetro && !info.valor) return (
+                    <div style={{ color:T.textMuted, fontFamily:FONT, fontSize:10, marginTop:4 }}>
+                      ℹ️ Encontrada em {info.client} — mas o CSV do SIM não trouxe Horímetro/Valor de aquisição pra essa frota.
+                    </div>
+                  )
+                  return null
+                })()}
               </div>
             </div>
 
