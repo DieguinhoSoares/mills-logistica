@@ -8,7 +8,7 @@
 // ============================================================
 import { describe, it, expect } from 'vitest'
 import Papa from 'papaparse'
-import { parseSIMCsv } from './utils'
+import { parseSIMCsv, buildFrotaIndex } from './utils'
 
 describe('parseSIMCsv — Cliente capturado separado de Planta/Obra', () => {
   it('Planta/Obra com nome de site diferente do Cliente: nome agrupado é a Planta/Obra, mas Cliente fica disponível pra busca', () => {
@@ -71,5 +71,23 @@ describe('parseSIMCsv — Cliente capturado separado de Planta/Obra', () => {
     ].join('\n')
     const clients = parseSIMCsv(csv, Papa)
     expect(clients).toEqual([])
+  })
+
+  it('captura Horímetro/Valor de aquisição/Nº de série por nInterno, usados pelo painel de Solicitação de NF', () => {
+    const csv = [
+      'grupo;grupo;grupo;grupo;grupo;grupo;grupo',
+      'Planta/Obra;Estado (Planta/Obra);Município (Planta/Obra);Nº interno;Horímetro;Valor de aquisição;Nº de série',
+      'RAIZEN ENERGIA;SP;Assis;PCP01141;16410;R$ 730.000,00;CAT0938KCW8K02663',
+    ].join('\n')
+    const [client] = parseSIMCsv(csv, Papa)
+    expect(client.machineHorimetro['PCP01141']).toBe('16410')
+    expect(client.machineValor['PCP01141']).toBe('R$ 730.000,00')
+    expect(client.machineSerie['PCP01141']).toBe('CAT0938KCW8K02663')
+
+    const idx = buildFrotaIndex([client])
+    expect(idx.get('PCP01141')).toEqual({
+      nInterno:'PCP01141', client:'RAIZEN ENERGIA', city:'Assis', state:'SP',
+      horimetro:'16410', valor:'R$ 730.000,00', serie:'CAT0938KCW8K02663',
+    })
   })
 })

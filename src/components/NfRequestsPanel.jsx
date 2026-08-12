@@ -7,8 +7,14 @@
 import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { T, FONT, BS, IS, LS, NF_STATUS, SUBTYPES_NF } from '../lib/constants'
-import { fmt, todayStr, getSubtypeLabel, nfStatusForCard } from '../lib/utils'
+import { fmt, todayStr, getSubtypeLabel, nfStatusForCard, buildFrotaIndex } from '../lib/utils'
 import { SapClientsUploadModal } from './SapClientsUploadModal'
+import { FrotaInput, MunicipioInput } from './UI'
+
+// "Cidade/UF" (string persistida no registro) ⇄ {m,s} (formato do MunicipioInput,
+// já usado em RequestForm pra Origem/Destino do card — mesma UX aqui).
+const parseOrigem  = str => { const [m,s] = String(str||'').split('/'); return m ? { m, s:s||'' } : null }
+const formatOrigem = v   => v ? [v.m, v.s].filter(Boolean).join('/') : ''
 
 const STATUS_OPTIONS = [
   ['solicitada', '📤 Solicitada'],
@@ -22,7 +28,7 @@ function blankForm(card) {
     cardId: card?.id || '',
     dataSolicitacao: todayStr(),
     nInterno: card?.nInterno || (card?.nInternos||[])[0] || '',
-    origem: card?.originCity || card?.origin || '',
+    origem: card ? formatOrigem({ m:card.originCity, s:card.origin }) : '',
     clienteDestino: '', cnpjDestino: '', codSapDestino: '',
     transportadora: card?.transportadoraNome || '',
     codSapTransporte: '',
@@ -44,12 +50,17 @@ function StatusPill({ status }) {
   )
 }
 
-export function NfRequestsPanel({ cards, nfRequests, sapClients, sapClientsError, saveNfRequest, saveCard, uploadSapClients, profile, addToast }) {
+export function NfRequestsPanel({ cards, nfRequests, sapClients, sapClientsError, simClients, saveNfRequest, saveCard, uploadSapClients, profile, addToast }) {
   const [form, setForm] = useState(null) // null = fechado; objeto = form aberto (novo ou edição)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [busca, setBusca] = useState('')
   const [clienteQuery, setClienteQuery] = useState('')
   const [saving, setSaving] = useState(false)
+
+  // nInterno → {client, city, state, horimetro, valor, serie}, a partir da
+  // base SIM já carregada — Frota/Horímetro/Valor de aquisição vêm dali em
+  // vez de digitados de cabeça (ver buildFrotaIndex em utils.js).
+  const frotaIndex = useMemo(() => buildFrotaIndex(simClients), [simClients])
 
   const cardsQueExigemNF = useMemo(() =>
     cards.filter(c => SUBTYPES_NF.includes(c.subtype) && c.status !== 'cancelado')
@@ -67,11 +78,22 @@ export function NfRequestsPanel({ cards, nfRequests, sapClients, sapClientsError
       .some(v => String(v||'').toLowerCase().includes(q)))
   }, [nfRequests, busca])
 
-  const clientesFiltrados = useMemo(() => {
+  // Cliente/CNPJ destino — busca no cadastro SAP (tem CNPJ/Código SAP) e,
+  // como fallback/complemento, na base SIM já carregada (tem o nome mas não
+  // CNPJ/SAP — usada mesmo quando o cadastro SAP novo ainda não foi subido).
+  const clientesSapFiltrados = useMemo(() => {
     const q = clienteQuery.trim().toLowerCase()
     if (q.length < 2) return []
-    return sapClients.filter(c => c.nome.toLowerCase().includes(q) || c.cnpj.includes(q)).slice(0,6)
+    return sapClients.filter(c => c.nome.toLowerCase().includes(q) || c.cnpj.includes(q)).slice(0,5)
   }, [sapClients, clienteQuery])
+
+  const clientesSimFiltrados = useMemo(() => {
+    const q = clienteQuery.trim().toLowerCase()
+    if (q.length < 2) return []
+    const norm = s => String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    const nq = norm(q)
+    return (simClients||[]).filter(c => norm(c.name).includes(nq) || (c.cliente && norm(c.cliente).includes(nq))).slice(0,5)
+  }, [simClients, clienteQuery])
 
   const set = (k,v) => setForm(p => ({ ...p, [k]:v }))
 
@@ -85,11 +107,27 @@ export function NfRequestsPanel({ cards, nfRequests, sapClients, sapClientsError
     setForm(p => ({
       ...p, cardId,
       nInterno:        p.nInterno        || card.nInterno || (card.nInternos||[])[0] || '',
-      origem:           p.origem          || card.originCity || card.origin || '',
+      origem:           p.origem          || formatOrigem({ m:card.originCity, s:card.origin }),
       motivo:           p.motivo          || getSubtypeLabel(card.type, card.subtype),
       motorista:        p.motorista       || card.driver || '',
       transportadora:   p.transportadora  || card.transportadoraNome || '',
     }))
+  }
+
+  // Frota escolhida (ou digitada igual a um nInterno conhecido) — autopreenche
+  // Origem/Horímetro/Valor a partir da base SIM, só quando o campo ainda
+  // está vazio (nunca sobrescreve algo que o analista já editou à mão).
+  const escolherFrota = nInterno => {
+    setForm(p => {
+      const info = frotaIndex.get(nInterno)
+      if (!info) return { ...p, nInterno }
+      return {
+        ...p, nInterno,
+        origem:    p.origem    || formatOrigem({ m:info.city, s:info.state }),
+        horimetro: p.horimetro || info.horimetro,
+        valor:     p.valor     || info.valor,
+      }
+    })
   }
 
   const escolherCliente = c => {
@@ -97,6 +135,11 @@ export function NfRequestsPanel({ cards, nfRequests, sapClients, sapClientsError
     set('cnpjDestino', c.cnpj)
     set('codSapDestino', c.codigoSap)
     setClienteQuery(c.nome)
+  }
+
+  const escolherClienteSim = c => {
+    set('clienteDestino', c.name)
+    setClienteQuery(c.name)
   }
 
   const handleSalvar = async () => {
@@ -209,25 +252,38 @@ export function NfRequestsPanel({ cards, nfRequests, sapClients, sapClientsError
 
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:12 }}>
               <div><label style={LS}>Data da solicitação *</label><input type="date" value={form.dataSolicitacao} onChange={e=>set('dataSolicitacao',e.target.value)} style={IS}/></div>
-              <div><label style={LS}>Frota (nº interno)</label><input value={form.nInterno} onChange={e=>set('nInterno',e.target.value)} style={IS}/></div>
+              <div>
+                <label style={LS}>Frota (nº interno)</label>
+                <FrotaInput value={form.nInterno} onChange={escolherFrota} simClients={simClients||[]}/>
+              </div>
             </div>
 
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:12 }}>
-              <div><label style={LS}>Origem</label><input value={form.origem} onChange={e=>set('origem',e.target.value)} style={IS}/></div>
+              <div>
+                <label style={LS}>Origem</label>
+                <MunicipioInput value={parseOrigem(form.origem)} onChange={v=>set('origem', formatOrigem(v))} placeholder="Cidade de origem..."/>
+              </div>
               <div><label style={LS}>Motivo</label><input value={form.motivo} onChange={e=>set('motivo',e.target.value)} style={IS}/></div>
             </div>
 
             <div style={{ marginBottom:12, position:'relative' }}>
               <label style={LS}>Cliente / CNPJ destino</label>
               <input value={clienteQuery} onChange={e=>{ setClienteQuery(e.target.value); set('clienteDestino', e.target.value) }}
-                placeholder="Buscar no cadastro SAP por nome ou CNPJ..." style={IS}/>
-              {clientesFiltrados.length > 0 && (
-                <div style={{ position:'absolute', top:'100%', left:0, right:0, background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.rSm, boxShadow:T.shadowMd, zIndex:10, marginTop:2, maxHeight:180, overflowY:'auto' }}>
-                  {clientesFiltrados.map((c,i) => (
-                    <div key={i} onClick={()=>escolherCliente(c)}
-                      style={{ padding:'7px 11px', cursor:'pointer', fontFamily:FONT, fontSize:11, borderBottom:i<clientesFiltrados.length-1?`1px solid ${T.border}`:'none' }}>
-                      <div style={{ color:T.text, fontWeight:700 }}>{c.nome}</div>
+                placeholder="Buscar por nome ou CNPJ (base SIM ou cadastro SAP)..." style={IS}/>
+              {(clientesSapFiltrados.length > 0 || clientesSimFiltrados.length > 0) && (
+                <div style={{ position:'absolute', top:'100%', left:0, right:0, background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.rSm, boxShadow:T.shadowMd, zIndex:10, marginTop:2, maxHeight:220, overflowY:'auto' }}>
+                  {clientesSapFiltrados.map((c,i) => (
+                    <div key={`sap-${i}`} onClick={()=>escolherCliente(c)}
+                      style={{ padding:'7px 11px', cursor:'pointer', fontFamily:FONT, fontSize:11, borderBottom:`1px solid ${T.border}` }}>
+                      <div style={{ color:T.text, fontWeight:700 }}>{c.nome} <span style={{ color:T.info, fontWeight:700, fontSize:9 }}>SAP</span></div>
                       <div style={{ color:T.textMuted, fontSize:10 }}>CNPJ {c.cnpj||'—'} {c.codigoSap && `· SAP ${c.codigoSap}`}</div>
+                    </div>
+                  ))}
+                  {clientesSimFiltrados.map((c,i) => (
+                    <div key={`sim-${i}`} onClick={()=>escolherClienteSim(c)}
+                      style={{ padding:'7px 11px', cursor:'pointer', fontFamily:FONT, fontSize:11, borderBottom:i<clientesSimFiltrados.length-1?`1px solid ${T.border}`:'none' }}>
+                      <div style={{ color:T.text, fontWeight:700 }}>{c.name}</div>
+                      <div style={{ color:T.textMuted, fontSize:10 }}>{c.city||'—'}/{c.state||'—'} · sem CNPJ cadastrado</div>
                     </div>
                   ))}
                 </div>

@@ -1079,6 +1079,7 @@ export function FrotasView() {
           nfRequests={nfRequests}
           sapClients={sapClients}
           sapClientsError={sapClientsError}
+          simClients={simClients}
           saveNfRequest={saveNfRequest}
           saveCard={saveCard}
           uploadSapClients={uploadSapClients}

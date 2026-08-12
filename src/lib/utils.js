@@ -329,6 +329,12 @@ export function parseSIMCsv(text, Papa) {
       r['GrupoModelo'] ||
       ''
     ).trim()
+    // Horímetro/Valor de aquisição/Nº de série — usados pelo painel de
+    // Solicitação de NF pra autopreencher esses campos a partir da própria
+    // base do SIM (evita o analista digitar de cabeça algo que o CSV já traz).
+    const horimetro = (r['Horímetro'] || r['Horimetro'] || '').trim()
+    const valorAquisicao = (r['Valor de aquisição'] || r['Valor de Aquisição'] || r['Valor de aquisicao'] || '').trim()
+    const serie = (r['Nº de série'] || r['N° de série'] || r['Nº de Série'] || r['Numero de serie'] || r['Número de série'] || '').trim()
 
     if (!map[name]) {
       map[name] = {
@@ -341,6 +347,9 @@ export function parseSIMCsv(text, Papa) {
         nInternos:    new Set(),
         machineGroups: {},  // nInterno → grupoModelo (para cálculo de frete)
         machineModelos: {}, // nInterno → {fabricante, modelo} (dimensão exata)
+        machineHorimetro: {}, // nInterno → horímetro
+        machineValor:     {}, // nInterno → valor de aquisição
+        machineSerie:     {}, // nInterno → nº de série
       }
     }
 
@@ -351,6 +360,9 @@ export function parseSIMCsv(text, Papa) {
       // Só sobrescreve se tiver grupoModelo real (não apaga dado existente)
       if (grupoModelo) map[name].machineGroups[nInterno] = grupoModelo
       if (fabricante || modelo) map[name].machineModelos[nInterno] = { fabricante, modelo }
+      if (horimetro) map[name].machineHorimetro[nInterno] = horimetro
+      if (valorAquisicao) map[name].machineValor[nInterno] = valorAquisicao
+      if (serie) map[name].machineSerie[nInterno] = serie
     }
     if (!map[name].state && state) map[name].state = state
     if (!map[name].city  && city)  map[name].city  = city
@@ -371,11 +383,36 @@ export function parseSIMCsv(text, Papa) {
       nInternos:     Array.from(c.nInternos),
       machineGroups: c.machineGroups || {},  // nInterno → grupoModelo
       machineModelos: c.machineModelos || {}, // nInterno → {fabricante, modelo}
+      machineHorimetro: c.machineHorimetro || {}, // nInterno → horímetro
+      machineValor:     c.machineValor || {},     // nInterno → valor de aquisição
+      machineSerie:     c.machineSerie || {},     // nInterno → nº de série
     }))
     .sort((a, b) => b.machines - a.machines)
 
   console.log(`✅ SIM parsed: ${clients.length} clientes, ${result.data.length} linhas`)
   return clients
+}
+
+// Índice achatado nInterno → dados da máquina (cliente/cidade/UF/horímetro/
+// valor/série), a partir da base SIM já carregada — usado pelo painel de
+// Solicitação de NF pra autopreencher Frota/Origem/Horímetro/Valor a partir
+// de um nInterno só, sem precisar varrer todos os clientes toda hora.
+export function buildFrotaIndex(simClients) {
+  const idx = new Map()
+  for (const c of (simClients || [])) {
+    for (const n of (c.nInternos || [])) {
+      idx.set(n, {
+        nInterno:  n,
+        client:    c.name,
+        city:      c.city || '',
+        state:     c.state || '',
+        horimetro: c.machineHorimetro?.[n] || '',
+        valor:     c.machineValor?.[n] || '',
+        serie:     c.machineSerie?.[n] || '',
+      })
+    }
+  }
+  return idx
 }
 
 // Parser da base "Clientes SAP" (Código SAP, CNPJ, Cliente, UF, Endereço) —
