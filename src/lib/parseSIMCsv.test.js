@@ -90,4 +90,16 @@ describe('parseSIMCsv — Cliente capturado separado de Planta/Obra', () => {
       horimetro:'16410', valor:'R$ 730.000,00', serie:'CAT0938KCW8K02663',
     })
   })
+
+  it('captura Horímetro/Valor/Série mesmo com grafia de cabeçalho diferente (sem acento, maiúscula, variante abreviada)', () => {
+    const csv = [
+      'grupo;grupo;grupo;grupo;grupo;grupo',
+      'Planta/Obra;Estado (Planta/Obra);Nº interno;HORIMETRO;Vlr Aquisição;N° de Série',
+      'RAIZEN ENERGIA;SP;PCP01141;16410;R$ 730.000,00;CAT0938KCW8K02663',
+    ].join('\n')
+    const [client] = parseSIMCsv(csv, Papa)
+    expect(client.machineHorimetro['PCP01141']).toBe('16410')
+    expect(client.machineValor['PCP01141']).toBe('R$ 730.000,00')
+    expect(client.machineSerie['PCP01141']).toBe('CAT0938KCW8K02663')
+  })
 })

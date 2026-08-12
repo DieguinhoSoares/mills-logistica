@@ -246,6 +246,24 @@ export function parseSIMCsv(text, Papa) {
     delimiter,
   })
 
+  // Mapa "cabeçalho normalizado → cabeçalho real da linha" — montado UMA vez
+  // (não por linha) a partir do header que o Papa.parse já detectou
+  // (result.meta.fields). Usado só pra Horímetro/Valor de aquisição/Nº de
+  // série (colunas com grafia menos padronizada entre exports do SIM do que
+  // "Nº interno"/"Planta/Obra"), pra não depender de adivinhar a acentuação
+  // exata usada num export específico. Normaliza removendo acento/pontuação/
+  // maiúscula — "Horímetro", "HORIMETRO", "Horas Motor" etc. tudo bate.
+  const normKey = k => (k||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'')
+  const headerMap = {}
+  for (const h of (result.meta?.fields || [])) headerMap[normKey(h)] = h
+  const getByHeader = (r, ...normTargets) => {
+    for (const t of normTargets) {
+      const key = headerMap[t]
+      if (key !== undefined && r[key] !== undefined && r[key] !== null && String(r[key]).trim()) return String(r[key]).trim()
+    }
+    return ''
+  }
+
   // Normaliza nome para chave de agrupamento:
   // Remove sufixo de localidade entre parênteses no final + trim + uppercase
   // Ex: "CONSTRUTORA APIA (Cambará/PR) " → "CONSTRUTORA APIA"
@@ -331,10 +349,13 @@ export function parseSIMCsv(text, Papa) {
     ).trim()
     // Horímetro/Valor de aquisição/Nº de série — usados pelo painel de
     // Solicitação de NF pra autopreencher esses campos a partir da própria
-    // base do SIM (evita o analista digitar de cabeça algo que o CSV já traz).
-    const horimetro = (r['Horímetro'] || r['Horimetro'] || '').trim()
-    const valorAquisicao = (r['Valor de aquisição'] || r['Valor de Aquisição'] || r['Valor de aquisicao'] || '').trim()
-    const serie = (r['Nº de série'] || r['N° de série'] || r['Nº de Série'] || r['Numero de serie'] || r['Número de série'] || '').trim()
+    // base do SIM (evita o analista digitar de cabeça algo que o CSV já
+    // traz). Matching normalizado (getByHeader/headerMap acima) — cobre
+    // variação de acento/maiúscula/pontuação sem precisar adivinhar a
+    // grafia exata usada num export específico do SIM.
+    const horimetro      = getByHeader(r, 'horimetro', 'horimetroatual', 'horasmotor', 'horas')
+    const valorAquisicao = getByHeader(r, 'valordeaquisicao', 'valoraquisicao', 'vlraquisicao', 'valordecompra', 'valorcompra')
+    const serie          = getByHeader(r, 'ndeserie', 'numerodeserie', 'nserie', 'serie')
 
     if (!map[name]) {
       map[name] = {

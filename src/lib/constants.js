@@ -112,9 +112,10 @@ export const MOTIVO_NF_OPTIONS = Array.from(new Set(
 // única de cor/label usada no badge do card (UI.jsx) e no painel de
 // Solicitação de NF (NfRequestsPanel.jsx).
 export const NF_STATUS = {
-  pendente:   { label:'NF pendente',    short:'📄 NF PENDENTE',    color:T.perigo,  bg:T.perigoLight  },
-  solicitada: { label:'NF solicitada',  short:'📄 NF SOLICITADA',  color:'#B8860B', bg:T.amareloLight },
-  emitida:    { label:'NF emitida',     short:'📄 NF EMITIDA',     color:T.sucesso, bg:T.sucessoLight },
+  pendente:   { label:'NF pendente',    short:'📄 NF PENDENTE',    color:T.perigo,   bg:T.perigoLight  },
+  solicitada: { label:'NF solicitada',  short:'📄 NF SOLICITADA',  color:'#B8860B',  bg:T.amareloLight },
+  emitida:    { label:'NF emitida',     short:'📄 NF EMITIDA',     color:T.sucesso,  bg:T.sucessoLight },
+  cancelada:  { label:'NF cancelada',   short:'📄 NF CANCELADA',   color:T.textMuted, bg:T.surfaceLow  },
 }
 
 // Ordenação de urgência para filas de aprovação (crítico primeiro)

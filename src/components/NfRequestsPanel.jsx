@@ -9,7 +9,7 @@ import { motion } from 'framer-motion'
 import { T, FONT, BS, IS, LS, NF_STATUS, SUBTYPES_NF, MOTIVO_NF_OPTIONS } from '../lib/constants'
 import { fmt, todayStr, getSubtypeLabel, nfStatusForCard, buildFrotaIndex } from '../lib/utils'
 import { SapClientsUploadModal } from './SapClientsUploadModal'
-import { FrotaInput, MunicipioInput } from './UI'
+import { FrotaInput, MunicipioInput, ConfirmModal } from './UI'
 
 // "Cidade/UF" (string persistida no registro) ⇄ {m,s} (formato do MunicipioInput,
 // já usado em RequestForm pra Origem/Destino do card — mesma UX aqui).
@@ -50,12 +50,20 @@ function StatusPill({ status }) {
   )
 }
 
-export function NfRequestsPanel({ cards, nfRequests, sapClients, sapClientsError, simClients, saveNfRequest, saveCard, uploadSapClients, profile, addToast }) {
+export function NfRequestsPanel({ cards, nfRequests, sapClients, sapClientsError, simClients, saveNfRequest, deleteNfRequest, saveCard, uploadSapClients, profile, addToast }) {
   const [form, setForm] = useState(null) // null = fechado; objeto = form aberto (novo ou edição)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [busca, setBusca] = useState('')
   const [clienteQuery, setClienteQuery] = useState('')
+  // Dropdown de Cliente/CNPJ destino continuava aberto depois de escolher um
+  // item — a lista é filtrada só pelo NOME digitado, e vários clientes SAP
+  // compartilham o mesmo nome com CNPJs diferentes (uma planta por CNPJ), então
+  // a busca continuava batendo com outros itens mesmo após a seleção. Precisa
+  // de um estado de "aberto" próprio (mesmo padrão do ClientInput/FrotaInput/
+  // MunicipioInput já usados no resto do app), fechado explicitamente ao clicar.
+  const [clienteOpen, setClienteOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [deletando, setDeletando] = useState(false)
   // Modo "Outro" do select de Motivo — precisa de estado próprio (não dá pra
   // derivar só de form.motivo==='') porque o próprio ato de escolher "Outro"
   // zera form.motivo até o analista digitar algo, e nesse instante ainda
@@ -134,6 +142,7 @@ export function NfRequestsPanel({ cards, nfRequests, sapClients, sapClientsError
     set('cnpjDestino', c.cnpj)
     set('codSapDestino', c.codigoSap)
     setClienteQuery(c.nome)
+    setClienteOpen(false)
   }
 
   const handleSalvar = async () => {
@@ -292,12 +301,15 @@ export function NfRequestsPanel({ cards, nfRequests, sapClients, sapClientsError
 
             <div style={{ marginBottom:12, position:'relative' }}>
               <label style={LS}>Cliente / CNPJ destino</label>
-              <input value={clienteQuery} onChange={e=>{ setClienteQuery(e.target.value); set('clienteDestino', e.target.value) }}
+              <input value={clienteQuery}
+                onChange={e=>{ setClienteQuery(e.target.value); set('clienteDestino', e.target.value); setClienteOpen(true) }}
+                onFocus={()=>setClienteOpen(true)}
+                onBlur={()=>setTimeout(()=>setClienteOpen(false), 180)}
                 placeholder="Buscar no cadastro SAP por nome ou CNPJ..." style={IS}/>
-              {clientesSapFiltrados.length > 0 && (
+              {clienteOpen && clientesSapFiltrados.length > 0 && (
                 <div style={{ position:'absolute', top:'100%', left:0, right:0, background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.rSm, boxShadow:T.shadowMd, zIndex:10, marginTop:2, maxHeight:220, overflowY:'auto' }}>
                   {clientesSapFiltrados.map((c,i) => (
-                    <div key={i} onClick={()=>escolherCliente(c)}
+                    <div key={i} onMouseDown={()=>escolherCliente(c)}
                       style={{ padding:'7px 11px', cursor:'pointer', fontFamily:FONT, fontSize:11, borderBottom:i<clientesSapFiltrados.length-1?`1px solid ${T.border}`:'none' }}>
                       <div style={{ color:T.text, fontWeight:700 }}>{c.nome}</div>
                       <div style={{ color:T.textMuted, fontSize:10 }}>CNPJ {c.cnpj||'—'} {c.codigoSap && `· SAP ${c.codigoSap}`}</div>
@@ -339,6 +351,14 @@ export function NfRequestsPanel({ cards, nfRequests, sapClients, sapClientsError
             </div>
 
             <div style={{ display:'flex', gap:10 }}>
+              {/* Excluir só faz sentido numa solicitação já salva (form.id) —
+                  numa nova, "Cancelar" abaixo já descarta sem gravar nada. */}
+              {form.id && (
+                <button onClick={()=>setDeletando(true)} disabled={saving}
+                  style={{ ...BS, background:T.perigoLight, color:T.perigo, border:`1px solid ${T.perigo}30`, fontSize:12 }}>
+                  🗑 Excluir
+                </button>
+              )}
               <button onClick={()=>setForm(null)} disabled={saving} style={{ ...BS, flex:1, background:T.surfaceAlt, color:T.textSec, border:`1px solid ${T.border}` }}>Cancelar</button>
               <button onClick={handleSalvar} disabled={saving} style={{ ...BS, flex:2, background:saving?T.textMuted:T.laranja, color:'white', fontWeight:700 }}>
                 {saving ? '⏳ Salvando...' : '💾 Salvar solicitação'}
@@ -354,6 +374,23 @@ export function NfRequestsPanel({ cards, nfRequests, sapClients, sapClientsError
           onClose={()=>setUploadOpen(false)}
         />
       )}
+
+      <ConfirmModal open={deletando} danger title="Excluir solicitação de NF"
+        message="Remove este registro permanentemente — não dá pra desfazer. Se a NF já tinha sido confirmada no card vinculado, isso não desfaz essa confirmação, só apaga o histórico da solicitação."
+        confirmLabel="🗑 Excluir"
+        onConfirm={async()=>{
+          try {
+            await deleteNfRequest(form.id)
+            addToast('Solicitação excluída.', 'info')
+            setDeletando(false)
+            setForm(null)
+          } catch (err) {
+            console.error('Erro ao excluir solicitação de NF:', err)
+            addToast('Erro ao excluir. Tente novamente.', 'error')
+            setDeletando(false)
+          }
+        }}
+        onCancel={()=>setDeletando(false)}/>
     </div>
   )
 }

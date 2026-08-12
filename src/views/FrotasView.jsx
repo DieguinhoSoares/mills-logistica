@@ -143,7 +143,7 @@ export function FrotasView() {
   const { requests, respondRequest }     = useRequests('frotas')
   const { simClients, uploadClients }    = useSimClients()
   const { sapClients, sapClientsError, uploadSapClients } = useSapClients()
-  const { nfRequests, saveNfRequest }    = useNfRequests()
+  const { nfRequests, saveNfRequest, deleteNfRequest } = useNfRequests()
   const { config, saveConfig }           = useConfig()
   const { notifications, unreadCount, markAllRead, markRead, deleteNotification, enablePush, disablePush } = useNotifications()
   const { toasts, add: addToast, dismiss } = useToasts()
@@ -1081,6 +1081,7 @@ export function FrotasView() {
           sapClientsError={sapClientsError}
           simClients={simClients}
           saveNfRequest={saveNfRequest}
+          deleteNfRequest={deleteNfRequest}
           saveCard={saveCard}
           uploadSapClients={uploadSapClients}
           profile={profile}
