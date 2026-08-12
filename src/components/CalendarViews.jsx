@@ -8,7 +8,7 @@ import { todayStr, getWeekDays, getMonthWeeks, cardsForDay } from '../lib/utils'
 import { ServiceCard, MoveModal } from './UI'
 
 /* ══ WEEK VIEW ════════════════════════════════════════════════════════════════ */
-export function WeekView({ cards, baseDate, conflicts, onEdit, onAddCard, onMoveCard, compact=false }) {
+export function WeekView({ cards, baseDate, conflicts, nfRequests, onEdit, onAddCard, onMoveCard, compact=false }) {
   const days = getWeekDays(baseDate)
   const [dragCard, setDragCard] = useState(null)
   const [dragOver, setDragOver] = useState(null)
@@ -40,7 +40,7 @@ export function WeekView({ cards, baseDate, conflicts, onEdit, onAddCard, onMove
                 </div>
                 <button onClick={()=>onAddCard(day)} style={{ background:T.laranjaLight, border:`1px solid ${T.laranja}50`, borderRadius:T.rSm, color:T.laranja, width:22, height:22, cursor:'pointer', fontSize:14, display:'flex', alignItems:'center', justifyContent:'center' }}>+</button>
               </div>
-              {dc.map(c => <ServiceCard key={c.id} card={c} conflicts={conflicts} onEdit={onEdit} compact={compact} onDragStart={(e,c2)=>{setDragCard(c2);e.dataTransfer.effectAllowed='move';}}/>)}
+              {dc.map(c => <ServiceCard key={c.id} card={c} conflicts={conflicts} nfRequests={nfRequests} onEdit={onEdit} compact={compact} onDragStart={(e,c2)=>{setDragCard(c2);e.dataTransfer.effectAllowed='move';}}/>)}
               {!dc.length && <div style={{ color:T.textMuted, fontSize:10, fontFamily:'IBM Plex Sans,sans-serif', textAlign:'center', marginTop:'auto', opacity:.4 }}>—</div>}
             </div>
           )

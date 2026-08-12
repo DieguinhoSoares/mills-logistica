@@ -1,4 +1,4 @@
-import { WD_SHORT, CARD_TYPES, CARD_SUBTYPES, URGENCY } from './constants'
+import { WD_SHORT, CARD_TYPES, CARD_SUBTYPES, URGENCY, SUBTYPES_NF } from './constants'
 
 // Antes usava toISOString(), que sempre retorna a data em UTC — entre 21h e
 // meia-noite no horário de Brasília (UTC-3), o UTC já tinha virado o dia
@@ -107,6 +107,23 @@ export function getSubtypeLabel(type, subtype) {
   if (!subtype) return '—'
   const list = CARD_SUBTYPES[type] || []
   return list.find(s => s.value === subtype)?.label || subtype
+}
+
+// Status da solicitação de NF de um card, a partir dos registros da coleção
+// nfRequests (ver useNfRequests em useFirestore.js) — 3 estados possíveis:
+// 'pendente' (exige NF, nenhuma solicitação registrada — o lembrete que
+// avisa "esqueceram de pedir"), 'solicitada' (registrada, aguardando
+// emissão) ou 'emitida'. Retorna null para cards que não exigem NF (fora de
+// SUBTYPES_NF) ou já cancelados — nesse caso não há badge nenhum a mostrar.
+// card.nfConfirmada (campo legado, ainda gravado pelo popup de fechamento do
+// serviço) também conta como 'emitida', para não regredir cards já
+// confirmados antes desta coleção existir.
+export function nfStatusForCard(card, nfRequests) {
+  if (!card || !SUBTYPES_NF.includes(card.subtype) || card.status === 'cancelado') return null
+  const registros = (nfRequests || []).filter(r => r.cardId === card.id)
+  if (card.nfConfirmada || registros.some(r => r.status === 'emitida')) return 'emitida'
+  if (registros.some(r => r.status === 'solicitada')) return 'solicitada'
+  return 'pendente'
 }
 
 // Equipamento reserva (a máquina que sai/é enviada ao cliente, distinta da
@@ -358,6 +375,44 @@ export function parseSIMCsv(text, Papa) {
     .sort((a, b) => b.machines - a.machines)
 
   console.log(`✅ SIM parsed: ${clients.length} clientes, ${result.data.length} linhas`)
+  return clients
+}
+
+// Parser da base "Clientes SAP" (Código SAP, CNPJ, Cliente, UF, Endereço) —
+// usada pelo painel de Solicitação de NF pra buscar CNPJ/Código SAP do
+// destino sem o analista digitar de cabeça. Upload manual (CSV exportado do
+// SAP), mesmo padrão de separador/encoding do CSV do SIM (parseSIMCsv
+// acima), mas sem a complexidade de linha de grupos/múltiplas fontes de
+// nome — a base SAP já vem "achatada", uma linha por cliente.
+export function parseSapClientsCsv(text, Papa) {
+  const clean = text.replace(/^\uFEFF/, '')
+  const lines = clean.split(/\r?\n/)
+  const headerLine = lines[0] || ''
+  const countSemi  = (headerLine.match(/;/g)  || []).length
+  const countComma = (headerLine.match(/,/g)  || []).length
+  const countTab   = (headerLine.match(/\t/g) || []).length
+  const delimiter  = countTab > countSemi && countTab > countComma ? '\t'
+                   : countComma > countSemi ? ',' : ';'
+
+  const result = Papa.parse(clean, { header:true, skipEmptyLines:true, delimiter })
+
+  const get = (r, keys) => {
+    for (const k of keys) { if (r[k] !== undefined && r[k] !== null && String(r[k]).trim()) return String(r[k]).trim() }
+    return ''
+  }
+
+  const clients = result.data
+    .map(r => ({
+      codigoSap: get(r, ['CODIGO SAP','Código SAP','Codigo SAP','COD SAP','Cod SAP','codigoSap']),
+      cnpj:      get(r, ['CNPJ','cnpj']),
+      nome:      get(r, ['CLIENTE','Cliente','cliente']),
+      uf:        get(r, ['REGIO','UF','Estado','uf']),
+      endereco:  get(r, ['ENDEREÇO','ENDERECO','Endereço','Endereco','endereco']),
+    }))
+    .filter(c => c.nome || c.cnpj)
+    .map(c => ({ ...c, cnpjDigits: c.cnpj.replace(/\D/g,'') }))
+
+  console.log(`✅ Clientes SAP parsed: ${clients.length} clientes, ${result.data.length} linhas`)
   return clients
 }
 

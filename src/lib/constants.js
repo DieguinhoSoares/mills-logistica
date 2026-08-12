@@ -97,6 +97,15 @@ export const CARD_SUBTYPES = {
   ],
 }
 
+// Estados da solicitação de NF (ver src/lib/utils.js#nfStatusForCard) — fonte
+// única de cor/label usada no badge do card (UI.jsx) e no painel de
+// Solicitação de NF (NfRequestsPanel.jsx).
+export const NF_STATUS = {
+  pendente:   { label:'NF pendente',    short:'📄 NF PENDENTE',    color:T.perigo,  bg:T.perigoLight  },
+  solicitada: { label:'NF solicitada',  short:'📄 NF SOLICITADA',  color:'#B8860B', bg:T.amareloLight },
+  emitida:    { label:'NF emitida',     short:'📄 NF EMITIDA',     color:T.sucesso, bg:T.sucessoLight },
+}
+
 // Ordenação de urgência para filas de aprovação (crítico primeiro)
 export const URGENCY_ORDER = { critico: 0, alto: 1, medio: 2, baixo: 3 }
 // Rótulos de SLA exibidos ao usuário (fonte única — não duplicar nas views)

@@ -641,6 +641,71 @@ export function useConfig() {
   return { config, saveConfig }
 }
 
+// Cadastro de Clientes SAP (Código SAP, CNPJ, Cliente, UF) — mesmo padrão de
+// upload em lotes do useSimClients acima, usado pelo painel de Solicitação
+// de NF pra buscar CNPJ/Código SAP do destino sem digitar de cabeça.
+export function useSapClients() {
+  const [sapClients, setSapClients] = useState([])
+  const [sapClientsError, setSapClientsError] = useState(false)
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db,'config','sapClients'), async snap => {
+      if (!snap.exists()) { setSapClientsError(false); return }
+      const { batches } = snap.data()
+      try {
+        const all = []
+        for (let i = 0; i < (batches||0); i++) {
+          const bSnap = await getDoc(doc(db,'config',`sapClients_${i}`))
+          if (bSnap.exists()) all.push(...(bSnap.data().clients||[]))
+        }
+        setSapClients(all)
+        setSapClientsError(false)
+      } catch (err) {
+        console.error('Erro ao carregar lotes do cadastro de Clientes SAP:', err)
+        setSapClientsError(true)
+      }
+    }, err => {
+      console.error('Erro no listener do cadastro de Clientes SAP:', err)
+      setSapClientsError(true)
+    })
+    return unsub
+  }, [])
+  const uploadSapClients = async clients => {
+    const BATCH = 50
+    const batches = []
+    for (let i = 0; i < clients.length; i += BATCH) batches.push(clients.slice(i, i+BATCH))
+    // Mesma ordem do fix em uploadClients (useSimClients) — grava todos os
+    // lotes primeiro, só depois o doc de metadados que o listener escuta.
+    await Promise.all(batches.map((b,i) => setDoc(doc(db,'config',`sapClients_${i}`), { clients:b, updatedAt:serverTimestamp() })))
+    await setDoc(doc(db,'config','sapClients'), { total:clients.length, batches:batches.length, updatedAt:serverTimestamp() })
+  }
+  return { sapClients, sapClientsError, uploadSapClients }
+}
+
+// Solicitações de NF — histórico vinculado aos cards (ver nfStatusForCard em
+// utils.js), alimentado pelo painel "Solicitação de NF" (Frotas) e também
+// pelo popup de confirmar NF no fechamento do serviço (upsert automático,
+// ver handleConfirmarNF/handleSaveCard em FrotasView.jsx).
+export function useNfRequests() {
+  const [nfRequests, setNfRequests] = useState([])
+  useEffect(() => {
+    const q = query(collection(db,'nfRequests'), orderBy('dataSolicitacao','desc'))
+    const unsub = onSnapshot(q,
+      snap => setNfRequests(snap.docs.map(d=>({ id:d.id, ...d.data() }))),
+      err => console.warn('nfRequests:', err)
+    )
+    return unsub
+  }, [])
+  const saveNfRequest = async request => {
+    const { id, ...data } = request
+    data.updatedAt = serverTimestamp()
+    Object.keys(data).forEach(k => { if (data[k] === undefined) delete data[k] })
+    if (id) await updateDoc(doc(db,'nfRequests',id), data)
+    else { data.createdAt = serverTimestamp(); await addDoc(collection(db,'nfRequests'), data) }
+  }
+  const deleteNfRequest = id => deleteDoc(doc(db,'nfRequests',id))
+  return { nfRequests, saveNfRequest, deleteNfRequest }
+}
+
 export function useDrivers() {
   const [drivers, setDrivers] = useState([])
   useEffect(() => {

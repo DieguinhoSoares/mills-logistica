@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { T, FONT, CARD_TYPES, URGENCY, BR_STATES } from '../lib/constants'
+import { T, FONT, CARD_TYPES, URGENCY, BR_STATES, NF_STATUS } from '../lib/constants'
 
 // ─── PushInviteBanner — convite automático pra ativar push (item 5) ───────
 // Aparece sozinho quando o navegador ainda não decidiu nada sobre permissão
@@ -39,7 +39,7 @@ export function PushInviteBanner({ mostrar, onAtivar, onDispensar }) {
     </div>
   )
 }
-import { fmt } from '../lib/utils'
+import { fmt, nfStatusForCard } from '../lib/utils'
 
 export function MillsLogo({ height=32 }) {
   return <img src="/mills-logistica/mills-logo.png" alt="mills" height={height} style={{ flexShrink:0 }}/>
@@ -376,13 +376,19 @@ export function MunicipioInput({ value, onChange, placeholder='Cidade...' }) {
   )
 }
 
-export function ServiceCard({ card, conflicts, onEdit, onDragStart, compact=false }) {
+export function ServiceCard({ card, conflicts, nfRequests, onEdit, onDragStart, compact=false }) {
   const ct  = CARD_TYPES[card.type]
   const ug  = URGENCY[card.urgency]
   const hasConf    = conflicts?.some(c=>c.a===card.id||c.b===card.id)
   const isLate     = card.calendarStatus === 'atrasado'
   const isCancelado = card.status === 'cancelado'
-  const semVinculo = !card.requestId && !card.cardOrigemId   // card criado direto pelo Frotas
+  // OTIMIZAR (hasConf) e "sem vínculo" (semVinculo) — em standby a pedido do
+  // usuário (2026-08): o rótulo do canto superior direito do card agora é o
+  // status de NF (nfStatus abaixo). "OTIMIZAR" ainda aparece no resumo de
+  // rotas otimizáveis (faixa de KPIs do FrotasView), só saiu do card em si.
+  // const semVinculo = !card.requestId && !card.cardOrigemId   // card criado direto pelo Frotas
+  const nfStatus = nfStatusForCard(card, nfRequests)
+  const nfMeta   = nfStatus ? NF_STATUS[nfStatus] : null
   // Subtipo legível — remove underscores e capitaliza
   const subtypeLabel = card.subtype ? card.subtype.replace(/_/g,' ').replace(/\b\w/g, l=>l.toUpperCase()) : null
   return (
@@ -392,10 +398,9 @@ export function ServiceCard({ card, conflicts, onEdit, onDragStart, compact=fals
         padding:compact?'5px 7px':'9px 11px', cursor:'grab', marginBottom:4,
         position:'relative', userSelect:'none', opacity:isCancelado?0.5:1,
         boxShadow:hasConf?`0 0 0 2px ${T.amarelo},${T.shadow}`:isLate?`0 0 0 2px ${T.perigo},${T.shadow}`:T.shadow }}>
-      {hasConf    && <div style={{ position:'absolute', top:-8, right:6, background:T.amarelo, color:'#000', fontSize:8, fontWeight:700, padding:'1px 5px', borderRadius:4, fontFamily:FONT }}>OTIMIZAR</div>}
       {isLate     && <div style={{ position:'absolute', top:-8, left:6, background:T.perigo, color:'#fff', fontSize:8, fontWeight:700, padding:'1px 5px', borderRadius:4, fontFamily:FONT }}>ATRASADO</div>}
       {isCancelado && <div style={{ position:'absolute', top:-8, left:6, background:'#5A5A5A', color:'#fff', fontSize:8, fontWeight:700, padding:'1px 5px', borderRadius:4, fontFamily:FONT }}>🚫 CANCELADO</div>}
-      {semVinculo && !compact && <div style={{ position:'absolute', top:-8, right:hasConf?'auto':6, background:'#607D8B', color:'#fff', fontSize:7, fontWeight:700, padding:'1px 5px', borderRadius:4, fontFamily:FONT }}>sem vínculo</div>}
+      {nfMeta && !compact && <div style={{ position:'absolute', top:-8, right:6, background:nfMeta.color, color:'#fff', fontSize:7, fontWeight:700, padding:'1px 5px', borderRadius:4, fontFamily:FONT, whiteSpace:'nowrap' }}>{nfMeta.short}</div>}
       <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:compact?1:4 }}>
         <span style={{ fontSize:compact?10:12 }}>{ct?.icon}</span>
         <span style={{ color:ct?.color, fontSize:8, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', fontFamily:FONT }}>{ct?.short}</span>

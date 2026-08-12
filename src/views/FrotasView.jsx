@@ -1,10 +1,10 @@
 import { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth }        from '../contexts/AuthContext'
-import { useCards, useRequests, useNotifications, useSimClients, useConfig, useDrivers, useAllRotogramas, notifyUser } from '../hooks/useFirestore'
+import { useCards, useRequests, useNotifications, useSimClients, useSapClients, useNfRequests, useConfig, useDrivers, useAllRotogramas, notifyUser } from '../hooks/useFirestore'
 import { MillsLogo, ToastContainer, useToasts, BrazilMap, NotificationBell, ConfirmModal } from '../components/UI'
 import { T, FONT, CARD_TYPES, MONTH_NAMES, BS, IS, NB, SUBTYPES_NF, SHADOW_CARD, BORDER_SUBTLE } from '../lib/constants'
-import { fmt, todayStr, getWeekDays, detectConflicts, getSubtypeLabel, findRelatedPendingRequest, sortByUrgency, sendTeamsNotification } from '../lib/utils'
+import { fmt, todayStr, getWeekDays, detectConflicts, getSubtypeLabel, findRelatedPendingRequest, sortByUrgency, sendTeamsNotification, nfStatusForCard } from '../lib/utils'
 import { db } from '../lib/firebase'
 import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore'
 import { ExportModal }      from '../components/ExportModal'
@@ -15,6 +15,7 @@ import { DriversModal }      from '../components/DriversModal'
 import { AssignDriverModal } from '../components/AssignDriverModal'
 import { RequestsKanban }    from '../components/RequestsKanban'
 import { CsvUploadModal }    from '../components/CsvUploadModal'
+import { NfRequestsPanel }   from '../components/NfRequestsPanel'
 import { DiagnosticoModal }  from '../components/DiagnosticoModal'
 import { WeekView, MonthView, YearView } from '../components/CalendarViews'
 
@@ -141,6 +142,8 @@ export function FrotasView() {
   const { cards, saveCard, deleteCard, moveCard } = useCards()
   const { requests, respondRequest }     = useRequests('frotas')
   const { simClients, uploadClients }    = useSimClients()
+  const { sapClients, sapClientsError, uploadSapClients } = useSapClients()
+  const { nfRequests, saveNfRequest }    = useNfRequests()
   const { config, saveConfig }           = useConfig()
   const { notifications, unreadCount, markAllRead, markRead, deleteNotification, enablePush, disablePush } = useNotifications()
   const { toasts, add: addToast, dismiss } = useToasts()
@@ -204,11 +207,35 @@ export function FrotasView() {
   // relatório de emissão de carbono, que precisa citar a NF de cada serviço.
   const [nfInputs, setNfInputs] = useState({})
   const [reviewValidacao, setReviewValidacao] = useState(null)
+  // Upsert do registro de Solicitação de NF (coleção nfRequests) a partir do
+  // card — usado tanto pelo popup de confirmar NF no fechamento do serviço
+  // (handleConfirmarNF abaixo) quanto pela edição via RequestForm
+  // (handleSaveCard). Reaproveita o registro já existente pra esse card (se
+  // houver, vindo do painel "Solicitação de NF") em vez de duplicar; sem
+  // registro prévio, cria um novo já como "emitida".
+  const syncNfRequestEmitida = async (card, numero) => {
+    const existente = nfRequests.find(r => r.cardId === card.id && r.status !== 'cancelada')
+    await saveNfRequest({
+      ...(existente || {}),
+      cardId:          card.id,
+      dataSolicitacao: existente?.dataSolicitacao || card.startDate || todayStr(),
+      nInterno:        existente?.nInterno        || card.nInterno || '',
+      origem:           existente?.origem          || card.originCity || card.origin || '',
+      clienteDestino:   existente?.clienteDestino   || card.client || '',
+      transportadora:   existente?.transportadora   || card.transportadoraNome || '',
+      motivo:           existente?.motivo           || getSubtypeLabel(card.type, card.subtype),
+      motorista:        existente?.motorista        || card.driver || '',
+      status:    'emitida',
+      numeroNF:  numero,
+      createdBy: existente?.createdBy || profile?.name || 'Frotas',
+    })
+  }
   const handleConfirmarNF = async (card) => {
     const numero = (nfInputs[card.id] || '').trim()
     if (!numero) { addToast('Digite o número da NF antes de confirmar.', 'error'); return }
     try {
       await saveCard({ ...card, numeroNF:numero, nfConfirmada:true, nfConfirmadaPor:profile?.name||'Frotas', nfConfirmadaEm:new Date().toISOString() })
+      await syncNfRequestEmitida(card, numero)
       addToast('✅ NF confirmada!', 'success')
     } catch (err) {
       console.error('Erro ao confirmar NF:', err)
@@ -284,6 +311,11 @@ export function FrotasView() {
       // Já tem veículo/km calculados — edição normal, sem repetir a estimativa
       try {
         await saveCard(mapped)
+        // NF confirmada agora (ou número alterado) via RequestForm — sincroniza
+        // com a coleção de solicitações (mesmo helper do popup de fechamento).
+        if (mapped.nfConfirmada && mapped.numeroNF && (!editCard?.nfConfirmada || editCard?.numeroNF !== mapped.numeroNF)) {
+          await syncNfRequestEmitida(mapped, mapped.numeroNF)
+        }
         addToast(`Serviço de ${mapped.client||'novo'} atualizado.`, 'success')
       } catch (err) {
         console.error('Erro ao salvar serviço:', err)
@@ -414,6 +446,10 @@ export function FrotasView() {
     c.status !== 'cancelado' &&
     !c.nfConfirmada
   )
+  // Sem NENHUMA solicitação registrada ainda — o lembrete "esqueceram de
+  // pedir" (distinto de nfPendentes acima, que também inclui quem já pediu
+  // e só está aguardando a emissão). Ver nfStatusForCard em utils.js.
+  const nfSemSolicitacao = cardsAtivos.filter(c => nfStatusForCard(c, nfRequests) === 'pendente')
   const totalValidacao = validacoes.length + semExecutorApp.length
   const totalNF        = nfPendentes.length
 
@@ -423,7 +459,8 @@ export function FrotasView() {
   // painel lateral) — não duplica nenhuma lógica de clique/modal.
   const centralAcoes = [
     { id:'validar',   title:'Validar serviços concluídos', sub:`${validacoes.length} aguardando conferência`,        count:validacoes.length,     badgeBg:T.laranja, badgeColor:'#fff',   onResolve:()=>{setActiveTab('agenda');setPainelTab('val')} },
-    { id:'nf',        title:'Confirmar NF emitida',        sub:`${nfPendentes.length} movimentação(ões) pendente(s)`,count:nfPendentes.length,    badgeBg:T.perigo,  badgeColor:'#fff',   onResolve:()=>{setActiveTab('agenda');setPainelTab('val')} },
+    { id:'nf_solicitar', title:'Solicitar NF',             sub:`${nfSemSolicitacao.length} serviço(s) sem solicitação registrada`, count:nfSemSolicitacao.length, badgeBg:T.perigo, badgeColor:'#fff', onResolve:()=>setActiveTab('nf') },
+    { id:'nf',        title:'Confirmar NF emitida',        sub:`${nfPendentes.length} movimentação(ões) pendente(s)`,count:nfPendentes.length,    badgeBg:T.amarelo,  badgeColor:T.text,   onResolve:()=>{setActiveTab('agenda');setPainelTab('val')} },
     { id:'atribuir',  title:'Atribuir motorista',          sub:`${semExecutorApp.length} serviço(s) sem executor`,   count:semExecutorApp.length, badgeBg:T.amarelo, badgeColor:T.text,   onResolve:()=>{setActiveTab('agenda');setPainelTab('val')} },
     { id:'solicitar', title:'Responder solicitações',      sub:`${pending} nova(s) do time solicitante`,             count:pending,                badgeBg:T.info,    badgeColor:'#fff',   onResolve:()=>{setActiveTab('agenda');setPainelTab('sol')} },
   ].filter(a => a.count > 0)
@@ -595,12 +632,13 @@ export function FrotasView() {
             <span style={{ color:T.verde, fontSize:9, fontWeight:700, letterSpacing:'0.06em' }}>LIVE</span>
           </div>
           <div style={{ background:T.surfaceAlt, border:`1px solid ${T.border}`, borderRadius:T.r, display:'flex', padding:3, gap:2 }}>
-            {[['agenda','📅 Agenda'],['requests','📥 Solicitações']].map(([v,l])=>(
+            {[['agenda','📅 Agenda'],['requests','📥 Solicitações'],['nf','📄 Solicitação de NF']].map(([v,l])=>(
               <button key={v} onClick={()=>setActiveTab(v)}
                 style={{ padding:'4px 12px', borderRadius:T.rSm, border:'none', background:activeTab===v?T.laranja:'transparent', color:activeTab===v?'white':T.textSec, fontFamily:'IBM Plex Sans,sans-serif', fontWeight:600, fontSize:11, cursor:'pointer', transition:'all .12s', display:'flex', alignItems:'center', gap:5 }}>
                 {l}
                 {v==='requests'&&pending>0&&<span style={{ background:activeTab==='requests'?'rgba(255,255,255,.3)':T.perigo, color:'white', borderRadius:10, padding:'0 5px', fontSize:9, fontWeight:800 }}>{pending}</span>}
                 {v==='agenda'&&validacoes.length>0&&<span style={{ background:activeTab==='agenda'?'rgba(255,255,255,.3)':T.info, color:'white', borderRadius:10, padding:'0 5px', fontSize:9, fontWeight:800 }}>{validacoes.length}</span>}
+                {v==='nf'&&nfSemSolicitacao.length>0&&<span style={{ background:activeTab==='nf'?'rgba(255,255,255,.3)':T.perigo, color:'white', borderRadius:10, padding:'0 5px', fontSize:9, fontWeight:800 }}>{nfSemSolicitacao.length}</span>}
               </button>
             ))}
           </div>
@@ -743,7 +781,7 @@ export function FrotasView() {
           ) : (
             <AnimatePresence mode="wait">
               <motion.div key={view} initial={{ opacity:0, y:5 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-5 }} transition={{ duration:.1 }} style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-                {view==='semana'&&<WeekView cards={cards} baseDate={baseDate} conflicts={conflicts} onEdit={c=>{setEditCard(c);setModal('card');}} onAddCard={d=>{setDefaultDate(d);setEditCard(null);setModal('card');}} onMoveCard={handleMoveCard} compact={calCompact}/>}
+                {view==='semana'&&<WeekView cards={cards} baseDate={baseDate} conflicts={conflicts} nfRequests={nfRequests} onEdit={c=>{setEditCard(c);setModal('card');}} onAddCard={d=>{setDefaultDate(d);setEditCard(null);setModal('card');}} onMoveCard={handleMoveCard} compact={calCompact}/>}
                 {view==='mes'&&<MonthView cards={cards} year={yr} month={mo} conflicts={conflicts} onEdit={c=>{setEditCard(c);setModal('card');}} onAddCard={d=>{setDefaultDate(d);setEditCard(null);setModal('card');}} onMoveCard={handleMoveCard}/>}
                 {view==='ano'&&<div style={{ overflow:'auto', flex:1 }}><YearView cards={cards} year={yr} onMonthClick={m=>{setMo(m);setView('mes');}}/></div>}
               </motion.div>
@@ -1032,6 +1070,21 @@ export function FrotasView() {
             <RequestsKanban requests={requests} teamsWebhookUrl={config?.teamsWebhookUrl} onRespond={handleRespond} onCancel={handleCancelRequest} profile={profile} simClients={simClients}/>
           </div>
         </div>
+      )}
+
+      {/* SOLICITAÇÃO DE NF TAB */}
+      {activeTab==='nf'&&(
+        <NfRequestsPanel
+          cards={cards}
+          nfRequests={nfRequests}
+          sapClients={sapClients}
+          sapClientsError={sapClientsError}
+          saveNfRequest={saveNfRequest}
+          saveCard={saveCard}
+          uploadSapClients={uploadSapClients}
+          profile={profile}
+          addToast={addToast}
+        />
       )}
 
       {/* MODALS */}
