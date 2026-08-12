@@ -142,16 +142,19 @@ export function NfRequestsPanel({ cards, nfRequests, sapClients, sapClientsError
     const novoOrigem    = info ? formatOrigem({ m:info.city, s:info.state }) : ''
     const novoHorimetro = info?.horimetro || ''
     const novoValor     = info?.valor || ''
-    setForm(p => {
-      const auto = lastAutoFill.current
-      const intocado = (atual, autoAnterior) => atual === autoAnterior
-      return {
-        ...p, nInterno,
-        origem:    intocado(p.origem, auto.origem)       ? novoOrigem    : p.origem,
-        horimetro: intocado(p.horimetro, auto.horimetro) ? novoHorimetro : p.horimetro,
-        valor:     intocado(p.valor, auto.valor)         ? novoValor     : p.valor,
-      }
-    })
+    // Snapshot do auto-preenchimento ANTERIOR antes de qualquer atualização —
+    // precisa ser lido aqui fora, não dentro do updater do setForm: o React
+    // só executa esse updater depois que esta função termina (batching), e
+    // se a leitura do ref acontecesse lá dentro ela já pegaria o valor NOVO
+    // (mutado logo abaixo), fazendo a comparação sempre falhar e travando o
+    // autopreenchimento por completo — foi exatamente o bug relatado.
+    const auto = lastAutoFill.current
+    setForm(p => ({
+      ...p, nInterno,
+      origem:    p.origem    === auto.origem    ? novoOrigem    : p.origem,
+      horimetro: p.horimetro === auto.horimetro ? novoHorimetro : p.horimetro,
+      valor:     p.valor     === auto.valor     ? novoValor     : p.valor,
+    }))
     lastAutoFill.current = { origem:novoOrigem, horimetro:novoHorimetro, valor:novoValor }
   }
 
