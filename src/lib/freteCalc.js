@@ -1094,7 +1094,13 @@ function normTxtUF(s) { return String(s||'').toUpperCase().normalize('NFD').repl
 // texto solto, às vezes com sujeira colada (ex: "Canápolis - MG"), e esse
 // texto sujo, se fosse repassado direto pra Nominatim depois, prejudicaria
 // a busca de coordenada mesmo já tendo descoberto a UF certa aqui.
-async function descobrirCidadeIBGE(cidade) {
+// Exportada pra reaproveitar em RequestReviewModal.jsx — aviso pro Frotas
+// quando a UF CADASTRADA na solicitação (vinda do Estado da Planta/Obra no
+// CSV do SIM, preenchida automaticamente ao escolher o cliente) parece
+// inconsistente com o nome da cidade, mesmo já vindo preenchida (esta
+// função aqui em cima só é chamada internamente quando falta UF — o aviso
+// do modal cobre o caso complementar: UF presente, mas errada na origem).
+export async function descobrirCidadeIBGE(cidade) {
   try {
     const res  = await fetch('https://servicodados.ibge.gov.br/api/v1/localidades/municipios?orderBy=nome')
     const data = await res.json()

@@ -2,10 +2,11 @@
 // RequestReviewModal — extraído de FrotasView.jsx (item 11 da revisão)
 // Modal de avaliação de solicitação pelo time de Frotas.
 // ============================================================
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { T, FONT, CARD_TYPES, URGENCY, BS, IS, LS } from '../lib/constants'
 import { fmt, getSubtypeLabel } from '../lib/utils'
+import { descobrirCidadeIBGE } from '../lib/freteCalc'
 import { FreteEstimativa } from './FreteEstimativa'
 
 /* ══ REQUEST REVIEW MODAL ════════════════════════════════════════════════════ */
@@ -15,6 +16,36 @@ export function RequestReviewModal({ req, teamsWebhookUrl, onRespond, onClose, p
   const ct = CARD_TYPES[req.type], ug = URGENCY[req.urgency]
   const chIcon  = { email:'📧', whatsapp:'💬', teams:'🟦' }
   const chLabel = { email:'E-mail corporativo', whatsapp:'WhatsApp', teams:'Microsoft Teams' }
+
+  // Caso real (2026-08): Planta/Obra "CMAA - Canápolis" cadastrada com
+  // Estado=BA no CSV do SIM (Canápolis é MG) — a UF errada vem preenchida
+  // automaticamente ao escolher o cliente (RequestForm.jsx), então a
+  // checagem "UF vazia" que já existe em calcularDistancia não pega esse
+  // caso (a UF NÃO está vazia, só está errada). Confere aqui contra o
+  // cadastro oficial do IBGE — mesma fonte/função já usada quando a UF
+  // falta — e avisa o Frotas antes de aprovar/calcular o frete sobre uma
+  // rota que sai do estado errado. Roda uma vez só, ao abrir o modal.
+  const [ufAvisos, setUfAvisos] = useState([])
+  useEffect(() => {
+    let cancelado = false
+    async function checar() {
+      const alvos = [
+        { label:'Origem',  cidade:req.originCityName, ufCadastrada:req.origin },
+        { label:'Destino', cidade:req.destCityName,   ufCadastrada:req.destination },
+      ]
+      const avisos = []
+      for (const alvo of alvos) {
+        if (!alvo.cidade || !alvo.ufCadastrada) continue
+        const achado = await descobrirCidadeIBGE(alvo.cidade)
+        if (achado && achado.uf !== alvo.ufCadastrada) {
+          avisos.push(`${alvo.label}: "${alvo.cidade}" é em ${achado.uf}, mas está cadastrado como ${alvo.ufCadastrada}`)
+        }
+      }
+      if (!cancelado) setUfAvisos(avisos)
+    }
+    checar()
+    return () => { cancelado = true }
+  }, [req.originCityName, req.origin, req.destCityName, req.destination])
 
   const handle = async status => {
     setSaving(true)
@@ -54,6 +85,17 @@ export function RequestReviewModal({ req, teamsWebhookUrl, onRespond, onClose, p
               </div>
             ))}
           </div>
+          {ufAvisos.length > 0 && (
+            <div style={{ marginTop:10, padding:'8px 10px', background:T.perigoLight, borderRadius:T.rSm, border:`1px solid ${T.perigo}30` }}>
+              <div style={{ color:T.perigo, fontSize:9, textTransform:'uppercase', letterSpacing:'0.07em', fontFamily:'IBM Plex Sans,sans-serif', fontWeight:700, marginBottom:3 }}>⚠ UF possivelmente errada (conferido contra o IBGE)</div>
+              {ufAvisos.map((a,i) => (
+                <div key={i} style={{ color:T.perigo, fontSize:11, fontFamily:'IBM Plex Sans,sans-serif' }}>{a}</div>
+              ))}
+              <div style={{ color:T.textSec, fontSize:10, fontFamily:'IBM Plex Sans,sans-serif', marginTop:4 }}>
+                Provável causa: Estado cadastrado errado pra essa Planta/Obra no CSV do SIM. A estimativa de frete abaixo pode estar calculando sobre uma rota errada.
+              </div>
+            </div>
+          )}
           {req.description && (
             <div style={{ marginTop:10, padding:'8px 10px', background:T.surface, borderRadius:T.rSm }}>
               <div style={{ color:T.textMuted, fontSize:9, textTransform:'uppercase', letterSpacing:'0.07em', fontFamily:'IBM Plex Sans,sans-serif', marginBottom:3 }}>Descrição</div>
