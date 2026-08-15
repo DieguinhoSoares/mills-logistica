@@ -1094,32 +1094,74 @@ function normTxtUF(s) { return String(s||'').toUpperCase().normalize('NFD').repl
 // texto solto, às vezes com sujeira colada (ex: "Canápolis - MG"), e esse
 // texto sujo, se fosse repassado direto pra Nominatim depois, prejudicaria
 // a busca de coordenada mesmo já tendo descoberto a UF certa aqui.
-// Exportada pra reaproveitar em RequestReviewModal.jsx — aviso pro Frotas
-// quando a UF CADASTRADA na solicitação (vinda do Estado da Planta/Obra no
-// CSV do SIM, preenchida automaticamente ao escolher o cliente) parece
-// inconsistente com o nome da cidade, mesmo já vindo preenchida (esta
-// função aqui em cima só é chamada internamente quando falta UF — o aviso
-// do modal cobre o caso complementar: UF presente, mas errada na origem).
+// Exportada pra reaproveitar em RequestReviewModal.jsx/AssignDriverModal.jsx/
+// RequestForm.jsx — aviso pro Frotas (ou pro solicitante, na origem) quando
+// a UF CADASTRADA parece inconsistente com o nome da cidade, mesmo já vindo
+// preenchida (esta função aqui em cima só é chamada internamente quando
+// falta UF — o aviso nos formulários/modais cobre o caso complementar: UF
+// presente, mas errada na origem — ex: Estado da Planta/Obra errado no CSV
+// do SIM).
+//
+// Cache em memória da lista completa do IBGE (~5.570 municípios) — a lista
+// não muda de um clique pro outro, e sem cache cada tela que faz essa
+// checagem (RequestForm, RequestReviewModal, AssignDriverModal, mais a
+// auditoria em lote abaixo) dispararia o mesmo download de novo. Município
+// não some/aparece durante uma sessão, então reusar o resultado é seguro.
+let _municipiosIBGECache = null
+async function buscarMunicipiosIBGE() {
+  if (_municipiosIBGECache) return _municipiosIBGECache
+  const res  = await fetch('https://servicodados.ibge.gov.br/api/v1/localidades/municipios?orderBy=nome')
+  const data = await res.json()
+  _municipiosIBGECache = data
+  return data
+}
+
+// Núcleo do match nome→UF, separado do fetch pra poder reaproveitar a
+// mesma lista já baixada numa auditoria em lote (ver auditarUFsSimClients).
+function resolverUFPorNome(cidade, municipios) {
+  const alvo = normTxtUF(cidade)
+  if (!alvo) return null
+  let matches = municipios.filter(m => normTxtUF(m.nome) === alvo)
+  // Se não bateu exato, tenta por prefixo — só aceita se sobrar
+  // exatamente 1 candidato inequívoco, mesmo padrão de segurança do
+  // match exato (ver comentário acima sobre nome com sujeira colada).
+  if (matches.length === 0) {
+    matches = municipios.filter(m => {
+      const nomeNorm = normTxtUF(m.nome)
+      return nomeNorm && (alvo.startsWith(nomeNorm) || nomeNorm.startsWith(alvo))
+    })
+  }
+  if (matches.length !== 1) return null
+  const uf = matches[0].microrregiao?.mesorregiao?.UF?.sigla
+  return uf ? { nome: matches[0].nome, uf } : null
+}
+
 export async function descobrirCidadeIBGE(cidade) {
   try {
-    const res  = await fetch('https://servicodados.ibge.gov.br/api/v1/localidades/municipios?orderBy=nome')
-    const data = await res.json()
-    const alvo = normTxtUF(cidade)
-    if (!alvo) return null
-    let matches = data.filter(m => normTxtUF(m.nome) === alvo)
-    // Se não bateu exato, tenta por prefixo — só aceita se sobrar
-    // exatamente 1 candidato inequívoco, mesmo padrão de segurança do
-    // match exato (ver comentário acima sobre nome com sujeira colada).
-    if (matches.length === 0) {
-      matches = data.filter(m => {
-        const nomeNorm = normTxtUF(m.nome)
-        return nomeNorm && (alvo.startsWith(nomeNorm) || nomeNorm.startsWith(alvo))
-      })
-    }
-    if (matches.length !== 1) return null
-    const uf = matches[0].microrregiao?.mesorregiao?.UF?.sigla
-    return uf ? { nome: matches[0].nome, uf } : null
+    const municipios = await buscarMunicipiosIBGE()
+    return resolverUFPorNome(cidade, municipios)
   } catch { return null }
+}
+
+// Varredura em lote — confere TODA a base de Plantas/Obras já carregada
+// (Base SIM) contra o IBGE de uma vez, em vez de esperar cada solicitação
+// aparecer uma por uma. Baixa a lista do IBGE uma única vez (cache acima) e
+// resolve todos os clientes com cidade+UF cadastradas sobre essa mesma
+// lista — não dispara uma consulta por cliente. Usada pelo painel de
+// diagnóstico (DiagnosticoModal) pra achar de uma vez toda Planta/Obra com
+// Estado errado no CSV, a causa raiz recorrente desse tipo de bug.
+export async function auditarUFsSimClients(simClients) {
+  const municipios = await buscarMunicipiosIBGE().catch(() => null)
+  if (!municipios) return { ok:false, divergencias:[] }
+  const divergencias = []
+  for (const c of (simClients || [])) {
+    if (!c.city || !c.state) continue
+    const achado = resolverUFPorNome(c.city, municipios)
+    if (achado && achado.uf !== c.state) {
+      divergencias.push({ cliente:c.name, cidade:c.city, ufCadastrada:c.state, ufReal:achado.uf })
+    }
+  }
+  return { ok:true, divergencias }
 }
 
 async function buscarCoordenadas(cidade, uf) {

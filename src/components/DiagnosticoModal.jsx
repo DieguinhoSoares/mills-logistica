@@ -8,7 +8,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { T, FONT, BS, IS, LS } from '../lib/constants'
-import { diagnosticarNInterno } from '../lib/freteCalc'
+import { diagnosticarNInterno, auditarUFsSimClients } from '../lib/freteCalc'
 import { buildFrotaIndex } from '../lib/utils'
 
 function Linha({ label, children }) {
@@ -29,10 +29,25 @@ function Selo({ ok, textoOk, textoFalha }) {
 export function DiagnosticoModal({ simClients, onClose }) {
   const [busca, setBusca] = useState('')
   const [diag, setDiag] = useState(null)
+  // Varredura em lote de Estado x cidade (IBGE) pra toda a base SIM — caso
+  // real (2026-08): Planta/Obra "CMAA - Canápolis" cadastrada com Estado=BA
+  // (Canápolis é MG) mandou motorista pra rota errada. Os avisos pontuais
+  // (RequestForm/RequestReviewModal/AssignDriverModal) só pegam esse erro
+  // quando alguém abre justamente aquela solicitação — isto aqui varre TODA
+  // a base de uma vez, pra achar toda Planta/Obra com Estado errado antes
+  // que vire um card.
+  const [auditoria, setAuditoria] = useState(null)
+  const [auditando, setAuditando] = useState(false)
 
   const handleBuscar = () => {
     if (!busca.trim()) { setDiag(null); return }
     setDiag(diagnosticarNInterno(busca, simClients))
+  }
+
+  const handleAuditar = async () => {
+    setAuditando(true)
+    setAuditoria(await auditarUFsSimClients(simClients))
+    setAuditando(false)
   }
 
   const r = diag?.resultado
@@ -50,6 +65,41 @@ export function DiagnosticoModal({ simClients, onClose }) {
         <p style={{ color:T.textMuted, fontFamily:FONT, fontSize:11, margin:'0 0 16px' }}>
           Digite o N° interno pra ver exatamente o que o sistema capturou da base SIM ({simClients?.length||0} clientes carregados) e por que bateu (ou não) com as tabelas de dimensão/peso.
         </p>
+
+        <div style={{ marginBottom:18, padding:'12px 14px', background:T.surfaceAlt, borderRadius:T.r, border:`1px solid ${T.border}` }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10 }}>
+            <div>
+              <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:T.text }}>🗺️ Auditar Estado x Cidade de todos os clientes</div>
+              <div style={{ fontFamily:FONT, fontSize:10, color:T.textMuted, marginTop:2 }}>Confere a base inteira contra o IBGE de uma vez — acha Planta/Obra com Estado errado no CSV antes que vire um card com rota errada.</div>
+            </div>
+            <button onClick={handleAuditar} disabled={auditando}
+              style={{ ...BS, background:auditando?T.borderMid:T.laranja, color:'white', fontWeight:700, fontSize:11, padding:'7px 14px', whiteSpace:'nowrap' }}>
+              {auditando ? '⏳ Auditando...' : '🔍 Auditar agora'}
+            </button>
+          </div>
+          {auditoria && !auditoria.ok && (
+            <div style={{ marginTop:10, color:T.perigo, fontFamily:FONT, fontSize:11 }}>❌ Não foi possível consultar o IBGE agora. Tente de novo em instantes.</div>
+          )}
+          {auditoria?.ok && auditoria.divergencias.length === 0 && (
+            <div style={{ marginTop:10, color:T.verde, fontFamily:FONT, fontSize:11, fontWeight:700 }}>✅ Nenhuma divergência encontrada — Estado de todas as Plantas/Obras bate com a cidade cadastrada.</div>
+          )}
+          {auditoria?.ok && auditoria.divergencias.length > 0 && (
+            <div style={{ marginTop:10 }}>
+              <div style={{ color:T.perigo, fontFamily:FONT, fontWeight:700, fontSize:11, marginBottom:6 }}>⚠️ {auditoria.divergencias.length} Planta(s)/Obra(s) com Estado divergente:</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:4, maxHeight:180, overflowY:'auto' }}>
+                {auditoria.divergencias.map((d,i) => (
+                  <div key={i} style={{ padding:'6px 9px', background:T.perigoLight, borderRadius:T.rSm, fontFamily:FONT, fontSize:11 }}>
+                    <strong style={{ color:T.text }}>{d.cliente}</strong>
+                    <span style={{ color:T.perigo }}> — {d.cidade} cadastrada como {d.ufCadastrada}, correto é {d.ufReal}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop:8, color:T.textMuted, fontFamily:FONT, fontSize:10, lineHeight:1.5 }}>
+                Corrija a coluna "Estado (Planta/Obra)" pra essas linhas no CSV do SIM e suba a base atualizada — o app só repete o que a base diz.
+              </div>
+            </div>
+          )}
+        </div>
 
         <div style={{ display:'flex', gap:8, marginBottom:16 }}>
           <input value={busca} onChange={e=>setBusca(e.target.value)}

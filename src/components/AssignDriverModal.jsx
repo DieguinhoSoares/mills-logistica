@@ -2,10 +2,11 @@
 // AssignDriverModal — extraído de FrotasView.jsx (item 11 da revisão)
 // Atribuição de motorista/transportadora ao aceitar solicitação.
 // ============================================================
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { T, FONT, BS, IS, LS } from '../lib/constants'
 import { fmt, todayStr } from '../lib/utils'
+import { descobrirCidadeIBGE } from '../lib/freteCalc'
 import { FreteEstimativa } from './FreteEstimativa'
 
 // ── AssignDriverModal ─────────────────────────────────────────────────────────
@@ -45,6 +46,34 @@ export function AssignDriverModal({ req, drivers, simClients, cards, onConfirm, 
     setDateError('')
   }
   const [note,setNote]=useState('')
+  // Mesma checagem do RequestReviewModal (ver descobrirCidadeIBGE em
+  // freteCalc.js) — precisa estar TAMBÉM aqui: este é o modal que de fato
+  // confirma o motorista/transportadora e cria o card com a rota gravada.
+  // Um caso real chegou até aqui sem aviso (motorista roteado pra UF
+  // errada) porque o aviso só existia na tela de avaliação anterior, um
+  // passo antes — quem só passa direto pra "Aceitar" sem reparar ali nunca
+  // via o alerta.
+  const [ufAvisos, setUfAvisos] = useState([])
+  useEffect(() => {
+    let cancelado = false
+    async function checar() {
+      const alvos = [
+        { label:'Origem',  cidade:req?.originCityName, ufCadastrada:req?.origin },
+        { label:'Destino', cidade:req?.destCityName,   ufCadastrada:req?.destination },
+      ]
+      const avisos = []
+      for (const alvo of alvos) {
+        if (!alvo.cidade || !alvo.ufCadastrada) continue
+        const achado = await descobrirCidadeIBGE(alvo.cidade)
+        if (achado && achado.uf !== alvo.ufCadastrada) {
+          avisos.push(`${alvo.label}: "${alvo.cidade}" é em ${achado.uf}, mas está cadastrado como ${alvo.ufCadastrada}`)
+        }
+      }
+      if (!cancelado) setUfAvisos(avisos)
+    }
+    checar()
+    return () => { cancelado = true }
+  }, [req?.originCityName, req?.origin, req?.destCityName, req?.destination])
   // Captura o que o FreteEstimativa está mostrando de fato — inclusive quando
   // o analista troca o veículo manualmente. Sem isso, a escolha feita ali
   // nunca chegava a este componente e era descartada ao confirmar.
@@ -79,6 +108,17 @@ export function AssignDriverModal({ req, drivers, simClients, cards, onConfirm, 
         style={{ background:T.surface, borderRadius:T.rLg, padding:28, width:540, maxHeight:'92vh', overflowY:'auto', boxShadow:T.shadowLg, border:`2px solid ${T.verde}` }}>
         <h2 style={{ color:T.text, fontFamily:FONT, fontWeight:700, fontSize:20, margin:'0 0 6px' }}>✅ Aceitar Solicitação</h2>
         <p style={{ color:T.textMuted, fontFamily:FONT, fontSize:12, margin:'0 0 4px' }}>Defina a execução para <strong style={{ color:T.laranja }}>{req?.clientName||req?.requesterName}</strong>.</p>
+        {ufAvisos.length > 0 && (
+          <div style={{ marginBottom:14, padding:'10px 13px', background:T.perigoLight, borderRadius:T.r, border:`1px solid ${T.perigo}40` }}>
+            <div style={{ color:T.perigo, fontFamily:FONT, fontWeight:700, fontSize:12, marginBottom:4 }}>⚠️ UF possivelmente errada (conferido contra o IBGE)</div>
+            {ufAvisos.map((a,i) => (
+              <div key={i} style={{ color:T.perigo, fontFamily:FONT, fontSize:11, marginBottom:2 }}>{a}</div>
+            ))}
+            <div style={{ color:T.textSec, fontFamily:FONT, fontSize:10, marginTop:4 }}>
+              Provável causa: Estado cadastrado errado pra essa Planta/Obra no CSV do SIM. A rota abaixo (e o motorista que você for atribuir) pode sair pro estado errado.
+            </div>
+          </div>
+        )}
         <FreteEstimativa request={req} simClients={simClients} onChange={setFrete}
           driverName={execType==='motorista' ? (selectedDriver?.name||'') : ''}/>
         <div style={{ display:'flex', gap:8, marginBottom:16, marginTop:16 }}>

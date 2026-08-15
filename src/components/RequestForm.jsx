@@ -14,6 +14,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { T, FONT, CARD_TYPES, CARD_SUBTYPES, URGENCY, URGENCY_SLA, IS, LS, BS, SUBTYPES_NF } from '../lib/constants'
 import { todayStr } from '../lib/utils'
+import { descobrirCidadeIBGE } from '../lib/freteCalc'
 import { ClientInput, MunicipioInput } from '../components/UI'
 
 const SUBTYPES_EMBARQUE       = ['troca_tecnica','sinistro','garantia']
@@ -215,6 +216,27 @@ export function RequestForm({ simClients, simClientsError, drivers, onSubmit, on
 
   const [form,   setForm]   = useState(initial)
   const [errors, setErrors] = useState({})
+  // Checa a UF que a Planta/Obra escolhida trouxe (ClientInput preenche
+  // destCity a partir do Estado cadastrado no CSV do SIM — ver onChange
+  // abaixo) contra o cadastro oficial do IBGE. Caso real (2026-08):
+  // "CMAA - Canápolis" cadastrada com Estado=BA (Canápolis é MG) mandou um
+  // motorista pra rota errada sem nenhum aviso na origem do problema — este
+  // é o ponto mais cedo possível pra pegar isso, antes até da solicitação
+  // existir. Mesmo aviso replicado em RequestReviewModal/AssignDriverModal
+  // (passos seguintes do fluxo) pra quem não reparar aqui.
+  const [ufAviso, setUfAviso] = useState('')
+  useEffect(() => {
+    let cancelado = false
+    async function checar() {
+      if (!form.destCity?.m || !form.destCity?.s) { if (!cancelado) setUfAviso(''); return }
+      const achado = await descobrirCidadeIBGE(form.destCity.m)
+      if (!cancelado) setUfAviso(achado && achado.uf !== form.destCity.s
+        ? `"${form.destCity.m}" é em ${achado.uf}, mas está cadastrado como ${form.destCity.s}. Provável Estado errado no CSV do SIM pra essa Planta/Obra.`
+        : '')
+    }
+    checar()
+    return () => { cancelado = true }
+  }, [form.destCity?.m, form.destCity?.s])
   const [saving, setSaving] = useState(false)
   const [step,   setStep]   = useState(1)
   // Modo do chip Motorista/Transportadora na reatribuição (isCardEdit) —
@@ -510,6 +532,11 @@ export function RequestForm({ simClients, simClientsError, drivers, onSubmit, on
                 onChange={c=>{set('clientName',c?.name||'');set('selectedClient',c||null);set('nInternos',[]);if(c?.state)set('destCity',{m:c.city||'',s:c.state})}}
                 simClients={simClients||[]} simClientsError={simClientsError}/>
               {form.clientName && <div style={{ marginTop:4, color:T.verde, fontSize:11, fontFamily:FONT, fontWeight:700 }}>✓ {form.clientName}</div>}
+              {ufAviso && (
+                <div style={{ marginTop:6, padding:'7px 10px', background:T.perigoLight, borderRadius:T.rSm, color:T.perigo, fontFamily:FONT, fontSize:11, fontWeight:600 }}>
+                  ⚠️ {ufAviso}
+                </div>
+              )}
               {fieldErr('clientName')}
             </div>
           )}
