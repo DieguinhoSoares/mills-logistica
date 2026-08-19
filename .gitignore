@@ -3,3 +3,10 @@ dist
 .env
 .env.local
 *.log
+
+# Backup local (scripts/localBackup.mjs) e credenciais de conta de serviço
+# do Firebase — nunca devem ir pro repositório (dado sensível/PII e chave
+# de acesso total ao banco, respectivamente).
+backups-local/
+*serviceAccount*.json
+*firebase-adminsdk*.json
