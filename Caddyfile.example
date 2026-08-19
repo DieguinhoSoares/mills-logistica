@@ -1,0 +1,18 @@
+# Caddyfile de exemplo pra hospedagem própria (ver HOSPEDAGEM-PROPRIA.md).
+# Copie pra "Caddyfile" (sem extensão) na mesma pasta do executável do
+# Caddy, ajuste o hostname e o caminho, e rode `caddy run`.
+#
+# Com hostname (recomendado — Caddy busca e renova o certificado HTTPS
+# automaticamente via Let's Encrypt, sem nenhuma configuração extra):
+mills-frotas.duckdns.org {
+    root * C:\caminho\completo\pra\mills-logistica\dist-local
+    file_server
+}
+
+# Sem hostname (só IP, sem HTTPS — descomente a linha abaixo e comente o
+# bloco acima; navegadores vão mostrar aviso de "não seguro", e notificações
+# push não funcionam sem HTTPS, mas o resto do sistema funciona normal):
+# :80 {
+#     root * C:\caminho\completo\pra\mills-logistica\dist-local
+#     file_server
+# }
