@@ -4,7 +4,7 @@ import { T, FONT, FILIAIS, IS, LS } from '../lib/constants'
 
 function MillsLogoFull() {
   return (
-    <img src="/mills-logistica/mills-logo.png" alt="mills" height="44" style={{ display:'block' }}/>
+    <img src={`${import.meta.env.BASE_URL}mills-logo.png`} alt="mills" height="44" style={{ display:'block' }}/>
   )
 }
 

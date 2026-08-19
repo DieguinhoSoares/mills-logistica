@@ -42,7 +42,7 @@ export function PushInviteBanner({ mostrar, onAtivar, onDispensar }) {
 import { fmt, nfStatusForCard } from '../lib/utils'
 
 export function MillsLogo({ height=32 }) {
-  return <img src="/mills-logistica/mills-logo.png" alt="mills" height={height} style={{ flexShrink:0 }}/>
+  return <img src={`${import.meta.env.BASE_URL}mills-logo.png`} alt="mills" height={height} style={{ flexShrink:0 }}/>
 }
 
 export function MillsPattern({ opacity=0.07, color=T.laranja }) {
