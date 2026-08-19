@@ -118,6 +118,30 @@ export const NF_STATUS = {
   cancelada:  { label:'NF cancelada',   short:'📄 NF CANCELADA',   color:T.textMuted, bg:T.surfaceLow  },
 }
 
+// Cadastro de Veículos (ver useVeiculos em useFirestore.js) — tipo do
+// veículo e tipo de documento em listas fixas, mesmo padrão do Motivo da
+// NF: evita "Seguro"/"seguro"/"SEGURO" divergindo entre cadastros.
+export const TIPO_VEICULO_OPTIONS = [
+  { value:'cavalo',  label:'🚛 Cavalo Mecânico' },
+  { value:'prancha', label:'🚚 Prancha' },
+  { value:'outro',   label:'📋 Outro' },
+]
+
+export const TIPO_DOCUMENTO_VEICULO_OPTIONS = [
+  'CRLV (Licenciamento)', 'Seguro', 'ANTT/RNTRC', 'Cronotacógrafo',
+  'Inspeção Veicular',
+]
+
+// Janelas de vencimento de documento (dias restantes até a validade) —
+// combinado com o usuário: 30d = só aviso, 15d = alerta pedindo ação,
+// 7d (ou já vencido) = crítico, exige confirmação de que a renovação foi
+// solicitada (ver documentoUrgencia em utils.js).
+export const DOC_URGENCIA = {
+  aviso:   { label:'Vence em breve',        dias:30, color:T.info,    bg:T.infoLight    },
+  alerta:  { label:'Requer ação',           dias:15, color:'#B8860B', bg:T.amareloLight },
+  critico: { label:'Urgente — confirme a solicitação de renovação', dias:7, color:T.perigo, bg:T.perigoLight },
+}
+
 // Ordenação de urgência para filas de aprovação (crítico primeiro)
 export const URGENCY_ORDER = { critico: 0, alto: 1, medio: 2, baixo: 3 }
 // Rótulos de SLA exibidos ao usuário (fonte única — não duplicar nas views)

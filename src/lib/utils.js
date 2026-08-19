@@ -1,4 +1,4 @@
-import { WD_SHORT, CARD_TYPES, CARD_SUBTYPES, URGENCY, SUBTYPES_NF } from './constants'
+import { WD_SHORT, CARD_TYPES, CARD_SUBTYPES, URGENCY, SUBTYPES_NF, DOC_URGENCIA } from './constants'
 
 // Antes usava toISOString(), que sempre retorna a data em UTC — entre 21h e
 // meia-noite no horário de Brasília (UTC-3), o UTC já tinha virado o dia
@@ -124,6 +124,49 @@ export function nfStatusForCard(card, nfRequests) {
   if (card.nfConfirmada || registros.some(r => r.status === 'emitida')) return 'emitida'
   if (registros.some(r => r.status === 'solicitada')) return 'solicitada'
   return 'pendente'
+}
+
+// Nível de urgência de um documento de veículo, a partir da data de
+// validade — 3 janelas combinadas com o usuário (ver DOC_URGENCIA em
+// constants.js): 'aviso' (30 dias), 'alerta' (15 dias, pede ação) e
+// 'critico' (7 dias ou já vencido — exige confirmação de que a renovação
+// foi solicitada, ver documentoPrecisaConfirmacao abaixo). null = sem
+// validade cadastrada, ou validade confortável (>30 dias), nada a mostrar.
+export function documentoUrgencia(validade) {
+  if (!validade) return null
+  const dias = Math.floor((new Date(validade) - new Date(todayStr())) / 86400000)
+  if (dias > DOC_URGENCIA.aviso.dias)   return null
+  if (dias > DOC_URGENCIA.alerta.dias)  return 'aviso'
+  if (dias > DOC_URGENCIA.critico.dias) return 'alerta'
+  return 'critico'
+}
+
+// No nível crítico (≤7 dias ou vencido), o documento fica "pendente de
+// confirmação" até o analista marcar explicitamente que já solicitou a
+// renovação (doc.renovacaoSolicitada) — mesmo padrão de gate usado na
+// confirmação de NF (ver nfStatusForCard acima). Enquanto não confirmar,
+// continua contando no lembrete; depois de confirmado, só some quando a
+// validade em si for atualizada (renovação de fato recebida).
+export function documentoPrecisaConfirmacao(documento) {
+  return documentoUrgencia(documento?.validade) === 'critico' && !documento?.renovacaoSolicitada
+}
+
+// Achata todos os documentos de todos os veículos que estão em alguma
+// janela de urgência (aviso/alerta/critico) — usado tanto pelo lembrete da
+// Central de Ações quanto pela seção "Pendentes" do VeiculosModal.
+export function documentosPendentes(veiculos) {
+  const pendentes = []
+  for (const v of (veiculos || [])) {
+    for (const doc of (v.documentos || [])) {
+      const nivel = documentoUrgencia(doc.validade)
+      if (!nivel) continue
+      pendentes.push({ veiculoId:v.id, veiculoPlaca:v.placa, veiculoTipo:v.tipo, documento:doc, nivel })
+    }
+  }
+  // Crítico primeiro, depois alerta, depois aviso — mesma ideia de
+  // priorização do URGENCY_ORDER já usado nas filas de aprovação.
+  const ordem = { critico:0, alerta:1, aviso:2 }
+  return pendentes.sort((a,b) => ordem[a.nivel] - ordem[b.nivel])
 }
 
 // Equipamento reserva (a máquina que sai/é enviada ao cliente, distinta da

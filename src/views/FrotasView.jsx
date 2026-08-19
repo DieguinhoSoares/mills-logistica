@@ -1,10 +1,10 @@
 import { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth }        from '../contexts/AuthContext'
-import { useCards, useRequests, useNotifications, useSimClients, useSapClients, useNfRequests, useConfig, useDrivers, useAllRotogramas, notifyUser } from '../hooks/useFirestore'
+import { useCards, useRequests, useNotifications, useSimClients, useSapClients, useNfRequests, useConfig, useDrivers, useVeiculos, useAllRotogramas, notifyUser } from '../hooks/useFirestore'
 import { MillsLogo, ToastContainer, useToasts, BrazilMap, NotificationBell, ConfirmModal } from '../components/UI'
 import { T, FONT, CARD_TYPES, MONTH_NAMES, BS, IS, NB, SUBTYPES_NF, SHADOW_CARD, BORDER_SUBTLE } from '../lib/constants'
-import { fmt, todayStr, getWeekDays, detectConflicts, getSubtypeLabel, findRelatedPendingRequest, sortByUrgency, sendTeamsNotification, nfStatusForCard } from '../lib/utils'
+import { fmt, todayStr, getWeekDays, detectConflicts, getSubtypeLabel, findRelatedPendingRequest, sortByUrgency, sendTeamsNotification, nfStatusForCard, documentosPendentes } from '../lib/utils'
 import { db } from '../lib/firebase'
 import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore'
 import { ExportModal }      from '../components/ExportModal'
@@ -12,6 +12,7 @@ import { RequestForm }       from '../components/RequestForm'
 import { RotogramaModal }    from '../components/RotogramaModal'
 import { SettingsModal }     from '../components/SettingsModal'
 import { DriversModal }      from '../components/DriversModal'
+import { VeiculosModal }     from '../components/VeiculosModal'
 import { AssignDriverModal } from '../components/AssignDriverModal'
 import { RequestsKanban }    from '../components/RequestsKanban'
 import { CsvUploadModal }    from '../components/CsvUploadModal'
@@ -148,6 +149,7 @@ export function FrotasView() {
   const { notifications, unreadCount, markAllRead, markRead, deleteNotification, enablePush, disablePush } = useNotifications()
   const { toasts, add: addToast, dismiss } = useToasts()
   const { drivers, saveDriver, deleteDriver } = useDrivers()
+  const { veiculos, saveVeiculo, deleteVeiculo } = useVeiculos()
   const { rotogramas } = useAllRotogramas()
 
   const [activeTab,    setActiveTab]    = useState('agenda')
@@ -195,6 +197,7 @@ export function FrotasView() {
   const [painelTab,    setPainelTab]    = useState('resumo')
   const [settingsModal, setSettingsModal] = useState(false)
   const [driversModal,  setDriversModal]  = useState(false)
+  const [veiculosModal, setVeiculosModal] = useState(false)
   const [diagnosticoModal, setDiagnosticoModal] = useState(false)
   const [assignModal,   setAssignModal]   = useState(null)
   const [rotogramaModal,setRotogramaModal]= useState(null)
@@ -452,6 +455,10 @@ export function FrotasView() {
   const nfSemSolicitacao = cardsAtivos.filter(c => nfStatusForCard(c, nfRequests) === 'pendente')
   const totalValidacao = validacoes.length + semExecutorApp.length
   const totalNF        = nfPendentes.length
+  // Documentos de veículo vencendo/vencidos (CRLV, seguro, ANTT etc.) — mesma
+  // lógica de 3 níveis usada dentro do VeiculosModal, reaproveitada aqui só
+  // pra alimentar o contador da Central de Ações.
+  const docsVencendo = useMemo(() => documentosPendentes(veiculos), [veiculos])
 
   // Central de Ações — consolida em uma lista só o que hoje aparece espalhado
   // em badges soltos pela tela (validação, NF, atribuição, solicitações).
@@ -463,6 +470,7 @@ export function FrotasView() {
     { id:'nf',        title:'Confirmar NF emitida',        sub:`${nfPendentes.length} movimentação(ões) pendente(s)`,count:nfPendentes.length,    badgeBg:T.amarelo,  badgeColor:T.text,   onResolve:()=>{setActiveTab('agenda');setPainelTab('val')} },
     { id:'atribuir',  title:'Atribuir motorista',          sub:`${semExecutorApp.length} serviço(s) sem executor`,   count:semExecutorApp.length, badgeBg:T.amarelo, badgeColor:T.text,   onResolve:()=>{setActiveTab('agenda');setPainelTab('val')} },
     { id:'solicitar', title:'Responder solicitações',      sub:`${pending} nova(s) do time solicitante`,             count:pending,                badgeBg:T.info,    badgeColor:'#fff',   onResolve:()=>{setActiveTab('agenda');setPainelTab('sol')} },
+    { id:'docs_veiculo', title:'Renovar documento de veículo', sub:`${docsVencendo.length} documento(s) vencendo ou vencido(s)`, count:docsVencendo.length, badgeBg:T.perigo, badgeColor:'#fff', onResolve:()=>setVeiculosModal(true) },
   ].filter(a => a.count > 0)
   const totalAcoes = centralAcoes.reduce((s,a)=>s+a.count, 0)
 
@@ -671,6 +679,11 @@ export function FrotasView() {
                 <button onClick={()=>{setDriversModal(true);setMaisOpen(false)}}
                   style={{ width:'100%', textAlign:'left', padding:'8px 12px', borderRadius:T.rSm, border:'none', background:'transparent', cursor:'pointer', fontFamily:FONT, fontSize:12, color:T.text }}>
                   👤 Motoristas
+                </button>
+                <button onClick={()=>{setVeiculosModal(true);setMaisOpen(false)}}
+                  style={{ width:'100%', textAlign:'left', padding:'8px 12px', borderRadius:T.rSm, border:'none', background:'transparent', cursor:'pointer', fontFamily:FONT, fontSize:12, color:T.text, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <span>🚚 Veículos</span>
+                  {docsVencendo.length>0&&<span style={{ color:T.perigo, fontSize:10, fontWeight:700 }}>({docsVencendo.length})</span>}
                 </button>
                 <button onClick={()=>{setDiagnosticoModal(true);setMaisOpen(false)}}
                   style={{ width:'100%', textAlign:'left', padding:'8px 12px', borderRadius:T.rSm, border:'none', background:'transparent', cursor:'pointer', fontFamily:FONT, fontSize:12, color:T.text }}>
@@ -1105,7 +1118,8 @@ export function FrotasView() {
           onClose={()=>{setModal(null);setEditCard(null);}}
         />}
         {exportModal&&<ExportModal cards={cards} onClose={()=>setExportModal(false)}/>}
-        {driversModal&&<DriversModal drivers={drivers} onSave={saveDriver} onDelete={deleteDriver} onClose={()=>setDriversModal(false)} onRotograma={d=>{setDriversModal(false);setRotogramaModal(d)}} addToast={addToast}/>}
+        {driversModal&&<DriversModal drivers={drivers} veiculos={veiculos} onSave={saveDriver} onDelete={deleteDriver} onClose={()=>setDriversModal(false)} onRotograma={d=>{setDriversModal(false);setRotogramaModal(d)}} addToast={addToast}/>}
+        {veiculosModal&&<VeiculosModal veiculos={veiculos} drivers={drivers} onSave={saveVeiculo} onDelete={deleteVeiculo} onClose={()=>setVeiculosModal(false)} addToast={addToast} profile={profile}/>}
         {diagnosticoModal&&<DiagnosticoModal simClients={simClients} onClose={()=>setDiagnosticoModal(false)}/>}
         {assignModal&&<AssignDriverModal req={assignModal.req} drivers={drivers} simClients={simClients} cards={cards} onConfirm={handleAssignConfirm} onCancel={()=>setAssignModal(null)}/>}
         {pendingCardForm&&<AssignDriverModal

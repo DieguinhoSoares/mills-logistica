@@ -726,6 +726,31 @@ export function useDrivers() {
   return { drivers, saveDriver, deleteDriver }
 }
 
+// Cadastro de Veículos (tipo, modelo, placa, motorista vinculado,
+// documentos/licenças) — mesmo padrão do useDrivers acima. Documentos ficam
+// embutidos no próprio documento do veículo (array `documentos`), não numa
+// subcoleção — lista pequena por veículo, não precisa de paginação própria.
+export function useVeiculos() {
+  const [veiculos, setVeiculos] = useState([])
+  useEffect(() => {
+    const q = query(collection(db,'veiculos'), orderBy('placa','asc'))
+    const unsub = onSnapshot(q,
+      snap => setVeiculos(snap.docs.map(d=>({ id:d.id, ...d.data() }))),
+      () => {}
+    )
+    return unsub
+  }, [])
+  const saveVeiculo = async veiculo => {
+    const { id, ...data } = veiculo
+    data.updatedAt = serverTimestamp()
+    Object.keys(data).forEach(k => { if (data[k] === undefined) delete data[k] })
+    if (id) await updateDoc(doc(db,'veiculos',id), data)
+    else { data.createdAt = serverTimestamp(); await addDoc(collection(db,'veiculos'), data) }
+  }
+  const deleteVeiculo = id => deleteDoc(doc(db,'veiculos',id))
+  return { veiculos, saveVeiculo, deleteVeiculo }
+}
+
 export function usePendingUsers() {
   const [pendingUsers, setPendingUsers] = useState([])
   useEffect(() => {
