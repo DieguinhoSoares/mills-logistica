@@ -75,7 +75,41 @@ export function VeiculosModal({ veiculos, drivers, onSave, onDelete, onClose, ad
   const set = (k,v) => setForm(p => ({ ...p, [k]:v }))
 
   const abrirNova   = () => { setForm(blankVeiculo); setNovoDoc(blankDocumento) }
-  const abrirEdicao = v  => { setForm({ ...blankVeiculo, ...v }); setNovoDoc(blankDocumento) }
+  // Ao abrir um veículo pra editar, migra sozinho qualquer documento salvo
+  // ANTES da correção do limite de 1MB (quando o arquivo ainda ficava
+  // embutido direto no registro do veículo, em `arquivoUrl`) — move o
+  // conteúdo pra subcoleção `arquivos` e deixa só a referência (arquivoId)
+  // no registro do veículo. Sem isso, veículos com documentos antigos
+  // continuariam travando ao tentar adicionar um novo (achado real: 3
+  // documentos legados quase no limite + 1 novo = estoura de novo).
+  const abrirEdicao = async v => {
+    setForm({ ...blankVeiculo, ...v })
+    setNovoDoc(blankDocumento)
+    const legados = (v.documentos||[]).filter(d => d.arquivoUrl && !d.arquivoId)
+    if (legados.length === 0) return
+    const novaLista = []
+    for (const d of (v.documentos||[])) {
+      if (d.arquivoUrl && !d.arquivoId) {
+        const arquivoId = `doc_${Date.now()}_${Math.random().toString(36).slice(2,8)}`
+        try {
+          await setDoc(doc(db,'veiculos',v.id,'arquivos',arquivoId), { base64:d.arquivoUrl, nome:d.arquivoNome||'arquivo', criadoEm:serverTimestamp() })
+          const { arquivoUrl, ...resto } = d
+          novaLista.push({ ...resto, arquivoId })
+        } catch (err) {
+          console.error('Erro ao migrar documento legado:', err)
+          novaLista.push(d)
+        }
+      } else {
+        novaLista.push(d)
+      }
+    }
+    try {
+      await onSave({ ...v, documentos:novaLista })
+      setForm(p => (p?.id===v.id ? { ...p, documentos:novaLista } : p))
+    } catch (err) {
+      console.error('Erro ao salvar migração de documentos:', err)
+    }
+  }
 
   const handleSalvar = async () => {
     if (!form.placa.trim()) { addToast('Informe a placa do veículo.', 'error'); return }
