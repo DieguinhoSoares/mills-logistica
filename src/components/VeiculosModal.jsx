@@ -5,9 +5,32 @@
 // ============================================================
 import { useState } from 'react'
 import { motion } from 'framer-motion'
+import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore'
+import { db } from '../lib/firebase'
 import { T, FONT, BS, IS, LS, TIPO_VEICULO_OPTIONS, TIPO_DOCUMENTO_VEICULO_OPTIONS, DOC_URGENCIA } from '../lib/constants'
 import { fmt, todayStr, documentoUrgencia, documentoPrecisaConfirmacao, documentosPendentes, arquivoParaBase64Documento } from '../lib/utils'
 import { ConfirmModal } from './UI'
+
+// O base64 do arquivo NÃO fica no array `documentos` do veículo — um veículo
+// com vários documentos grandes (AET de cada estado, CRLV, seguro...) estoura
+// fácil o limite de 1MB por documento do Firestore, que é compartilhado por
+// TODO o registro do veículo (achado real: 2º AET de ~126KB, que sozinho é
+// pequeno, quebrou ao salvar porque a SOMA com os documentos já anexados
+// passou de 1.048.576 bytes). Cada arquivo vira sua própria subcoleção
+// `veiculos/{veiculoId}/arquivos/{arquivoId}` — cada um com seu próprio
+// limite de 1MB isolado — e o array `documentos` guarda só a referência
+// (arquivoId), não o conteúdo, então nunca estoura mesmo com muitos anexos.
+async function baixarArquivo(veiculoId, arquivoId, nomeArquivo) {
+  const snap = await getDoc(doc(db,'veiculos',veiculoId,'arquivos',arquivoId))
+  if (!snap.exists()) throw new Error('Arquivo não encontrado.')
+  const { base64 } = snap.data()
+  const a = document.createElement('a')
+  a.href = base64
+  a.download = nomeArquivo || 'documento'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+}
 
 const blankVeiculo = { tipo:'truck', modelo:'', placa:'', motoristaId:'', ativo:true, documentos:[] }
 const blankDocumento = { tipoDoc:'', tipoDocOutro:'', numero:'', validade:'' }
@@ -31,6 +54,7 @@ export function VeiculosModal({ veiculos, drivers, onSave, onDelete, onClose, ad
   const [novoDoc, setNovoDoc]   = useState(blankDocumento)
   const [saving, setSaving]     = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [baixando, setBaixando] = useState(null) // arquivoId do documento sendo baixado agora
   const [deleting, setDeleting] = useState(null) // veículo sendo confirmado pra exclusão
 
   const pendentes = documentosPendentes(veiculos)
@@ -72,13 +96,15 @@ export function VeiculosModal({ veiculos, drivers, onSave, onDelete, onClose, ad
     if (!tipoFinal) { addToast('Escolha ou digite o tipo do documento.', 'error'); return }
     if (!novoDoc.validade) { addToast('Informe a data de validade.', 'error'); return }
 
-    let arquivoUrl = ''
+    let arquivoId = ''
     let arquivoNome = ''
     const arquivo = novoDoc._arquivo
     if (arquivo) {
       setUploading(true)
       try {
-        arquivoUrl = await arquivoParaBase64Documento(arquivo)
+        const base64 = await arquivoParaBase64Documento(arquivo)
+        arquivoId = `doc_${Date.now()}_${Math.random().toString(36).slice(2,8)}`
+        await setDoc(doc(db,'veiculos',form.id,'arquivos',arquivoId), { base64, nome:arquivo.name, criadoEm:serverTimestamp() })
         arquivoNome = arquivo.name
       } catch (err) {
         console.error('Erro ao anexar arquivo:', err)
@@ -91,7 +117,7 @@ export function VeiculosModal({ veiculos, drivers, onSave, onDelete, onClose, ad
 
     const documento = {
       tipo: tipoFinal, numero: novoDoc.numero.trim(), validade: novoDoc.validade,
-      arquivoUrl, arquivoNome,
+      arquivoId, arquivoNome,
       renovacaoSolicitada: false,
       criadoEm: new Date().toISOString(),
     }
@@ -106,12 +132,26 @@ export function VeiculosModal({ veiculos, drivers, onSave, onDelete, onClose, ad
   }
 
   const handleExcluirDocumento = async idx => {
+    const documento = form.documentos[idx]
     try {
       await salvarDocumentos(form.documentos.filter((_,i) => i !== idx))
+      if (documento.arquivoId) await deleteDoc(doc(db,'veiculos',form.id,'arquivos',documento.arquivoId)).catch(()=>{})
       addToast('Documento removido.', 'info')
     } catch (err) {
       console.error('Erro ao remover documento:', err)
       addToast('Erro ao remover. Tente novamente.', 'error')
+    }
+  }
+
+  const handleBaixarDocumento = async d => {
+    setBaixando(d.arquivoId)
+    try {
+      await baixarArquivo(form.id, d.arquivoId, d.arquivoNome)
+    } catch (err) {
+      console.error('Erro ao baixar arquivo:', err)
+      addToast('Erro ao baixar arquivo. Tente novamente.', 'error')
+    } finally {
+      setBaixando(null)
     }
   }
 
@@ -241,7 +281,15 @@ export function VeiculosModal({ veiculos, drivers, onSave, onDelete, onClose, ad
                         <div style={{ fontFamily:FONT, fontSize:10, color:T.textMuted }}>
                           {d.numero && `Nº ${d.numero} · `}Validade: {fmt(d.validade)}
                         </div>
-                        {d.arquivoUrl && (
+                        {d.arquivoId && (
+                          <button onClick={()=>handleBaixarDocumento(d)} disabled={baixando===d.arquivoId}
+                            style={{ background:'none', border:'none', padding:0, textAlign:'left', cursor:'pointer', fontFamily:FONT, fontSize:10, color:T.info, textDecoration:'underline' }}>
+                            {baixando===d.arquivoId ? '⏳ Baixando...' : `📥 Baixar ${d.arquivoNome||'arquivo'}`}
+                          </button>
+                        )}
+                        {/* Compat: documento salvo antes da migração pra subcoleção
+                            de arquivos ainda tem o base64 direto em arquivoUrl. */}
+                        {!d.arquivoId && d.arquivoUrl && (
                           <a href={d.arquivoUrl} target="_blank" rel="noopener noreferrer" style={{ fontFamily:FONT, fontSize:10, color:T.info, textDecoration:'underline' }}>
                             📥 Baixar {d.arquivoNome||'arquivo'}
                           </a>
@@ -290,6 +338,9 @@ export function VeiculosModal({ veiculos, drivers, onSave, onDelete, onClose, ad
         confirmLabel="🗑 Excluir"
         onConfirm={async()=>{
           try {
+            for (const documento of (deleting.documentos||[])) {
+              if (documento.arquivoId) await deleteDoc(doc(db,'veiculos',deleting.id,'arquivos',documento.arquivoId)).catch(()=>{})
+            }
             await onDelete(deleting.id)
             addToast('Veículo removido.', 'info')
             setForm(null)
