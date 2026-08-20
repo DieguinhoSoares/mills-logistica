@@ -7,9 +7,22 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from '../lib/firebase'
-import { T, FONT, BS, IS, LS, TIPO_VEICULO_OPTIONS, TIPO_DOCUMENTO_VEICULO_OPTIONS, DOC_URGENCIA } from '../lib/constants'
+import { T, FONT, BS, IS, LS, TIPO_VEICULO_OPTIONS, TIPO_DOCUMENTO_VEICULO_OPTIONS, DOC_URGENCIA, MONTH_NAMES } from '../lib/constants'
 import { fmt, todayStr, documentoUrgencia, documentoPrecisaConfirmacao, documentosPendentes, arquivoParaBase64Documento } from '../lib/utils'
 import { ConfirmModal } from './UI'
+
+// O seletor nativo de data do navegador pode mostrar os campos em ordem
+// Mês/Dia (locale em inglês) em vez de Dia/Mês — achado real: um analista
+// digitou "06/09" pensando em "6 de setembro" e o campo leu como "9 de
+// junho" (já passado), bloqueando o salvamento sem deixar claro o motivo.
+// Essa confirmação por extenso deixa a data escolhida inequívoca na hora,
+// não importa como o navegador do usuário está configurado.
+function validadeExtenso(iso) {
+  if (!iso) return ''
+  const [y,m,d] = iso.split('-').map(Number)
+  if (!y || !m || !d) return ''
+  return `${d} de ${MONTH_NAMES[m-1]?.toLowerCase()} de ${y}`
+}
 
 // O base64 do arquivo NÃO fica no array `documentos` do veículo — um veículo
 // com vários documentos grandes (AET de cada estado, CRLV, seguro...) estoura
@@ -95,6 +108,13 @@ export function VeiculosModal({ veiculos, drivers, onSave, onDelete, onClose, ad
     const tipoFinal = novoDoc.tipoDoc === 'outro' ? novoDoc.tipoDocOutro.trim() : novoDoc.tipoDoc
     if (!tipoFinal) { addToast('Escolha ou digite o tipo do documento.', 'error'); return }
     if (!novoDoc.validade) { addToast('Informe a data de validade.', 'error'); return }
+    // Mensagem explícita (em vez de deixar só o navegador bloquear em
+    // silêncio) — cobre o caso real de alguém digitar dia/mês trocados e o
+    // campo aceitar uma data que já passou sem avisar por quê.
+    if (novoDoc.validade < todayStr()) {
+      addToast(`A validade informada (${validadeExtenso(novoDoc.validade)}) já passou. Confira se não trocou o dia pelo mês.`, 'error')
+      return
+    }
 
     let arquivoId = ''
     let arquivoNome = ''
@@ -319,6 +339,11 @@ export function VeiculosModal({ veiculos, drivers, onSave, onDelete, onClose, ad
                     )}
                     <input value={novoDoc.numero} onChange={e=>setNovoDoc(p=>({...p,numero:e.target.value}))} placeholder="Número (opcional)" style={{ ...IS, fontSize:11 }}/>
                     <input type="date" value={novoDoc.validade} onChange={e=>setNovoDoc(p=>({...p,validade:e.target.value}))} min={todayStr()} style={{ ...IS, fontSize:11 }}/>
+                    {novoDoc.validade && (
+                      <div style={{ fontFamily:FONT, fontSize:10, fontWeight:700, color:T.laranja }}>
+                        → {validadeExtenso(novoDoc.validade)} — confira antes de adicionar
+                      </div>
+                    )}
                     <input type="file" onChange={e=>setNovoDoc(p=>({...p,_arquivo:e.target.files?.[0]||null}))} style={{ fontFamily:FONT, fontSize:10 }}/>
                     <div style={{ fontFamily:FONT, fontSize:9, color:T.textMuted }}>Foto: comprimida automaticamente. PDF: até ~700KB.</div>
                     <button onClick={handleAdicionarDocumento} disabled={uploading}
