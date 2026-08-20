@@ -9,7 +9,7 @@ import { T, FONT, BS, IS, LS, TIPO_VEICULO_OPTIONS, TIPO_DOCUMENTO_VEICULO_OPTIO
 import { fmt, todayStr, documentoUrgencia, documentoPrecisaConfirmacao, documentosPendentes, arquivoParaBase64Documento } from '../lib/utils'
 import { ConfirmModal } from './UI'
 
-const blankVeiculo = { tipo:'cavalo', modelo:'', placa:'', motoristaId:'', ativo:true, documentos:[] }
+const blankVeiculo = { tipo:'truck', modelo:'', placa:'', motoristaId:'', ativo:true, documentos:[] }
 const blankDocumento = { tipoDoc:'', tipoDocOutro:'', numero:'', validade:'' }
 
 function tipoVeiculoLabel(tipo) {

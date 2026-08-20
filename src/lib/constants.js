@@ -1,3 +1,5 @@
+import { VEICULOS } from './freteCalc'
+
 // ─── MILLS BRAND — Manual da Marca Abril 2021 ────────────────────────────────
 // Fonte: IBM Plex Sans — unificada em todo o app (antes dividida entre
 // Nunito no login/UI e IBM Plex Sans/Barlow Condensed no resto).
@@ -119,12 +121,14 @@ export const NF_STATUS = {
 }
 
 // Cadastro de Veículos (ver useVeiculos em useFirestore.js) — tipo do
-// veículo e tipo de documento em listas fixas, mesmo padrão do Motivo da
-// NF: evita "Seguro"/"seguro"/"SEGURO" divergindo entre cadastros.
+// veículo é o MESMO conjunto usado na tabela de preços de frete (VEICULOS,
+// em freteCalc.js), pra não ter duas listas de "tipo de veículo" divergindo
+// entre a cotação de frete e o cadastro de frota. "frete_rodando" fica de
+// fora — não é um veículo de verdade, é a opção "sem embarque" do frete.
+const ICONE_TIPO_VEICULO = { '3/4':'🚐', truck:'🚛', bitruck:'🚛', prancha3:'🚚', prancha4:'🚚', bitrem9:'🚚' }
 export const TIPO_VEICULO_OPTIONS = [
-  { value:'cavalo',  label:'🚛 Cavalo Mecânico' },
-  { value:'prancha', label:'🚚 Prancha' },
-  { value:'outro',   label:'📋 Outro' },
+  ...VEICULOS.filter(v => v.id !== 'frete_rodando').map(v => ({ value:v.id, label:`${ICONE_TIPO_VEICULO[v.id]||'🚚'} ${v.label}` })),
+  { value:'outro', label:'📋 Outro' },
 ]
 
 export const TIPO_DOCUMENTO_VEICULO_OPTIONS = [

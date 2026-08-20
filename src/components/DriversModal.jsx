@@ -119,7 +119,7 @@ export function DriversModal({ drivers, veiculos=[], onSave, onDelete, onClose, 
                   <div style={{ fontFamily:FONT, fontSize:10, color:T.textMuted }}>{d.unit||'—'} {d.active===false?'· 🔴 Inativo':''}</div>
                   {veiculosDoMotorista.length>0&&(
                     <div style={{ fontFamily:FONT, fontSize:10, color:T.laranja, marginTop:2 }}>
-                      {veiculosDoMotorista.map(v=>`${v.tipo==='cavalo'?'🚛':v.tipo==='prancha'?'🚚':'📋'} ${v.placa}`).join(' · ')}
+                      {veiculosDoMotorista.map(v=>`${(TIPO_VEICULO_LABEL[v.tipo]||'📋').split(' ')[0]} ${v.placa}`).join(' · ')}
                     </div>
                   )}
                 </div>
