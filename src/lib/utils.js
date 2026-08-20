@@ -169,6 +169,49 @@ export function documentosPendentes(veiculos) {
   return pendentes.sort((a,b) => ordem[a.nivel] - ordem[b.nivel])
 }
 
+// Documento de veículo (CRLV, seguro, ANTT etc.) — guardado como base64 no
+// próprio documento do veículo no Firestore (mesmo padrão já usado pra
+// card.conclusaoFoto), evitando depender do Firebase Storage (que hoje exige
+// o plano pago Blaze pra ser habilitado num projeto novo). Foto é
+// recomprimida via canvas, igual comprimirImagem() em MotoristaView.jsx;
+// outros arquivos (PDF etc.) não dá pra comprimir no navegador, então têm um
+// limite de tamanho — acima disso o Firestore recusaria salvar (limite de
+// 1MB por documento, e o base64 já soma ~33% de overhead sozinho).
+const TAMANHO_MAXIMO_DOCUMENTO = 700 * 1024 // ~700KB
+
+export async function arquivoParaBase64Documento(file) {
+  if (file.type.startsWith('image/')) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = e => {
+        const img = new Image()
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          let { width, height } = img
+          const maxWidth = 1400
+          if (width > maxWidth) { height = Math.round(height * maxWidth / width); width = maxWidth }
+          canvas.width = width; canvas.height = height
+          canvas.getContext('2d').drawImage(img, 0, 0, width, height)
+          resolve(canvas.toDataURL('image/jpeg', 0.75))
+        }
+        img.onerror = reject
+        img.src = e.target.result
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+  }
+  if (file.size > TAMANHO_MAXIMO_DOCUMENTO) {
+    throw new Error('Arquivo maior que 700KB — comprima o PDF ou anexe uma foto do documento no lugar.')
+  }
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = e => resolve(e.target.result)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
 // Equipamento reserva (a máquina que sai/é enviada ao cliente, distinta da
 // que retorna em card.nInterno) — lê o array bruto nInternosReserva primeiro,
 // já que card.machine é uma string achatada calculada uma vez na gravação e

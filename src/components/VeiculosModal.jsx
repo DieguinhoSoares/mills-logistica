@@ -6,8 +6,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { T, FONT, BS, IS, LS, TIPO_VEICULO_OPTIONS, TIPO_DOCUMENTO_VEICULO_OPTIONS, DOC_URGENCIA } from '../lib/constants'
-import { fmt, todayStr, documentoUrgencia, documentoPrecisaConfirmacao, documentosPendentes } from '../lib/utils'
-import { uploadDocumentoVeiculo, excluirDocumentoVeiculo } from '../lib/storage'
+import { fmt, todayStr, documentoUrgencia, documentoPrecisaConfirmacao, documentosPendentes, arquivoParaBase64Documento } from '../lib/utils'
 import { ConfirmModal } from './UI'
 
 const blankVeiculo = { tipo:'cavalo', modelo:'', placa:'', motoristaId:'', ativo:true, documentos:[] }
@@ -57,10 +56,8 @@ export function VeiculosModal({ veiculos, drivers, onSave, onDelete, onClose, ad
   }
 
   // Documentos são salvos na hora (não esperam o botão "Salvar veículo") —
-  // envolvem upload de arquivo, então precisam ser autocontidos: se o
-  // analista fechar o modal sem clicar em "Salvar veículo", um documento já
-  // anexado não pode ficar órfão (arquivo subido no Storage mas nunca
-  // referenciado em lugar nenhum). Sempre parte do dado mais recente vindo
+  // se o analista fechar o modal sem clicar em "Salvar veículo", o documento
+  // já anexado não pode se perder. Sempre parte do dado mais recente vindo
   // de `veiculos` (prop), não do rascunho local `form`, pra não sobrescrever
   // uma mudança concorrente feita por outra pessoa nos campos básicos.
   const salvarDocumentos = async novaLista => {
@@ -75,12 +72,14 @@ export function VeiculosModal({ veiculos, drivers, onSave, onDelete, onClose, ad
     if (!tipoFinal) { addToast('Escolha ou digite o tipo do documento.', 'error'); return }
     if (!novoDoc.validade) { addToast('Informe a data de validade.', 'error'); return }
 
-    let anexo = null
+    let arquivoUrl = ''
+    let arquivoNome = ''
     const arquivo = novoDoc._arquivo
     if (arquivo) {
       setUploading(true)
       try {
-        anexo = await uploadDocumentoVeiculo(form.id, arquivo)
+        arquivoUrl = await arquivoParaBase64Documento(arquivo)
+        arquivoNome = arquivo.name
       } catch (err) {
         console.error('Erro ao anexar arquivo:', err)
         addToast(err.message || 'Erro ao anexar arquivo. Tente novamente.', 'error')
@@ -92,7 +91,7 @@ export function VeiculosModal({ veiculos, drivers, onSave, onDelete, onClose, ad
 
     const documento = {
       tipo: tipoFinal, numero: novoDoc.numero.trim(), validade: novoDoc.validade,
-      arquivoUrl: anexo?.url || '', arquivoCaminho: anexo?.caminho || '', arquivoNome: anexo?.nome || '',
+      arquivoUrl, arquivoNome,
       renovacaoSolicitada: false,
       criadoEm: new Date().toISOString(),
     }
@@ -107,10 +106,8 @@ export function VeiculosModal({ veiculos, drivers, onSave, onDelete, onClose, ad
   }
 
   const handleExcluirDocumento = async idx => {
-    const doc = form.documentos[idx]
     try {
       await salvarDocumentos(form.documentos.filter((_,i) => i !== idx))
-      if (doc.arquivoCaminho) await excluirDocumentoVeiculo(doc.arquivoCaminho)
       addToast('Documento removido.', 'info')
     } catch (err) {
       console.error('Erro ao remover documento:', err)
@@ -275,9 +272,10 @@ export function VeiculosModal({ veiculos, drivers, onSave, onDelete, onClose, ad
                     <input value={novoDoc.numero} onChange={e=>setNovoDoc(p=>({...p,numero:e.target.value}))} placeholder="Número (opcional)" style={{ ...IS, fontSize:11 }}/>
                     <input type="date" value={novoDoc.validade} onChange={e=>setNovoDoc(p=>({...p,validade:e.target.value}))} min={todayStr()} style={{ ...IS, fontSize:11 }}/>
                     <input type="file" onChange={e=>setNovoDoc(p=>({...p,_arquivo:e.target.files?.[0]||null}))} style={{ fontFamily:FONT, fontSize:10 }}/>
+                    <div style={{ fontFamily:FONT, fontSize:9, color:T.textMuted }}>Foto: comprimida automaticamente. PDF: até ~700KB.</div>
                     <button onClick={handleAdicionarDocumento} disabled={uploading}
                       style={{ ...BS, background:uploading?T.textMuted:T.laranjaLight, color:uploading?'white':T.laranja, border:`1px solid ${T.laranja}30`, fontWeight:700, fontSize:11 }}>
-                      {uploading ? '⏳ Enviando arquivo...' : '+ Adicionar documento'}
+                      {uploading ? '⏳ Processando arquivo...' : '+ Adicionar documento'}
                     </button>
                   </div>
                 </>
@@ -292,9 +290,6 @@ export function VeiculosModal({ veiculos, drivers, onSave, onDelete, onClose, ad
         confirmLabel="🗑 Excluir"
         onConfirm={async()=>{
           try {
-            for (const d of (deleting.documentos||[])) {
-              if (d.arquivoCaminho) await excluirDocumentoVeiculo(d.arquivoCaminho)
-            }
             await onDelete(deleting.id)
             addToast('Veículo removido.', 'info')
             setForm(null)

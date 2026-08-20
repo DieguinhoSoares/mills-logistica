@@ -2,7 +2,6 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
-import { getStorage } from 'firebase/storage'
 import { getMessaging, isSupported } from 'firebase/messaging'
 
 const firebaseConfig = {
@@ -17,11 +16,6 @@ const firebaseConfig = {
 export const app     = initializeApp(firebaseConfig)
 export const auth    = getAuth(app)
 export const db      = getFirestore(app)
-// Storage — usado pelo cadastro de Veículos (upload/download de documentos:
-// CRLV, seguro, ANTT etc. — ver src/lib/storage.js). Precisa da regra
-// correspondente publicada no Firebase Console (Storage → Rules), não
-// gerenciada por este repositório — ver comentário em storage.js.
-export const storage = getStorage(app)
 // Cloud Functions do Firebase foi trocado por endpoints na Vercel (free,
 // sem exigir plano pago) — ver src/lib/vercelApi.js. Não precisa mais de
 // getFunctions aqui.
