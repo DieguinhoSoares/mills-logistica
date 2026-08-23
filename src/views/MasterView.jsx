@@ -8,7 +8,7 @@ import { detectConflicts, fmt, getSubtypeLabel, sortByUrgency } from '../lib/uti
 import { doc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { salvarWhatsAppConfig } from '../lib/vercelApi'
-import { useCards, useRequests, useNotifications, useConfig, usePendingUsers, useManagerialRequests, runDailyBackup, useMessages, useAllUsers, useBackupStatus, notifyUser, backfillSeqIds, backfillKmHistorico, approveAsSupervisor, refuseAsSupervisor, approveAsGerente, refuseAsGerente, useFalhasSilenciosas } from '../hooks/useFirestore'
+import { useCards, useRequests, useNotifications, useConfig, usePendingUsers, useManagerialRequests, runDailyBackup, useMessages, useAllUsers, useBackupStatus, notifyUser, backfillSeqIds, backfillKmHistorico, approveAsSupervisor, refuseAsSupervisor, approveAsGerente, refuseAsGerente, useFalhasSilenciosas, useEmbarques } from '../hooks/useFirestore'
 import { FreteEstimativa } from '../components/FreteEstimativa'
 import { coordenadaForaDaUF } from '../lib/freteCalc'
 import { MessageThread }    from '../components/MessageThread'
@@ -106,6 +106,7 @@ export function MasterView({ simClients = [] }) {
   const { cards, deleteCard }                       = useCards()
   const { requests, respondRequest }                = useRequests('master')
   const { requests: mgrReqs }                       = useManagerialRequests()
+  const { embarques }                               = useEmbarques()
   const { notifications, unreadCount, markAllRead, markRead, deleteNotification, enablePush, disablePush } = useNotifications()
   const { config, saveConfig }                      = useConfig()
   const { toasts, add:addToast, dismiss }           = useToasts()
@@ -519,7 +520,7 @@ export function MasterView({ simClients = [] }) {
           </div>
         )}
 
-        {tab==='kpis' && <KPIView cards={cards} requests={requests} simClients={simClients}
+        {tab==='kpis' && <KPIView cards={cards} requests={requests} simClients={simClients} embarques={embarques}
           onNavigateToAprovacoes={()=>{ setTab('aprovacao'); setFilterAprov('todos') }}/>}
 
         {tab==='map' && (

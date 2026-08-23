@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { T, FONT, CARD_TYPES, URGENCY, BS, SHADOW_CARD, BORDER_SUBTLE } from '../lib/constants'
+import { T, FONT, CARD_TYPES, URGENCY, BS, SHADOW_CARD, BORDER_SUBTLE, PESQUISA_SATISFACAO_PERGUNTAS } from '../lib/constants'
 import { resumirEmissoes } from '../lib/emissoes'
 import { todayStr, getWeekDays } from '../lib/utils'
 
@@ -153,7 +153,7 @@ function DayChart({ title, dias, meta }) {
   )
 }
 
-export function KPIView({ cards, requests, simClients, onNavigateToAprovacoes }) {
+export function KPIView({ cards, requests, simClients, embarques=[], onNavigateToAprovacoes }) {
   // Filtro por unidade — chips no topo, recalcula tudo abaixo. 'todas' não
   // filtra nada (comportamento igual ao de antes de existir esse filtro).
   const [unidadeFiltro, setUnidadeFiltro] = useState('todas')
@@ -218,6 +218,21 @@ export function KPIView({ cards, requests, simClients, onNavigateToAprovacoes })
   // Mills pra divulgação externa. Ver src/lib/emissoes.js: consumo médio por
   // veículo ainda marcado "a confirmar" com o time de Meio Ambiente.
   const emissoes = useMemo(() => resumirEmissoes(cardsPeriodo, simClients), [cardsPeriodo, simClients])
+
+  // Pesquisa de satisfação do Checklist de Embarque — não filtra por período
+  // (volume ainda baixo no início; olhar tudo em vez de zerar o painel toda
+  // semana). Só embarques autorizados geram link de cliente, então
+  // "enviadas" = tem clienteToken; "respondidas" = cliente confirmou.
+  const pesquisaStats = useMemo(() => {
+    const enviadas = embarques.filter(e => e.clienteToken)
+    const respondidas = enviadas.filter(e => e.clienteConfirmacao)
+    const medias = PESQUISA_SATISFACAO_PERGUNTAS.map(p => {
+      const notas = respondidas.map(e => e.clientePesquisa?.[p.id]).filter(Boolean)
+      const media = notas.length ? notas.reduce((s,n)=>s+n,0)/notas.length : null
+      return { ...p, media, qtd:notas.length }
+    })
+    return { totalEnviadas:enviadas.length, totalRespondidas:respondidas.length, medias }
+  }, [embarques])
 
   const stats = useMemo(() => {
     const hoje = todayStr()
@@ -498,6 +513,27 @@ export function KPIView({ cards, requests, simClients, onNavigateToAprovacoes })
           <KPICard title="Sem Dado"         value={emissoes.servicosSemDado}                                icon="⚠️" color={T.perigo}   bg={T.perigoLight}  sub="Serviços sem km ou consumo cadastrado"/>
         </div>
       </div>
+
+      {pesquisaStats.totalEnviadas > 0 && (
+        <div style={{ marginTop:20 }}>
+          <h3 style={{ fontFamily:FONT, fontWeight:800, fontSize:14, color:T.text, margin:'0 0 10px' }}>🌟 Pesquisa de Satisfação — Embarques</h3>
+          <div style={{ background:T.surface, border:T.borderSubtle, borderRadius:16, boxShadow:T.shadowCard, padding:16 }}>
+            <div style={{ fontFamily:FONT, fontSize:11, color:T.textMuted, marginBottom:12 }}>
+              {pesquisaStats.totalRespondidas} de {pesquisaStats.totalEnviadas} confirmação(ões) de recebimento enviada(s) respondida(s)
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {pesquisaStats.medias.map(p => (
+                <div key={p.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10 }}>
+                  <span style={{ fontFamily:FONT, fontSize:11.5, color:T.textSec, flex:1 }}>{p.texto}</span>
+                  {p.media
+                    ? <span style={{ fontFamily:FONT, fontSize:11.5, fontWeight:700, color:T.amarelo, whiteSpace:'nowrap' }}>{'★'.repeat(Math.round(p.media))}{'☆'.repeat(5-Math.round(p.media))} <span style={{ color:T.textMuted, fontWeight:400 }}>({p.media.toFixed(1)} · {p.qtd})</span></span>
+                    : <span style={{ fontFamily:FONT, fontSize:11, color:T.textMuted }}>sem respostas</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {stats.total===0 && (
         <div style={{ textAlign:'center', padding:'40px 0', color:T.textMuted, fontFamily:FONT, marginTop:20 }}>

@@ -8,7 +8,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { doc, getDoc } from 'firebase/firestore'
 import { db } from '../lib/firebase'
-import { T, FONT, BS, IS, LS, FILIAIS_EMBARQUE, EMBARQUE_CHECKLIST_ITENS, EMBARQUE_GRUPOS, EMBARQUE_FOTOS_EQUIPAMENTO } from '../lib/constants'
+import { T, FONT, BS, IS, LS, FILIAIS_EMBARQUE, EMBARQUE_CHECKLIST_ITENS, EMBARQUE_GRUPOS, EMBARQUE_FOTOS_EQUIPAMENTO, PESQUISA_SATISFACAO_PERGUNTAS } from '../lib/constants'
 import { useAuth } from '../contexts/AuthContext'
 
 const STATUS_COR = { ok:T.sucesso, nok:T.perigo, na:T.textMuted }
@@ -67,7 +67,11 @@ export function EmbarquesModal({ embarques, onSave, onClose, addToast }) {
   const handleFinalizar = async decisao => {
     setFinalizando(true)
     try {
-      await onSave({ id:embarqueAtual.id, embarcadorToken:embarqueAtual.embarcadorToken, status:'finalizado', decisao, liberadoPor:profile?.name||'Frotas', liberadoEm:new Date().toISOString() })
+      const patch = { id:embarqueAtual.id, embarcadorToken:embarqueAtual.embarcadorToken, status:'finalizado', decisao, liberadoPor:profile?.name||'Frotas', liberadoEm:new Date().toISOString() }
+      // Link do cliente só existe se a saída foi autorizada — não faz
+      // sentido mandar confirmação de recebimento de um embarque bloqueado.
+      if (decisao==='autorizado') patch.clienteToken = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)
+      await onSave(patch)
       addToast(decisao==='autorizado' ? '✅ Embarque autorizado!' : '🚫 Embarque bloqueado.', decisao==='autorizado'?'success':'info')
     } catch (err) {
       console.error('Erro ao finalizar checklist:', err)
@@ -201,6 +205,46 @@ export function EmbarquesModal({ embarques, onSave, onClose, addToast }) {
                       <button onClick={()=>handleFinalizar('autorizado')} disabled={finalizando||itensNok.length>0}
                         style={{ ...BS, flex:1, background:itensNok.length>0?T.textMuted:T.sucesso, color:'white', fontWeight:700, fontSize:11, padding:'10px 0' }}>✅ Autorizar saída</button>
                     </div>
+                  </div>
+                )}
+
+                {embarqueAtual.status==='finalizado' && embarqueAtual.decisao==='autorizado' && !embarqueAtual.clienteConfirmacao && (
+                  <div style={{ borderTop:`1px solid ${T.border}`, paddingTop:12, display:'flex', flexDirection:'column', gap:8 }}>
+                    <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:T.text }}>📤 Enviar confirmação pro cliente</div>
+                    {(() => {
+                      const linkCliente = `${window.location.origin}${window.location.pathname}?cliente=${embarqueAtual.clienteToken}`
+                      const textoWhats = `Olá! Seu equipamento (${embarqueAtual.frota}) saiu da Mills ${embarqueAtual.filial}. Por favor, confirme o recebimento e responda uma pesquisa rápida (30 segundos): ${linkCliente}`
+                      return (
+                        <div style={{ display:'flex', gap:8 }}>
+                          <a href={`https://wa.me/?text=${encodeURIComponent(textoWhats)}`} target="_blank" rel="noopener noreferrer"
+                            style={{ ...BS, flex:1, textDecoration:'none', textAlign:'center', background:'#25D366', color:'white', fontWeight:700, fontSize:11, padding:'9px 0' }}>
+                            📱 Enviar por WhatsApp
+                          </a>
+                          <button onClick={()=>copiarLink(linkCliente)} style={{ ...BS, flex:1, background:T.infoLight, color:T.info, border:`1px solid ${T.info}30`, fontWeight:700, fontSize:11 }}>📋 Copiar link</button>
+                        </div>
+                      )
+                    })()}
+                  </div>
+                )}
+
+                {embarqueAtual.clienteConfirmacao && (
+                  <div style={{ borderTop:`1px solid ${T.border}`, paddingTop:12, display:'flex', flexDirection:'column', gap:8 }}>
+                    <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:T.sucesso }}>✅ Cliente confirmou o recebimento</div>
+                    <div style={{ fontFamily:FONT, fontSize:11, color:T.textSec }}>
+                      {embarqueAtual.clienteConfirmacao.nomeCompleto} · {new Date(embarqueAtual.clienteConfirmacao.dataHora).toLocaleString('pt-BR')}
+                    </div>
+                    {embarqueAtual.clientePesquisa && Object.keys(embarqueAtual.clientePesquisa).length>0 && (
+                      <div style={{ background:T.surfaceAlt, borderRadius:T.rSm, padding:10, display:'flex', flexDirection:'column', gap:4 }}>
+                        {PESQUISA_SATISFACAO_PERGUNTAS.map(p => embarqueAtual.clientePesquisa[p.id] ? (
+                          <div key={p.id} style={{ fontFamily:FONT, fontSize:10, color:T.textSec, display:'flex', justifyContent:'space-between' }}>
+                            <span>{p.texto}</span><span>{'★'.repeat(embarqueAtual.clientePesquisa[p.id])}{'☆'.repeat(5-embarqueAtual.clientePesquisa[p.id])}</span>
+                          </div>
+                        ) : null)}
+                        {embarqueAtual.clientePesquisa.observacao && (
+                          <div style={{ fontFamily:FONT, fontSize:10, color:T.textMuted, fontStyle:'italic', marginTop:4 }}>"{embarqueAtual.clientePesquisa.observacao}"</div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

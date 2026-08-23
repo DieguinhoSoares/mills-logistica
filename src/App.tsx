@@ -6,6 +6,7 @@ import { GerenteView }     from './views/GerenteView'
 import { SolicitanteView } from './views/SolicitanteView'
 import { MotoristaView }     from './views/MotoristaView'
 import { EmbarcadorView }    from './views/EmbarcadorView'
+import { ClienteEmbarqueView } from './views/ClienteEmbarqueView'
 import { IndicadoresView }   from './views/IndicadoresView'
 import { useSimClients, usePushInvite } from './hooks/useFirestore'
 import { PushInviteBanner } from './components/UI'
@@ -84,6 +85,8 @@ export default function App() {
   if (motoristaToken) return <MotoristaView token={motoristaToken} />
   const embarqueToken  = params.get('embarque')
   if (embarqueToken) return <EmbarcadorView token={embarqueToken} />
+  const clienteToken   = params.get('cliente')
+  if (clienteToken) return <ClienteEmbarqueView token={clienteToken} />
 
   return (
     <AuthProvider>

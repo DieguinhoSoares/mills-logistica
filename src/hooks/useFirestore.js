@@ -802,6 +802,35 @@ export function useEmbarqueByToken(token) {
   return { embarque, loading, error, salvarProgresso }
 }
 
+// Checklist de Embarque — confirmação do cliente (Fase 2), sem login,
+// token separado do embarcador (clienteToken só existe depois que o
+// analista autoriza a saída — ver EmbarquesModal). Pesquisa de satisfação
+// não é obrigatória: enviarConfirmacao aceita `pesquisa` parcial/vazia.
+export function useEmbarqueByClienteToken(token) {
+  const [embarque, setEmbarque] = useState(null)
+  const [loading,  setLoading]  = useState(true)
+  const [error,    setError]    = useState(null)
+  useEffect(() => {
+    if (!token) { setError('Link inválido.'); setLoading(false); return }
+    const q = query(collection(db,'embarques'), where('clienteToken','==',token))
+    const unsub = onSnapshot(q, snap => {
+      if (snap.empty) { setError('Link inválido ou checklist não encontrado.'); setLoading(false); return }
+      setEmbarque({ id:snap.docs[0].id, ...snap.docs[0].data() })
+      setLoading(false)
+    }, () => { setError('Erro ao carregar dados.'); setLoading(false) })
+    return unsub
+  }, [token])
+  const enviarConfirmacao = async ({ nomeCompleto, pesquisa }) => {
+    if (!embarque) return
+    await updateDoc(doc(db,'embarques',embarque.id), {
+      clienteConfirmacao: { nomeCompleto, dataHora:new Date().toISOString() },
+      clientePesquisa: pesquisa || {},
+      updatedAt: serverTimestamp(),
+    })
+  }
+  return { embarque, loading, error, enviarConfirmacao }
+}
+
 export function usePendingUsers() {
   const [pendingUsers, setPendingUsers] = useState([])
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { useAuth }                              from '../contexts/AuthContext'
-import { useCards, useRequests, useNotifications, useSimClients } from '../hooks/useFirestore'
+import { useCards, useRequests, useNotifications, useSimClients, useEmbarques } from '../hooks/useFirestore'
 import { KPIView }                              from './KPIView'
 import { MillsLogo, NotificationBell }          from '../components/UI'
 import { T, FONT, BS }                          from '../lib/constants'
@@ -9,6 +9,7 @@ export function IndicadoresView() {
   const { cards }                    = useCards()
   const { requests }                 = useRequests()
   const { simClients }               = useSimClients()
+  const { embarques }                = useEmbarques()
   const { notifications, markAllRead, markRead, deleteNotification, enablePush, disablePush } = useNotifications()
   const unread = notifications.filter(n => !n.read).length
 
@@ -47,7 +48,7 @@ export function IndicadoresView() {
 
       {/* KPIView ocupa o restante */}
       <div style={{ flex:1, overflow:'hidden' }}>
-        <KPIView cards={cards} requests={requests} simClients={simClients}/>
+        <KPIView cards={cards} requests={requests} simClients={simClients} embarques={embarques}/>
       </div>
 
     </div>

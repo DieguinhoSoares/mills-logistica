@@ -200,6 +200,17 @@ export const FILIAIS_EMBARQUE = [
   'Cotia-SP', 'Osasco-SP', 'Assis-SP', 'Santos-SP', 'Sumaré-SP',
 ]
 
+// Pesquisa de satisfação (Fase 2 do Checklist de Embarque — confirmação
+// do cliente). Foco no REPORTE do processo, não numa avaliação direta do
+// analista. Não é obrigatória pro cliente confirmar o recebimento, mas
+// aparece sempre — incentivada, não travada.
+export const PESQUISA_SATISFACAO_PERGUNTAS = [
+  { id:'informacoes_claras',   texto:'Todas as informações sobre o frete foram passadas com clareza?' },
+  { id:'duvidas_esclarecidas', texto:'Eventuais dúvidas foram esclarecidas durante o processo?' },
+  { id:'condicoes_chegada',    texto:'Condições de chegada do(s) equipamento(s)' },
+  { id:'cumprimento_prazos',   texto:'Cumprimento de prazos' },
+]
+
 // Janelas de vencimento de documento (dias restantes até a validade) —
 // combinado com o usuário: 30d = só aviso, 15d = alerta pedindo ação,
 // 7d (ou já vencido) = crítico, exige confirmação de que a renovação foi
