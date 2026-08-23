@@ -136,6 +136,70 @@ export const TIPO_DOCUMENTO_VEICULO_OPTIONS = [
   'Inspeção Veicular',
 ]
 
+// Checklist de Embarque (INS-EMB-01) — planilha da liberação logística +
+// ajustes do Edivaldo/Tadeu. `risco` vem da Matriz de Risco (só usado
+// internamente pra severidade/relatório — NUNCA aparece no PDF impresso,
+// por pedido explícito). `foto`=true sempre exige foto; `fotoSeAplicavel`
+// (só o AET) exige foto apenas quando o item não é marcado N/A.
+export const EMBARQUE_CHECKLIST_ITENS = [
+  { numero:1,  grupo:'Documentação', descricao:'Autorização gerencial formalizada ou contrato assinado', risco:'Documental' },
+  { numero:2,  grupo:'Documentação', descricao:'NF emitida e conferida (origem, destino, CNPJ, CFOP)', risco:'Documental' },
+  { numero:3,  grupo:'Documentação', descricao:'Placa do cavalo e carreta conferidas', risco:'Documental', foto:true },
+  { numero:4,  grupo:'Documentação', descricao:'Nome e documento do motorista validados', risco:'Documental' },
+  { numero:5,  grupo:'Documentação', descricao:'Transportadora homologada', risco:'Logístico' },
+  { numero:6,  grupo:'Documentação', descricao:'AET — Autorização Especial de Trânsito (quando aplicável)', risco:'Documental', fotoSeAplicavel:true },
+  { numero:7,  grupo:'Documentação', descricao:'Seguro de transporte vigente e averbação realizada', risco:'Compliance' },
+
+  { numero:8,  grupo:'Equipamento', descricao:'Equipamento correto (modelo e número de série)', risco:'Operacional' },
+  { numero:9,  grupo:'Equipamento', descricao:'Horímetro registrado', risco:'Operacional', foto:true },
+  { numero:10, grupo:'Equipamento', descricao:'Combustível conforme padrão — não pode estar na reserva', risco:'Operacional', foto:true },
+  { numero:11, grupo:'Equipamento', descricao:'Acessórios listados e conferidos', risco:'Operacional' },
+  { numero:12, grupo:'Equipamento', descricao:'Check-list de saída realizado, sem pendências (nº OM)', risco:'Operacional' },
+  { numero:13, grupo:'Equipamento', descricao:'Altura e largura do conjunto medidas', risco:'Operacional' },
+  { numero:14, grupo:'Equipamento', descricao:'Foto da bateria', risco:'Operacional', foto:true },
+
+  { numero:15, grupo:'Caminhão Prancha', descricao:'Prancha compatível com peso e dimensão', risco:'Segurança' },
+  { numero:16, grupo:'Caminhão Prancha', descricao:'Capacidade de carga adequada', risco:'Segurança' },
+  { numero:17, grupo:'Caminhão Prancha', descricao:'Documentação do veículo regular', risco:'Documental' },
+  { numero:18, grupo:'Caminhão Prancha', descricao:'Condições adequadas (pneus, iluminação, estrutura)', risco:'Segurança', foto:true },
+  { numero:19, grupo:'Caminhão Prancha', descricao:'Motorista com EPI adequado', risco:'Segurança', foto:true },
+  { numero:20, grupo:'Caminhão Prancha', descricao:'Cintas/correntes de amarração', risco:'Segurança', foto:true },
+  { numero:21, grupo:'Caminhão Prancha', descricao:'Pontos de ancoragem / equipamento amarrado', risco:'Segurança', foto:true },
+  { numero:22, grupo:'Caminhão Prancha', descricao:'Travamento de implementos realizado', risco:'Segurança', foto:true },
+  { numero:23, grupo:'Caminhão Prancha', descricao:'Calços aplicados (quando necessário)', risco:'Segurança', foto:true },
+  { numero:24, grupo:'Caminhão Prancha', descricao:'Vídeo de 360° registrado na OM do inspetor', risco:'Segurança', confirmacao:true },
+  { numero:25, grupo:'Caminhão Prancha', descricao:'Placa do transporte', risco:'Documental', foto:true },
+  { numero:26, grupo:'Caminhão Prancha', descricao:'Documentação física com o motorista', risco:'Documental' },
+
+  { numero:27, grupo:'Rastreabilidade', descricao:'Informações enviadas ao cliente', risco:'Contrato' },
+  { numero:28, grupo:'Rastreabilidade', descricao:'Status atualizado no sistema', risco:'Contrato' },
+  { numero:29, grupo:'Rastreabilidade', descricao:'Cliente informado da saída', risco:'Contrato' },
+  { numero:30, grupo:'Rastreabilidade', descricao:'Previsão de chegada registrada', risco:'Contrato' },
+  { numero:31, grupo:'Rastreabilidade', descricao:'Nenhuma pendência aberta', risco:'Contrato' },
+]
+
+export const EMBARQUE_GRUPOS = ['Documentação', 'Equipamento', 'Caminhão Prancha', 'Rastreabilidade']
+
+// 4 fotos do equipamento em si (não do transporte) — mesmo padrão de
+// ângulos que a Hengel usa nos comprovantes de embarque deles.
+export const EMBARQUE_FOTOS_EQUIPAMENTO = [
+  { angulo:'frente',            label:'Frente' },
+  { angulo:'traseira',          label:'Traseira' },
+  { angulo:'lateral_esquerda',  label:'Lateral Esquerda' },
+  { angulo:'lateral_direita',   label:'Lateral Direita' },
+]
+
+// Filiais Mills (saída de pátio) — lista mais completa que FILIAIS (que é
+// só das unidades com Frotas ativo hoje no app); essa vem da planilha de
+// liberação logística, cobre todas as unidades que fazem embarque.
+export const FILIAIS_EMBARQUE = [
+  'Camaçari-BA', 'Fortaleza-CE', 'Brasília-DF', 'Serra-ES', 'Goiânia-GO',
+  'Contagem-MG', 'Uberlândia-MG', 'Betim-MG', 'Cuiabá-MT', 'Ananindeua-PA',
+  'Parauapebas-PA', 'São José dos Pinhais-PR', 'Rio de Janeiro-RJ',
+  'Rio Grande-RS', 'Cachoeirinha-RS', 'Joinville-SC', 'Aracaju-SE',
+  'Cotia-SP', 'Osasco-SP', 'Assis-SP', 'Santos-SP', 'Sumaré-SP',
+]
+
 // Janelas de vencimento de documento (dias restantes até a validade) —
 // combinado com o usuário: 30d = só aviso, 15d = alerta pedindo ação,
 // 7d (ou já vencido) = crítico, exige confirmação de que a renovação foi

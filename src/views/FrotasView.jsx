@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth }        from '../contexts/AuthContext'
-import { useCards, useRequests, useNotifications, useSimClients, useSapClients, useNfRequests, useConfig, useDrivers, useVeiculos, useAllRotogramas, notifyUser } from '../hooks/useFirestore'
+import { useCards, useRequests, useNotifications, useSimClients, useSapClients, useNfRequests, useConfig, useDrivers, useVeiculos, useEmbarques, useAllRotogramas, notifyUser } from '../hooks/useFirestore'
 import { MillsLogo, ToastContainer, useToasts, BrazilMap, NotificationBell, ConfirmModal } from '../components/UI'
 import { T, FONT, CARD_TYPES, MONTH_NAMES, BS, IS, NB, SUBTYPES_NF, SHADOW_CARD, BORDER_SUBTLE } from '../lib/constants'
 import { fmt, todayStr, getWeekDays, detectConflicts, getSubtypeLabel, findRelatedPendingRequest, sortByUrgency, sendTeamsNotification, nfStatusForCard, documentosPendentes } from '../lib/utils'
@@ -13,6 +13,7 @@ import { RotogramaModal }    from '../components/RotogramaModal'
 import { SettingsModal }     from '../components/SettingsModal'
 import { DriversModal }      from '../components/DriversModal'
 import { VeiculosModal }     from '../components/VeiculosModal'
+import { NovoEmbarqueModal } from '../components/NovoEmbarqueModal'
 import { AssignDriverModal } from '../components/AssignDriverModal'
 import { RequestsKanban }    from '../components/RequestsKanban'
 import { CsvUploadModal }    from '../components/CsvUploadModal'
@@ -150,6 +151,7 @@ export function FrotasView() {
   const { toasts, add: addToast, dismiss } = useToasts()
   const { drivers, saveDriver, deleteDriver } = useDrivers()
   const { veiculos, saveVeiculo, deleteVeiculo } = useVeiculos()
+  const { saveEmbarque } = useEmbarques()
   const { rotogramas } = useAllRotogramas()
 
   const [activeTab,    setActiveTab]    = useState('agenda')
@@ -198,6 +200,7 @@ export function FrotasView() {
   const [settingsModal, setSettingsModal] = useState(false)
   const [driversModal,  setDriversModal]  = useState(false)
   const [veiculosModal, setVeiculosModal] = useState(false)
+  const [novoEmbarqueModal, setNovoEmbarqueModal] = useState(false)
   const [diagnosticoModal, setDiagnosticoModal] = useState(false)
   const [assignModal,   setAssignModal]   = useState(null)
   const [rotogramaModal,setRotogramaModal]= useState(null)
@@ -685,6 +688,10 @@ export function FrotasView() {
                   <span>🚚 Veículos</span>
                   {docsVencendo.length>0&&<span style={{ color:T.perigo, fontSize:10, fontWeight:700 }}>({docsVencendo.length})</span>}
                 </button>
+                <button onClick={()=>{setNovoEmbarqueModal(true);setMaisOpen(false)}}
+                  style={{ width:'100%', textAlign:'left', padding:'8px 12px', borderRadius:T.rSm, border:'none', background:'transparent', cursor:'pointer', fontFamily:FONT, fontSize:12, color:T.text }}>
+                  🛡️ Checklist de Embarque (teste)
+                </button>
                 <button onClick={()=>{setDiagnosticoModal(true);setMaisOpen(false)}}
                   style={{ width:'100%', textAlign:'left', padding:'8px 12px', borderRadius:T.rSm, border:'none', background:'transparent', cursor:'pointer', fontFamily:FONT, fontSize:12, color:T.text }}>
                   🔍 Diagnosticar Equipamento
@@ -1120,6 +1127,7 @@ export function FrotasView() {
         {exportModal&&<ExportModal cards={cards} onClose={()=>setExportModal(false)}/>}
         {driversModal&&<DriversModal drivers={drivers} veiculos={veiculos} onSave={saveDriver} onDelete={deleteDriver} onClose={()=>setDriversModal(false)} onRotograma={d=>{setDriversModal(false);setRotogramaModal(d)}} addToast={addToast}/>}
         {veiculosModal&&<VeiculosModal veiculos={veiculos} drivers={drivers} onSave={saveVeiculo} onDelete={deleteVeiculo} onClose={()=>setVeiculosModal(false)} addToast={addToast} profile={profile}/>}
+        {novoEmbarqueModal&&<NovoEmbarqueModal onSave={saveEmbarque} onClose={()=>setNovoEmbarqueModal(false)} addToast={addToast}/>}
         {diagnosticoModal&&<DiagnosticoModal simClients={simClients} onClose={()=>setDiagnosticoModal(false)}/>}
         {assignModal&&<AssignDriverModal req={assignModal.req} drivers={drivers} simClients={simClients} cards={cards} onConfirm={handleAssignConfirm} onCancel={()=>setAssignModal(null)}/>}
         {pendingCardForm&&<AssignDriverModal

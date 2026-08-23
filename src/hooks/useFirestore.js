@@ -751,6 +751,57 @@ export function useVeiculos() {
   return { veiculos, saveVeiculo, deleteVeiculo }
 }
 
+// Checklist de Embarque (INS-EMB-01) — lado do analista (logado, papel
+// frotas/master). saveEmbarque cria/atualiza; ao criar, gera um token
+// aberto (mesmo padrão de ensureDriverToken) pro embarcador preencher pelo
+// celular sem login.
+export function useEmbarques() {
+  const [embarques, setEmbarques] = useState([])
+  useEffect(() => {
+    const q = query(collection(db,'embarques'), orderBy('createdAt','desc'))
+    const unsub = onSnapshot(q,
+      snap => setEmbarques(snap.docs.map(d=>({ id:d.id, ...d.data() }))),
+      () => {}
+    )
+    return unsub
+  }, [])
+  const saveEmbarque = async embarque => {
+    const { id, ...data } = embarque
+    data.updatedAt = serverTimestamp()
+    Object.keys(data).forEach(k => { if (data[k] === undefined) delete data[k] })
+    if (id) { await updateDoc(doc(db,'embarques',id), data); return { id, embarcadorToken:embarque.embarcadorToken } }
+    data.createdAt = serverTimestamp()
+    data.status = data.status || 'em_preenchimento'
+    data.embarcadorToken = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)
+    const ref = await addDoc(collection(db,'embarques'), data)
+    return { id:ref.id, embarcadorToken:data.embarcadorToken }
+  }
+  return { embarques, saveEmbarque }
+}
+
+// Checklist de Embarque — lado do embarcador (sem login, acesso só por
+// token na URL, mesmo padrão de MotoristaView/token de motorista).
+export function useEmbarqueByToken(token) {
+  const [embarque, setEmbarque] = useState(null)
+  const [loading,  setLoading]  = useState(true)
+  const [error,    setError]    = useState(null)
+  useEffect(() => {
+    if (!token) { setError('Link inválido.'); setLoading(false); return }
+    const q = query(collection(db,'embarques'), where('embarcadorToken','==',token))
+    const unsub = onSnapshot(q, snap => {
+      if (snap.empty) { setError('Link inválido ou checklist não encontrado.'); setLoading(false); return }
+      setEmbarque({ id:snap.docs[0].id, ...snap.docs[0].data() })
+      setLoading(false)
+    }, () => { setError('Erro ao carregar dados.'); setLoading(false) })
+    return unsub
+  }, [token])
+  const salvarProgresso = async patch => {
+    if (!embarque) return
+    await updateDoc(doc(db,'embarques',embarque.id), { ...patch, updatedAt:serverTimestamp() })
+  }
+  return { embarque, loading, error, salvarProgresso }
+}
+
 export function usePendingUsers() {
   const [pendingUsers, setPendingUsers] = useState([])
   useEffect(() => {

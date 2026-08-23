@@ -5,6 +5,7 @@ import { MasterView }      from './views/MasterView'
 import { GerenteView }     from './views/GerenteView'
 import { SolicitanteView } from './views/SolicitanteView'
 import { MotoristaView }     from './views/MotoristaView'
+import { EmbarcadorView }    from './views/EmbarcadorView'
 import { IndicadoresView }   from './views/IndicadoresView'
 import { useSimClients, usePushInvite } from './hooks/useFirestore'
 import { PushInviteBanner } from './components/UI'
@@ -81,6 +82,8 @@ export default function App() {
   const params         = new URLSearchParams(window.location.search)
   const motoristaToken = params.get('motorista')
   if (motoristaToken) return <MotoristaView token={motoristaToken} />
+  const embarqueToken  = params.get('embarque')
+  if (embarqueToken) return <EmbarcadorView token={embarqueToken} />
 
   return (
     <AuthProvider>
