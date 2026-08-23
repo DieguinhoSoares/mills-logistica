@@ -822,9 +822,15 @@ export function useEmbarqueByClienteToken(token) {
   }, [token])
   const enviarConfirmacao = async ({ nomeCompleto, pesquisa }) => {
     if (!embarque) return
+    // Firestore recusa a escrita inteira se qualquer campo (mesmo aninhado)
+    // vier undefined — achado real: campo de observação em branco virava
+    // `observacao:undefined` e derrubava o envio inteiro sem chegar a
+    // tentar pela rede.
+    const pesquisaLimpa = { ...(pesquisa||{}) }
+    Object.keys(pesquisaLimpa).forEach(k => { if (pesquisaLimpa[k] === undefined) delete pesquisaLimpa[k] })
     await updateDoc(doc(db,'embarques',embarque.id), {
       clienteConfirmacao: { nomeCompleto, dataHora:new Date().toISOString() },
-      clientePesquisa: pesquisa || {},
+      clientePesquisa: pesquisaLimpa,
       updatedAt: serverTimestamp(),
     })
   }
