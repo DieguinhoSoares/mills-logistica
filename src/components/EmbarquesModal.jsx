@@ -81,6 +81,19 @@ export function EmbarquesModal({ embarques, onSave, onClose, addToast }) {
     }
   }
 
+  const handleGerarLinkCliente = async () => {
+    setFinalizando(true)
+    try {
+      const clienteToken = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)
+      await onSave({ id:embarqueAtual.id, embarcadorToken:embarqueAtual.embarcadorToken, clienteToken })
+    } catch (err) {
+      console.error('Erro ao gerar link do cliente:', err)
+      addToast('Erro ao gerar link. Tente novamente.', 'error')
+    } finally {
+      setFinalizando(false)
+    }
+  }
+
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(26,22,18,.55)', zIndex:3500, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)' }}>
       <motion.div initial={{ scale:.95, opacity:0 }} animate={{ scale:1, opacity:1 }}
@@ -211,7 +224,14 @@ export function EmbarquesModal({ embarques, onSave, onClose, addToast }) {
                 {embarqueAtual.status==='finalizado' && embarqueAtual.decisao==='autorizado' && !embarqueAtual.clienteConfirmacao && (
                   <div style={{ borderTop:`1px solid ${T.border}`, paddingTop:12, display:'flex', flexDirection:'column', gap:8 }}>
                     <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:T.text }}>📤 Enviar confirmação pro cliente</div>
-                    {(() => {
+                    {!embarqueAtual.clienteToken ? (
+                      // Checklists autorizados antes desta funcionalidade existir não têm
+                      // clienteToken — gera agora em vez de exigir refazer tudo de novo.
+                      <button onClick={()=>handleGerarLinkCliente()} disabled={finalizando}
+                        style={{ ...BS, background:T.laranjaLight, color:T.laranja, border:`1px solid ${T.laranja}30`, fontWeight:700, fontSize:11, padding:'9px 0' }}>
+                        {finalizando ? '⏳...' : '🔗 Gerar link do cliente'}
+                      </button>
+                    ) : (() => {
                       const linkCliente = `${window.location.origin}${window.location.pathname}?cliente=${embarqueAtual.clienteToken}`
                       const textoWhats = `Olá! Seu equipamento (${embarqueAtual.frota}) saiu da Mills ${embarqueAtual.filial}. Por favor, confirme o recebimento e responda uma pesquisa rápida (30 segundos): ${linkCliente}`
                       return (
