@@ -13,7 +13,7 @@ import { RotogramaModal }    from '../components/RotogramaModal'
 import { SettingsModal }     from '../components/SettingsModal'
 import { DriversModal }      from '../components/DriversModal'
 import { VeiculosModal }     from '../components/VeiculosModal'
-import { NovoEmbarqueModal } from '../components/NovoEmbarqueModal'
+import { EmbarquesModal }    from '../components/EmbarquesModal'
 import { AssignDriverModal } from '../components/AssignDriverModal'
 import { RequestsKanban }    from '../components/RequestsKanban'
 import { CsvUploadModal }    from '../components/CsvUploadModal'
@@ -151,7 +151,7 @@ export function FrotasView() {
   const { toasts, add: addToast, dismiss } = useToasts()
   const { drivers, saveDriver, deleteDriver } = useDrivers()
   const { veiculos, saveVeiculo, deleteVeiculo } = useVeiculos()
-  const { saveEmbarque } = useEmbarques()
+  const { embarques, saveEmbarque } = useEmbarques()
   const { rotogramas } = useAllRotogramas()
 
   const [activeTab,    setActiveTab]    = useState('agenda')
@@ -200,7 +200,7 @@ export function FrotasView() {
   const [settingsModal, setSettingsModal] = useState(false)
   const [driversModal,  setDriversModal]  = useState(false)
   const [veiculosModal, setVeiculosModal] = useState(false)
-  const [novoEmbarqueModal, setNovoEmbarqueModal] = useState(false)
+  const [embarquesModal, setEmbarquesModal] = useState(false)
   const [diagnosticoModal, setDiagnosticoModal] = useState(false)
   const [assignModal,   setAssignModal]   = useState(null)
   const [rotogramaModal,setRotogramaModal]= useState(null)
@@ -688,9 +688,9 @@ export function FrotasView() {
                   <span>🚚 Veículos</span>
                   {docsVencendo.length>0&&<span style={{ color:T.perigo, fontSize:10, fontWeight:700 }}>({docsVencendo.length})</span>}
                 </button>
-                <button onClick={()=>{setNovoEmbarqueModal(true);setMaisOpen(false)}}
+                <button onClick={()=>{setEmbarquesModal(true);setMaisOpen(false)}}
                   style={{ width:'100%', textAlign:'left', padding:'8px 12px', borderRadius:T.rSm, border:'none', background:'transparent', cursor:'pointer', fontFamily:FONT, fontSize:12, color:T.text }}>
-                  🛡️ Checklist de Embarque (teste)
+                  🛡️ Checklist de Embarque
                 </button>
                 <button onClick={()=>{setDiagnosticoModal(true);setMaisOpen(false)}}
                   style={{ width:'100%', textAlign:'left', padding:'8px 12px', borderRadius:T.rSm, border:'none', background:'transparent', cursor:'pointer', fontFamily:FONT, fontSize:12, color:T.text }}>
@@ -1127,7 +1127,7 @@ export function FrotasView() {
         {exportModal&&<ExportModal cards={cards} onClose={()=>setExportModal(false)}/>}
         {driversModal&&<DriversModal drivers={drivers} veiculos={veiculos} onSave={saveDriver} onDelete={deleteDriver} onClose={()=>setDriversModal(false)} onRotograma={d=>{setDriversModal(false);setRotogramaModal(d)}} addToast={addToast}/>}
         {veiculosModal&&<VeiculosModal veiculos={veiculos} drivers={drivers} onSave={saveVeiculo} onDelete={deleteVeiculo} onClose={()=>setVeiculosModal(false)} addToast={addToast} profile={profile}/>}
-        {novoEmbarqueModal&&<NovoEmbarqueModal onSave={saveEmbarque} onClose={()=>setNovoEmbarqueModal(false)} addToast={addToast}/>}
+        {embarquesModal&&<EmbarquesModal embarques={embarques} onSave={saveEmbarque} onClose={()=>setEmbarquesModal(false)} addToast={addToast}/>}
         {diagnosticoModal&&<DiagnosticoModal simClients={simClients} onClose={()=>setDiagnosticoModal(false)}/>}
         {assignModal&&<AssignDriverModal req={assignModal.req} drivers={drivers} simClients={simClients} cards={cards} onConfirm={handleAssignConfirm} onCancel={()=>setAssignModal(null)}/>}
         {pendingCardForm&&<AssignDriverModal
