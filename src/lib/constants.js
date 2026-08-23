@@ -150,13 +150,8 @@ export const EMBARQUE_CHECKLIST_ITENS = [
   { numero:6,  grupo:'Documentação', descricao:'AET — Autorização Especial de Trânsito (quando aplicável)', risco:'Documental', fotoSeAplicavel:true },
   { numero:7,  grupo:'Documentação', descricao:'Seguro de transporte vigente e averbação realizada', risco:'Compliance' },
 
-  { numero:8,  grupo:'Equipamento', descricao:'Equipamento correto (modelo e número de série)', risco:'Operacional' },
-  { numero:9,  grupo:'Equipamento', descricao:'Horímetro registrado', risco:'Operacional', foto:true },
-  { numero:10, grupo:'Equipamento', descricao:'Combustível conforme padrão — não pode estar na reserva', risco:'Operacional', foto:true },
   { numero:11, grupo:'Equipamento', descricao:'Acessórios listados e conferidos', risco:'Operacional' },
   { numero:12, grupo:'Equipamento', descricao:'Check-list de saída realizado, sem pendências (nº OM)', risco:'Operacional' },
-  { numero:13, grupo:'Equipamento', descricao:'Altura e largura do conjunto medidas', risco:'Operacional' },
-  { numero:14, grupo:'Equipamento', descricao:'Foto da bateria', risco:'Operacional', foto:true },
 
   { numero:15, grupo:'Caminhão Prancha', descricao:'Prancha compatível com peso e dimensão', risco:'Segurança' },
   { numero:16, grupo:'Caminhão Prancha', descricao:'Capacidade de carga adequada', risco:'Segurança' },
@@ -180,8 +175,19 @@ export const EMBARQUE_CHECKLIST_ITENS = [
 
 export const EMBARQUE_GRUPOS = ['Documentação', 'Equipamento', 'Caminhão Prancha', 'Rastreabilidade']
 
-// 4 fotos do equipamento em si (não do transporte) — mesmo padrão de
-// ângulos que a Hengel usa nos comprovantes de embarque deles.
+// Itens verificados POR MÁQUINA (carregamento pode ter mais de um
+// equipamento na mesma prancha) — saíram do checklist geral porque são
+// sobre CADA equipamento, não sobre o transporte como um todo.
+export const EMBARQUE_ITENS_POR_MAQUINA = [
+  { chave:'equipamentoCorreto', descricao:'Equipamento correto (modelo e número de série)', risco:'Operacional' },
+  { chave:'horimetro',          descricao:'Horímetro registrado', risco:'Operacional', foto:true },
+  { chave:'combustivel',        descricao:'Combustível conforme padrão — não pode estar na reserva', risco:'Operacional', foto:true },
+  { chave:'alturaLargura',      descricao:'Altura e largura medidas', risco:'Operacional' },
+  { chave:'bateria',            descricao:'Foto da bateria', risco:'Operacional', foto:true },
+]
+
+// 4 fotos de cada máquina (não do transporte) — mesmo padrão de ângulos
+// que a Hengel usa nos comprovantes de embarque deles.
 export const EMBARQUE_FOTOS_EQUIPAMENTO = [
   { angulo:'frente',            label:'Frente' },
   { angulo:'traseira',          label:'Traseira' },

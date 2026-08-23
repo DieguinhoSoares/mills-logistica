@@ -8,7 +8,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { doc, getDoc } from 'firebase/firestore'
 import { db } from '../lib/firebase'
-import { T, FONT, BS, IS, LS, FILIAIS_EMBARQUE, EMBARQUE_CHECKLIST_ITENS, EMBARQUE_GRUPOS, EMBARQUE_FOTOS_EQUIPAMENTO, PESQUISA_SATISFACAO_PERGUNTAS } from '../lib/constants'
+import { T, FONT, BS, IS, LS, FILIAIS_EMBARQUE, EMBARQUE_CHECKLIST_ITENS, EMBARQUE_GRUPOS, EMBARQUE_ITENS_POR_MAQUINA, EMBARQUE_FOTOS_EQUIPAMENTO, PESQUISA_SATISFACAO_PERGUNTAS } from '../lib/constants'
 import { useAuth } from '../contexts/AuthContext'
 
 const STATUS_COR = { ok:T.sucesso, nok:T.perigo, na:T.textMuted }
@@ -62,7 +62,12 @@ export function EmbarquesModal({ embarques, onSave, onClose, addToast }) {
     () => addToast('Não consegui copiar — selecione o link manualmente.', 'error')
   )
 
-  const itensNok = embarqueAtual ? Object.entries(embarqueAtual.itens||{}).filter(([,v])=>v?.status==='nok') : []
+  const itensNok = embarqueAtual
+    ? [
+        ...Object.entries(embarqueAtual.itens||{}).filter(([,v])=>v?.status==='nok'),
+        ...(embarqueAtual.maquinas||[]).flatMap(m => Object.entries(m.itens||{}).filter(([,v])=>v?.status==='nok')),
+      ]
+    : []
 
   const handleFinalizar = async decisao => {
     setFinalizando(true)
@@ -170,6 +175,40 @@ export function EmbarquesModal({ embarques, onSave, onClose, addToast }) {
                   <div>Responsável: <strong>{embarqueAtual.responsavelNome||'—'} {embarqueAtual.responsavelMatricula?`(mat. ${embarqueAtual.responsavelMatricula})`:''}</strong></div>
                 </div>
 
+                <div>
+                  <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:T.verde, marginBottom:5 }}>🚜 Máquinas Transportadas ({(embarqueAtual.maquinas||[]).length})</div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                    {(embarqueAtual.maquinas||[]).map((maq, idx) => (
+                      <div key={maq.id} style={{ background:T.surfaceAlt, borderRadius:T.rSm, padding:10, display:'flex', flexDirection:'column', gap:5 }}>
+                        <div style={{ fontFamily:FONT, fontWeight:700, fontSize:11, color:T.text }}>Máquina {idx+1}: {maq.nome||'(sem nome)'}</div>
+                        {EMBARQUE_ITENS_POR_MAQUINA.map(item => {
+                          const v = maq.itens?.[item.chave]
+                          return (
+                            <div key={item.chave} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, padding:'3px 6px', background:v?.status==='nok'?T.perigoLight:'transparent', borderRadius:6 }}>
+                              <span style={{ fontFamily:FONT, fontSize:10, color:T.text }}>{item.descricao}{v?.observacao?` — ${v.observacao}`:''}</span>
+                              <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+                                {v?.fotoId && <button onClick={()=>abrirFoto(embarqueAtual.id,v.fotoId)} style={{ background:'none', border:'none', cursor:'pointer', fontSize:11 }}>👁</button>}
+                                <span style={{ fontFamily:FONT, fontWeight:700, fontSize:9, color:v?.status?STATUS_COR[v.status]:T.textMuted }}>{v?.status?STATUS_LABEL[v.status]:'—'}</span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                        <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:2 }}>
+                          {EMBARQUE_FOTOS_EQUIPAMENTO.map(({ angulo, label }) => {
+                            const fotoId = maq.fotos?.[angulo]
+                            return (
+                              <button key={angulo} disabled={!fotoId} onClick={()=>fotoId && abrirFoto(embarqueAtual.id, fotoId)}
+                                style={{ ...BS, background:fotoId?T.sucessoLight:T.surfaceLow, color:fotoId?T.sucesso:T.textMuted, border:`1px solid ${fotoId?T.sucesso+'30':T.border}`, fontSize:9, padding:'4px 8px', cursor:fotoId?'pointer':'default' }}>
+                                {fotoId?'✅':'○'} {label}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 {EMBARQUE_GRUPOS.map(grupo => (
                   <div key={grupo}>
                     <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:T.verde, marginBottom:5 }}>{grupo}</div>
@@ -189,21 +228,6 @@ export function EmbarquesModal({ embarques, onSave, onClose, addToast }) {
                     </div>
                   </div>
                 ))}
-
-                <div>
-                  <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:T.verde, marginBottom:5 }}>📷 Fotos do Equipamento</div>
-                  <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-                    {EMBARQUE_FOTOS_EQUIPAMENTO.map(({ angulo, label }) => {
-                      const fotoId = embarqueAtual.fotosEquipamento?.[angulo]
-                      return (
-                        <button key={angulo} disabled={!fotoId} onClick={()=>fotoId && abrirFoto(embarqueAtual.id, fotoId)}
-                          style={{ ...BS, background:fotoId?T.sucessoLight:T.surfaceLow, color:fotoId?T.sucesso:T.textMuted, border:`1px solid ${fotoId?T.sucesso+'30':T.border}`, fontSize:10, padding:'5px 9px', cursor:fotoId?'pointer':'default' }}>
-                          {fotoId?'✅':'○'} {label}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
 
                 {embarqueAtual.status==='em_preenchimento' && (
                   <div style={{ borderTop:`1px solid ${T.border}`, paddingTop:12 }}>

@@ -3,16 +3,17 @@
 // pátio pelo embarcador, SEM LOGIN (acesso só por token na URL, mesmo
 // padrão de MotoristaView/link do motorista). Layout mobile-first.
 //
-// Escopo desta primeira versão (validação de preenchimento no celular):
-// só o preenchimento em si, com "Salvar" — SEM liberação final (isso é
-// exclusivo do analista, dentro do FrotasView) e SEM o link/pesquisa do
-// cliente (fase seguinte). Depois de "finalizado" pelo analista, esta
-// tela vira somente leitura.
+// Carregamento pode ter mais de uma máquina na mesma prancha — por isso
+// os itens que são "por equipamento" (modelo/série, horímetro,
+// combustível, altura/largura, bateria + as 4 fotos de ângulo) viram uma
+// lista repetível de máquinas, cada uma com seu próprio conjunto. O
+// checklist geral (documentação, prancha, amarração, rastreabilidade)
+// continua único — é sobre o transporte como um todo, não por máquina.
 // ============================================================
 import { useState, useEffect } from 'react'
 import { doc, setDoc } from 'firebase/firestore'
 import { db } from '../lib/firebase'
-import { T, FONT, BS, IS, LS, EMBARQUE_CHECKLIST_ITENS, EMBARQUE_GRUPOS, EMBARQUE_FOTOS_EQUIPAMENTO } from '../lib/constants'
+import { T, FONT, BS, IS, LS, EMBARQUE_CHECKLIST_ITENS, EMBARQUE_GRUPOS, EMBARQUE_ITENS_POR_MAQUINA, EMBARQUE_FOTOS_EQUIPAMENTO } from '../lib/constants'
 import { arquivoParaBase64Documento } from '../lib/utils'
 import { useEmbarqueByToken } from '../hooks/useFirestore'
 
@@ -22,7 +23,9 @@ const STATUS_OPCOES = [
   { value:'na',  label:'N/A', cor:T.textMuted, bg:T.surfaceLow },
 ]
 
-function ItemLinha({ item, valor, onChange, onFoto, enviandoFoto }) {
+const novaMaquina = () => ({ id:`maq_${Date.now()}_${Math.random().toString(36).slice(2,6)}`, nome:'', itens:{}, fotos:{} })
+
+function ItemLinha({ rotulo, item, valor, onChange, onFoto, enviandoFoto }) {
   const v = valor || {}
   const exigeFoto = item.foto || (item.fotoSeAplicavel && v.status && v.status!=='na')
 
@@ -31,14 +34,14 @@ function ItemLinha({ item, valor, onChange, onFoto, enviandoFoto }) {
       <div style={{ background:T.surfaceAlt, borderRadius:T.rSm, padding:'10px 12px', display:'flex', alignItems:'center', gap:10 }}>
         <input type="checkbox" checked={v.status==='ok'} onChange={e=>onChange({ status:e.target.checked?'ok':null })}
           style={{ width:18, height:18, flexShrink:0 }}/>
-        <span style={{ fontFamily:FONT, fontSize:12, color:T.text }}>{item.numero}. {item.descricao}</span>
+        <span style={{ fontFamily:FONT, fontSize:12, color:T.text }}>{rotulo}{item.descricao}</span>
       </div>
     )
   }
 
   return (
     <div style={{ background:T.surfaceAlt, borderRadius:T.rSm, padding:'10px 12px', display:'flex', flexDirection:'column', gap:7 }}>
-      <span style={{ fontFamily:FONT, fontSize:12, color:T.text, fontWeight:500 }}>{item.numero}. {item.descricao}</span>
+      <span style={{ fontFamily:FONT, fontSize:12, color:T.text, fontWeight:500 }}>{rotulo}{item.descricao}</span>
       <div style={{ display:'flex', gap:6 }}>
         {STATUS_OPCOES.map(o => (
           <button key={o.value} onClick={()=>onChange({ status:o.value })}
@@ -82,7 +85,7 @@ export function EmbarcadorView({ token }) {
         cavaloModelo: embarque.cavaloModelo||'', cavaloPlaca: embarque.cavaloPlaca||'',
         prancharModelo: embarque.prancharModelo||'', prancharPlaca: embarque.prancharPlaca||'',
         itens: embarque.itens || {},
-        fotosEquipamento: embarque.fotosEquipamento || {},
+        maquinas: embarque.maquinas?.length ? embarque.maquinas : [novaMaquina()],
         responsavelNome: embarque.responsavelNome||'', responsavelMatricula: embarque.responsavelMatricula||'',
       })
     }
@@ -108,12 +111,24 @@ export function EmbarcadorView({ token }) {
 
   const setItem = (numero, patch) => setForm(p => ({ ...p, itens:{ ...p.itens, [numero]:{ ...p.itens[numero], ...patch } } }))
 
+  const setMaquina = (maquinaId, patch) => setForm(p => ({ ...p, maquinas:p.maquinas.map(m => m.id===maquinaId ? { ...m, ...patch } : m) }))
+  const setMaquinaItem = (maquinaId, chave, patch) => setForm(p => ({ ...p, maquinas:p.maquinas.map(m =>
+    m.id===maquinaId ? { ...m, itens:{ ...m.itens, [chave]:{ ...m.itens[chave], ...patch } } } : m
+  ) }))
+  const addMaquina = () => setForm(p => ({ ...p, maquinas:[...p.maquinas, novaMaquina()] }))
+  const removeMaquina = maquinaId => setForm(p => p.maquinas.length<=1 ? p : ({ ...p, maquinas:p.maquinas.filter(m=>m.id!==maquinaId) }))
+
+  const salvarFoto = async file => {
+    const base64 = await arquivoParaBase64Documento(file)
+    const fotoId = `foto_${Date.now()}_${Math.random().toString(36).slice(2,8)}`
+    await setDoc(doc(db,'embarques',embarque.id,'fotos',fotoId), { base64, criadoEm:new Date().toISOString() })
+    return fotoId
+  }
+
   const handleFotoItem = async (numero, file) => {
     setFotoEnviando(`item-${numero}`)
     try {
-      const base64 = await arquivoParaBase64Documento(file)
-      const fotoId = `foto_${Date.now()}_${Math.random().toString(36).slice(2,8)}`
-      await setDoc(doc(db,'embarques',embarque.id,'fotos',fotoId), { base64, criadoEm:new Date().toISOString() })
+      const fotoId = await salvarFoto(file)
       setItem(numero, { fotoId })
     } catch (err) {
       console.error('Erro ao anexar foto:', err)
@@ -123,13 +138,24 @@ export function EmbarcadorView({ token }) {
     }
   }
 
-  const handleFotoEquipamento = async (angulo, file) => {
-    setFotoEnviando(`eq-${angulo}`)
+  const handleFotoMaquinaItem = async (maquinaId, chave, file) => {
+    setFotoEnviando(`maq-${maquinaId}-item-${chave}`)
     try {
-      const base64 = await arquivoParaBase64Documento(file)
-      const fotoId = `foto_${Date.now()}_${Math.random().toString(36).slice(2,8)}`
-      await setDoc(doc(db,'embarques',embarque.id,'fotos',fotoId), { base64, criadoEm:new Date().toISOString() })
-      setForm(p => ({ ...p, fotosEquipamento:{ ...p.fotosEquipamento, [angulo]:fotoId } }))
+      const fotoId = await salvarFoto(file)
+      setMaquinaItem(maquinaId, chave, { fotoId })
+    } catch (err) {
+      console.error('Erro ao anexar foto:', err)
+      setMsg('❌ Erro ao anexar foto. Tente novamente.')
+    } finally {
+      setFotoEnviando(null)
+    }
+  }
+
+  const handleFotoMaquinaAngulo = async (maquinaId, angulo, file) => {
+    setFotoEnviando(`maq-${maquinaId}-foto-${angulo}`)
+    try {
+      const fotoId = await salvarFoto(file)
+      setMaquina(maquinaId, { fotos:{ ...form.maquinas.find(m=>m.id===maquinaId).fotos, [angulo]:fotoId } })
     } catch (err) {
       console.error('Erro ao anexar foto:', err)
       setMsg('❌ Erro ao anexar foto. Tente novamente.')
@@ -185,37 +211,60 @@ export function EmbarcadorView({ token }) {
             </div>
           </div>
 
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:T.verde }}>🚜 Máquinas Transportadas ({form.maquinas.length})</div>
+              <button onClick={addMaquina} type="button" style={{ ...BS, background:T.laranjaLight, color:T.laranja, border:`1px solid ${T.laranja}30`, fontSize:10, padding:'5px 10px' }}>+ Adicionar máquina</button>
+            </div>
+            {form.maquinas.map((maq, idx) => (
+              <div key={maq.id} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:T.r, padding:12, display:'flex', flexDirection:'column', gap:8 }}>
+                <div style={{ display:'flex', gap:8, alignItems:'flex-end' }}>
+                  <div style={{ flex:1 }}>
+                    <label style={LS}>Máquina {idx+1} — nome/nº interno</label>
+                    <input value={maq.nome} onChange={e=>setMaquina(maq.id,{ nome:e.target.value })} style={IS} placeholder="Ex: EHS01259 — Escavadeira CAT 320"/>
+                  </div>
+                  {form.maquinas.length>1 && (
+                    <button onClick={()=>removeMaquina(maq.id)} type="button" style={{ background:'none', border:'none', color:T.perigo, cursor:'pointer', fontSize:16, padding:'0 4px 8px' }}>🗑</button>
+                  )}
+                </div>
+                {EMBARQUE_ITENS_POR_MAQUINA.map(item => (
+                  <ItemLinha key={item.chave} rotulo="" item={item} valor={maq.itens[item.chave]}
+                    onChange={patch=>setMaquinaItem(maq.id,item.chave,patch)}
+                    onFoto={file=>handleFotoMaquinaItem(maq.id,item.chave,file)}
+                    enviandoFoto={fotoEnviando===`maq-${maq.id}-item-${item.chave}`}/>
+                ))}
+                <div style={{ fontFamily:FONT, fontSize:10, color:T.textSec, fontWeight:700, marginTop:4 }}>📷 Fotos (4 ângulos)</div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                  {EMBARQUE_FOTOS_EQUIPAMENTO.map(({ angulo, label }) => (
+                    <div key={angulo} style={{ background:T.surfaceAlt, borderRadius:T.rSm, padding:8, textAlign:'center' }}>
+                      <div style={{ fontFamily:FONT, fontSize:9.5, color:T.textSec, fontWeight:700, marginBottom:5 }}>{label}</div>
+                      {maq.fotos[angulo]
+                        ? <div style={{ fontFamily:FONT, fontSize:9.5, color:T.sucesso, fontWeight:700 }}>📷 Anexada</div>
+                        : <label>
+                            <input type="file" accept="image/*" capture="environment" style={{ display:'none' }}
+                              onChange={e=>e.target.files?.[0] && handleFotoMaquinaAngulo(maq.id,angulo,e.target.files[0])}/>
+                            <span style={{ ...BS, display:'inline-block', background:fotoEnviando===`maq-${maq.id}-foto-${angulo}`?T.textMuted:T.laranjaLight, color:fotoEnviando===`maq-${maq.id}-foto-${angulo}`?'white':T.laranja, border:`1px solid ${T.laranja}30`, fontSize:9, padding:'5px 8px', cursor:'pointer' }}>
+                              {fotoEnviando===`maq-${maq.id}-foto-${angulo}` ? '⏳...' : '📷 Anexar'}
+                            </span>
+                          </label>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
           {EMBARQUE_GRUPOS.map(grupo => (
             <div key={grupo} style={{ display:'flex', flexDirection:'column', gap:8 }}>
               <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:T.verde }}>{grupo}</div>
               {EMBARQUE_CHECKLIST_ITENS.filter(i=>i.grupo===grupo).map(item => (
-                <ItemLinha key={item.numero} item={item} valor={form.itens[item.numero]}
+                <ItemLinha key={item.numero} rotulo={`${item.numero}. `} item={item} valor={form.itens[item.numero]}
                   onChange={patch=>setItem(item.numero,patch)}
                   onFoto={file=>handleFotoItem(item.numero,file)}
                   enviandoFoto={fotoEnviando===`item-${item.numero}`}/>
               ))}
             </div>
           ))}
-
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-            <div style={{ fontFamily:FONT, fontWeight:700, fontSize:13, color:T.verde }}>📷 Fotos do Equipamento (4 ângulos)</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-              {EMBARQUE_FOTOS_EQUIPAMENTO.map(({ angulo, label }) => (
-                <div key={angulo} style={{ background:T.surfaceAlt, borderRadius:T.rSm, padding:10, textAlign:'center' }}>
-                  <div style={{ fontFamily:FONT, fontSize:10, color:T.textSec, fontWeight:700, marginBottom:6 }}>{label}</div>
-                  {form.fotosEquipamento[angulo]
-                    ? <div style={{ fontFamily:FONT, fontSize:10, color:T.sucesso, fontWeight:700 }}>📷 Anexada</div>
-                    : <label>
-                        <input type="file" accept="image/*" capture="environment" style={{ display:'none' }}
-                          onChange={e=>e.target.files?.[0] && handleFotoEquipamento(angulo,e.target.files[0])}/>
-                        <span style={{ ...BS, display:'inline-block', background:fotoEnviando===`eq-${angulo}`?T.textMuted:T.laranjaLight, color:fotoEnviando===`eq-${angulo}`?'white':T.laranja, border:`1px solid ${T.laranja}30`, fontSize:9, padding:'5px 8px', cursor:'pointer' }}>
-                          {fotoEnviando===`eq-${angulo}` ? '⏳...' : '📷 Anexar'}
-                        </span>
-                      </label>}
-                </div>
-              ))}
-            </div>
-          </div>
 
           <div style={{ background:T.surface, borderRadius:T.r, padding:14, display:'flex', flexDirection:'column', gap:8 }}>
             <div style={{ fontFamily:FONT, fontWeight:700, fontSize:12, color:T.text }}>Responsável pela verificação</div>
